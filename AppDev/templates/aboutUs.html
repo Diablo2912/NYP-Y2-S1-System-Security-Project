@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="text-center my-4">About Us</h1>
+
+<img src="{{ url_for('static', filename='assets/filler_logo.png') }}" alt="Logo" style="display: block; margin-left: auto; margin-right: auto;">
+
+<p class="text-center"> A comprehensive destination for modern farmers, offering premium farm products and services.
+    <br>Featuring top-quality soil, seeds, and advanced tools like the Carbon Footprint Calculator,
+    <br>Crop Calendar, and Soil Data Map. It’s a go-to hub for those aiming to cultivate sustainably and efficiently.</p>
+
+<div class="text-center">
+    <a href="https://www.facebook.com/YourPage" target="_blank" style="display: inline-block">
+        <button type="button" class="btn btn-success">Follow us on FB</button>
+    </a>
+    <a href="https://www.facebook.com/YourPage" target="_blank" style="display: inline-block;">
+        <button type="button" class="btn btn-success">Follow us on IG</button>
+    </a>
+</div>
+
+{% endblock %}

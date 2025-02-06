@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="text-center my-4">Precision Agriculture tools</h1>
+
+<!-- DataTables CSS and JS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
+<!-- jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<!-- DataTables Js -->
+<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+
+<!-- Add some spacing to move the table lower -->
+<div style="margin-top: 40px;">
+  <!-- Table with DataTable functionality -->
+  <table id="farmToolsTable" class="table">
+    <thead>
+      <tr>
+        <th scope="col">#</th>
+        <th scope="col">Plant</th>
+        <th scope="col">Optimum Temperature</th>
+        <th scope="col">Optimum pH</th>
+        <th scope="col">Water Supply</th>
+        <th scope="col">Soil & Fertiliser</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">1</th>
+        <td>Corn</td>
+        <td>21-29°C</td>
+        <td>5.8-7.0</td>
+        <td>Moderate to High (requires consistent moisture)</td>
+        <td>Well-drained, fertile soil with balanced nutrients. Needs nitrogen-based fertiliser.</td>
+      </tr>
+      <tr>
+        <th scope="row">2</th>
+        <td>Wheat</td>
+        <td>15-18°C</td>
+        <td>6.0-7.0</td>
+        <td>Moderate (requires well-drained soil)</td>
+        <td>Well-drained loamy soil. Balanced fertiliser with adequate nitrogen.</td>
+      </tr>
+      <tr>
+        <th scope="row">3</th>
+        <td>Rice</td>
+        <td>25-32°C</td>
+        <td>5.0-6.5</td>
+        <td>High (needs constant water, can tolerate flooding)</td>
+        <td>Waterlogged soils, nutrient-rich. Requires nitrogen and potassium fertiliser.</td>
+      </tr>
+      <tr>
+        <th scope="row">4</th>
+        <td>Soybeans</td>
+        <td>20-30°C</td>
+        <td>6.0-7.0</td>
+        <td>High (needs constant water, can tolerate flooding)</td>
+        <td>Well-drained, loamy soil. Needs balanced fertiliser with moderate nitrogen.</td>
+      </tr>
+      <tr>
+        <th scope="row">5</th>
+        <td>Cotton</td>
+        <td>21-30°C</td>
+        <td>5.5-7.0</td>
+        <td>Moderate (dry conditions suited)</td>
+        <td>Well-drained, sandy loam soil. Nitrogen and potassium fertiliser.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Initialize DataTable -->
+<script>
+  $(document).ready(function() {
+    $('#farmToolsTable').DataTable();  // Initialize DataTable
+  });
+</script>
+
+
+<!-- Map -->
+<h3>Soil Information Map</h3>
+
+<div style="display: flex; justify-content: center; align-items: center; margin-bottom: 40px">
+  <iframe src="{{ url_for('static', filename='/map.html') }}" width="700px" height="500px" frameborder="0"></iframe>
+</div>
+
+{% endblock %}
+

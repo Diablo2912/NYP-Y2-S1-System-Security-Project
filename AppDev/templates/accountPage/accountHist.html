@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container">
+  <div class="row">
+    <!-- Left Container -->
+    <div class="col-md-4 p-3">
+      <div class="card d-flex mb-3 m-3">
+        <div class="card-body pb-0">
+
+          <div class="d-flex mb-3">
+            <img class="flex" src="{{ url_for('static', filename='assets/person.svg') }}" width="60" height="60">
+            <div class="flex-grow-1 ms-3">
+              <h2 class="card-title mb-1">Name</h2>
+                <h6 class="card-subtitle text-body-secondary">email</h6>
+            </div>
+          </div>
+
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="/accountInfo" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
+                <span class="badge bg-success p-2 fs-5 align-middle shadow" style="--bs-bg-opacity: .5" >Your Info</span></a>
+            </li>
+
+            <li class="list-group-item">
+              <a href="/accountSecurity" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Security Settings</span></a>
+            </li>
+
+            <li class="list-group-item">
+              <a href="/accountHist" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
+                <span class="badge bg-success p-2 fs-5 align-middle shadow">Purchase History</span></a>
+            </li>
+          </ul>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Container (Form) -->
+    <div class="col-md-8 p-3">
+      <div class="card d-flex mb-3 m-3 bg-success-subtle">
+        <div class="card-body">
+          <h1>Purchase History</h1>
+          <div class="container mt-5">
+
+        <!-- Search Form -->
+        <!--<div class="mb-4">
+            <input type="text" id="searchInput" class="form-control" placeholder="Search by Customer Name or Transaction ID" onkeyup="searchTransactions()">
+        </div>-->
+
+        {% if transactions %}
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped" id="transactionTable">
+                    <thead class="table-success">
+                        <tr>
+                            <th>Transaction ID</th>
+                            <th>Date</th>
+                            <th>Customer Name</th>
+                            <th>Email Address</th>
+                            <th>Phone Number</th>
+                            <th>Address</th>
+                            <th>Items Purchased</th>
+                            <th>Total Price</th>
+                            <th>Actions</th> <!-- Column for delete button -->
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transaction in transactions %}
+                            <tr id="transaction-{{ transaction['id'] }}">
+                                <td>{{ transaction['id'] }}</td>
+                                <td>{{ transaction['order_date'] }}</td>
+                                <td>{{ transaction['customer_name'] }}</td>
+                                <td>{{ transaction['email_address'] }}</td>
+                                <td>{{ transaction['phone_number'] }}</td>
+                                <td>
+                                    {{ transaction['customer_address'] }},
+                                    {{ transaction['postal_code'] }},
+                                    {{ transaction['customer_city'] }}
+                                </td>
+                                <td>
+                                    <ul class="list-unstyled">
+                                        {% for item in transaction['cart'].values() %}
+                                            <li>{{ item['name'] }} (x{{ item['quantity'] }}) - ${{ item['price'] * item['quantity'] }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </td>
+                                <td><strong>${{ transaction['total_price'] }}</strong></td>
+                                <td>
+                                    <button class="btn btn-danger" onclick="deleteTransaction('{{ transaction['id'] }}')">Delete</button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-info text-center">No purchases found.</div>
+        {% endif %}
+
+        <div class="text-center mt-4">
+            <a href="{{ url_for('product') }}" class="btn btn-primary">Back to Products</a>
+        </div>
+    </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

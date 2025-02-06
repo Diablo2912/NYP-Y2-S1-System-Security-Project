@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h1 class="text-center my-4">Products</h1>
+
+    <!-- Featured Products Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="text-center">Featured Products</h2>
+        </div>
+        {% for product in load_products[0:3] %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 180px;">
+                    <!-- Replace with an actual image if available -->
+                    Product Image
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ product.name }}</h5>
+                    <p class="card-text">Quantity: {{ product.quantity }}</p>
+                    <p class="card-text">Category: {{ product.category }}</p>
+                    <p class="card-text">PRICE: ${{ "%.2f"|format(product.price) }}</p>
+                </div>
+                <div class="card-footer text-center">
+                    <button class="btn btn-success w-100">Add to Cart</button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="row">
+        <!-- Filter Section -->
+        <div class="col-lg-3 mb-4">
+            <button class="btn btn-secondary w-100 mb-3" data-bs-toggle="collapse" data-bs-target="#filter-section">FILTER</button>
+            <div id="filter-section" class="collapse">
+                <div class="card p-3">
+                    <form method="get" action="/product/">
+                        <div class="mb-3">
+                            <h5>Product Category</h5>
+                            {% for category in all_categories %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="category" value="{{ category }}" id="{{ category }}"
+                                    {% if category in request.args.getlist('category') %}checked{% endif %}>
+                                <label class="form-check-label" for="{{ category }}">{{ category }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Apply Filter</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Full Product List Section -->
+        <div class="col-lg-9">
+            <div class="row">
+                {% for product in load_products %}
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 180px;">
+                            <!-- Placeholder for Product Image -->
+                            Product Image
+                        </div>
+                        <div class="card-body">
+                            <h5 class="card-title">{{ product.name }}</h5>
+                            <p class="card-text">Quantity: {{ product.quantity }}</p>
+                            <p class="card-text">Category: {{ product.category }}</p>
+                            <p class="card-text">PRICE: ${{ "%.2f"|format(product.price) }}</p>
+                        </div>
+                        <div class="card-footer text-center">
+                            <button class="btn btn-success w-100">Add to Cart</button>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-center">No products found with these filters.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+

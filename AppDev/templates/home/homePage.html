@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- Bootstrap-styled Home Page -->
+<h1 class="text-center my-4">Home</h1>
+<div class="container">
+    <header class="mb-4">
+        <div class="row align-items-center">
+            <div class="col-lg-6 text-center text-lg-start">
+                <h1 class="fw-bold text-success">Cropzy: Cultivating Growth, Harvesting Excellence.</h1>
+                <p class="text-muted">Cropzy is an innovative agricultural solutions company dedicated to empowering farmers with advanced tools and technologies to maximize crop yields, ensure sustainability, and drive efficiency from seed to harvest.</p>
+                <a href="/aboutUs" class="btn btn-success">Link to About Us page</a>
+            </div>
+            <div class="col-lg-6 text-center">
+                <img src="{{ url_for('static', filename='assets/crops-growing-in-thailand.jpg') }}" alt="Placeholder Image" class="img-fluid rounded shadow">
+            </div>
+        </div>
+    </header>
+
+    <section class="mb-4">
+        <div class="card p-4 shadow">
+            <h2 class="text-success mb-3">Featured Articles</h2>
+            <div id="articles-carousel" class="carousel slide" data-bs-ride="carousel">
+                <!-- Carousel Indicators -->
+                <div class="carousel-indicators">
+                    {% for article in articles %}
+                    <button type="button" style="background-color: black" data-bs-target="#articles-carousel" data-bs-slide-to="{{ loop.index0 }}"
+                            {% if loop.index == 1 %}class="active"{% endif %} aria-current="true" aria-label="Slide {{ loop.index }}">
+                    </button>
+                    {% endfor %}
+                </div>
+
+                <!-- Carousel Inner -->
+                <div class="carousel-inner">
+                    {% if articles %}
+                        {% for article in articles %}
+                        <div class="carousel-item {% if loop.index == 1 %}active{% endif %}">
+                            <div class="text-center">
+                                <img src="{{ article.urlToImage or 'default-image.jpg' }}"
+                                     class="d-block w-50 mx-auto"
+                                     alt="Image for {{ article.title }}">
+                                <div class="mt-3">
+                                    <h3>{{ article.title }}</h3>
+                                    <p>{{ article.description or 'No description available.' }}</p>
+                                    <a href="{{ article.url }}" target="_blank" class="btn btn-primary">Read More</a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p>No articles available at the moment.</p>
+                    {% endif %}
+                </div>
+
+                <!-- Carousel Controls -->
+                <br>
+                <br>
+                <br>
+                <button class="carousel-control-prev" type="button" data-bs-target="#articles-carousel" data-bs-slide="prev">
+                    <span class="carousel-control-prev-icon" aria-hidden="true" style="background-color: white; border-radius: 50%;"></span>
+                    <span class="visually-hidden">Previous</span>
+                </button>
+                <button class="carousel-control-next" type="button" data-bs-target="#articles-carousel" data-bs-slide="next">
+                    <span class="carousel-control-next-icon" aria-hidden="true" style="background-color: white; border-radius: 50%;"></span>
+                    <span class="visually-hidden">Next</span>
+                </button>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Seasonal Updates Section -->
+    <section class="mb-4">
+        <div class="card p-4 shadow">
+            <h2 class="text-success mb-3">Seasonal Updates</h2>
+            <a href="{{ url_for('create_update') }}" class="btn btn-primary mb-3">Create a Seasonal Update</a>
+
+            <!-- Flash Messages -->
+            <div class="text-center">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} text-center">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            <!-- Updates Table -->
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Title</th>
+                            <th>Content</th>
+                            <th>Date</th>
+                            <th>Season</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if updates %}
+                            {% for update in updates %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>{{ update.title }}</td>
+                                    <td>{{ update.content }}</td>
+                                    <td>{{ update.date }}</td>
+                                    <td>{{ update.season }}</td>
+                                    <td>
+                                        <!-- Delete Button: Redirect to Confirmation Page -->
+                                        <a href="{{ url_for('request_delete', index=loop.index0) }}" class="btn btn-danger btn-sm">Delete</a>
+
+                                        <!-- Edit Button -->
+                                        <a href="{{ url_for('edit_update', index=loop.index0) }}" class="btn btn-warning btn-sm">Edit</a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center">No seasonal updates available at the moment.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Top Product Section -->
+    <section>
+        <div class="card p-4 shadow">
+            <h2 class="text-success mb-3">CO2 Emissions Chart</h2>
+            <div class="text-center">
+                {% if chart_data %}
+                    <img src="data:image/png;base64,{{ chart_data }}" alt="CO2 Emissions Chart" class="img-fluid rounded shadow">
+                {% else %}
+                    <p>No products available to display the chart.</p>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+</div>
+
+{% endblock %}
+
+

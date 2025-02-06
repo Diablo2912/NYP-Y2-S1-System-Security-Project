@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% from "includes/_formHelper.html" import render_field %}
+
+<!-- Center the form -->
+<div class="d-flex justify-content-center align-items-center mt-3 p-3">
+  <div class="card bg-success-subtle w-100" style="max-width: 500px;">
+    <div class="card-body">
+      <h1 class="text-center m-3 fs-3">You Have Successfully Sign Up</h1>
+        <div class="d-flex justify-content-center">
+            <a class="btn btn-success mt-3 " href="/">To Home Page</a>
+        </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

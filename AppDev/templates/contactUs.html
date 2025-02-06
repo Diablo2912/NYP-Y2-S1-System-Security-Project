@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container">
+  <div class="row">
+    <!-- Left Container -->
+    <div class="col-lg-4 p-3">
+      <div class="card d-flex mb-3 m-3">
+        <div class="card-body">
+          <h1>Contact Info</h1>
+
+          <ul class="list-group list-group-flush">
+
+            <li class="list-group-item">
+              <img class="me-2" src="{{ url_for('static', filename='assets/phone.svg') }}" width="30" height="30">
+              +65 9876 5432</li>
+
+            <li class="list-group-item">
+              <img class="me-2" src="{{ url_for('static', filename='assets/mail.svg') }}" width="30" height="30">
+              cropzy@gmail.com</li>
+
+            <li class="list-group-item">
+              <img class="me-2" src="{{ url_for('static', filename='assets/location.svg') }}" width="30" height="30">
+              123 Some Road. Singapore</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Container (Form) -->
+    <div class="col-lg-8 p-3">
+      <div class="card d-flex mb-3 m-3 bg-success-subtle">
+        <div class="card-body">
+          <h1>Submit Form</h1>
+          <form class="row g-3">
+            <div class="col-md-6">
+              <label for="inputFirstname" class="form-label mb-1">First Name</label>
+              <input type="text" class="form-control" id="inputFirstname" placeholder="e.g. Glen">
+            </div>
+            <div class="col-md-6">
+              <label for="inputLastname" class="form-label mb-1">Last Name</label>
+              <input type="text" class="form-control" id="inputLastname" placeholder="e.g. Loo">
+            </div>
+            <div class="col-md-6">
+              <label for="inputEmail" class="form-label mb-1">Email Address</label>
+              <input type="email" class="form-control" id="inputEmail" placeholder="e.g. name@example.com">
+            </div>
+            <div class="col-md-6">
+              <label for="inputNumber" class="form-label mb-1">Phone</label>
+              <input type="number" class="form-control" id="inputNumber" placeholder="e.g. 9876 5432">
+            </div>
+            <div class="form-label">Purpose of form: (select 1)
+              <div class="form-check mt-1">
+                <input class="form-check-input" type="radio" name="flexRadioDefault" id="flexRadioOption1" checked>
+                <label class="form-check-label" for="flexRadioOption1">Feedback</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="flexRadioDefault" id="flexRadioOption2">
+                <label class="form-check-label" for="flexRadioOption2">General Enquiry</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="flexRadioDefault" id="flexRadioOption3">
+                <label class="form-check-label" for="flexRadioOption3">Complaint</label>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label for="addInfo" class="form-label">Additional Information</label>
+              <textarea class="form-control" id="addInfo" rows="4"></textarea>
+            </div>
+            <div class="col-12 text-end">
+              <button type="submit" class="btn btn-success">Submit Form</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

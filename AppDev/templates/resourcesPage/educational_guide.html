@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!--Edit here-->
+<style>
+    .content-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 20px;
+    }
+
+    .text-container {
+        width: 48%;
+        margin-left: 100px;
+        margin-top: 150px;
+    }
+
+    .video-container {
+        width: 48%;
+        margin-right: 100px;
+        margin-top: 50px;
+    }
+
+    .card {
+        margin-top: 20px;
+    }
+
+    .text-center {
+        margin-top: 20px;
+    }
+
+    .row {
+        margin-top: 150px;
+    }
+</style>
+
+<body>
+
+<h1 class="text-center">Educational Guide</h1>
+
+<!-- Video Description -->
+<div class="content-container">
+    <div class="text-container">
+        <h3>How to Start a Small Farm | Step-by-Step Guide</h3>
+        <p>Starting a small farm can be a rewarding venture, but it requires careful planning and strategy.<br>
+            In this video, we walk you through the essential steps to launch your own successful farm business.<br>
+            From budgeting and gaining hands-on experience to creating a business plan and considering alternatives.</p>
+    </div>
+
+    <!-- Video -->
+    <div class="video-container">
+        <iframe width="100%" height="400" src="https://www.youtube.com/embed/heTxEsrPVdQ?si=B-zj8FTcnk4W3pM8" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+    </div>
+</div>
+
+<div class="row d-flex justify-content-between">
+    <div class="col-12 col-md-3 mb-4 d-flex justify-content-center">
+        <!-- Card 1 -->
+        <div class="card" style="width: 18rem;">
+            <img src="/static/assets/farming.jpg" class="card-img-top" alt="...">
+            <div class="card-body">
+                <h5 class="card-title">How to Start a Farm: 10 Farming Tips for Beginners</h5>
+                <p class="card-text">A friendly guide offering essential tips for new farmers. It offers essential advice for new farmers, from choosing land and crops to budgeting and learning key skills.</p>
+                <a href="https://blog.agriapp.com/blog/smart-farming/how-to-start-a-farm-10-farming-tips-for-beginners/" class="btn btn-primary" target="_blank">View More</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-3 mb-4 d-flex justify-content-center">
+        <!-- Card 2 -->
+        <div class="card" style="width: 18rem;">
+            <img src="/static/assets/farming.jpg" class="card-img-top" alt="...">
+            <div class="card-body">
+                <h5 class="card-title">How to Start a Farm: 10 Farming Tips for Beginners</h5>
+                <p class="card-text">A friendly guide offering essential tips for new farmers. It offers essential advice for new farmers, from choosing land and crops to budgeting and learning key skills.</p>
+                <a href="https://blog.agriapp.com/blog/smart-farming/how-to-start-a-farm-10-farming-tips-for-beginners/" class="btn btn-primary" target="_blank">View More</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-3 mb-4 d-flex justify-content-center">
+        <!-- Card 3 -->
+        <div class="card" style="width: 18rem;">
+            <img src="/static/assets/farming.jpg" class="card-img-top" alt="...">
+            <div class="card-body">
+                <h5 class="card-title">How to Start a Farm: 10 Farming Tips for Beginners</h5>
+                <p class="card-text">A friendly guide offering essential tips for new farmers. It offers essential advice for new farmers, from choosing land and crops to budgeting and learning key skills.</p>
+                <a href="https://blog.agriapp.com/blog/smart-farming/how-to-start-a-farm-10-farming-tips-for-beginners/" class="btn btn-primary" target="_blank">View More</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-3 mb-4 d-flex justify-content-center">
+        <!-- Card 4 -->
+        <div class="card" style="width: 18rem;">
+            <img src="/static/assets/farming.jpg" class="card-img-top" alt="...">
+            <div class="card-body">
+                <h5 class="card-title">How to Start a Farm: 10 Farming Tips for Beginners</h5>
+                <p class="card-text">A friendly guide offering essential tips for new farmers. It offers essential advice for new farmers, from choosing land and crops to budgeting and learning key skills.</p>
+                <a href="https://blog.agriapp.com/blog/smart-farming/how-to-start-a-farm-10-farming-tips-for-beginners/" class="btn btn-primary" target="_blank">View More</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+<!--To here-->
+
+{% endblock %}

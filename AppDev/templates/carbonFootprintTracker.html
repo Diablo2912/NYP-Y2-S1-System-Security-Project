@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="text-center mb-4">Carbon Footprint Tracker</h1>
+
+    <form method="POST" id="carbon-form">
+        <div id="products-container">
+            {% for product in selected_products %}
+                <div class="row align-items-center mb-3 product-row" id="product-row-{{ loop.index }}">
+                    <div class="col">
+                        <select name="product[]" class="form-select product-select">
+                            {% for item in productsCFT %}
+                                <option value="{{ item.name }}" {% if item.name == product.name %}selected{% endif %}
+                                        data-co2="{{ item.co2 }}">
+                                    {{ item.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <span class="badge bg-info">CO2: {{ product.co2 }} kg</span>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-danger btn-sm delete-product-btn"
+                                data-row-id="product-row-{{ loop.index }}"
+                                data-product-name="{{ product.name }}">
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            {% endfor %}
+
+            <div class="row align-items-center mb-3">
+                <div class="col">
+                    <select name="product[]" class="form-select product-select">
+                        <option value="" disabled selected>Select a product</option>
+                        {% for item in productsCFT %}
+                            <option value="{{ item.name }}" data-co2="{{ item.co2 }}">{{ item.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-grid">
+            <button type="submit" class="btn btn-primary">Calculate Total CO2</button>
+        </div>
+    </form>
+
+    <div id="total-co2" class="text-center mt-4">
+        <span class="fw-bold">Total CO2:</span> <span id="co2-value">0.00</span> kg
+    </div>
+</div>
+
+<script>
+
+    function updateTotalCO2() {
+        let totalCO2 = 0;
+
+
+        document.querySelectorAll('.product-select').forEach(select => {
+            const selectedOption = select.options[select.selectedIndex];
+            const co2Value = parseFloat(selectedOption.getAttribute('data-co2')) || 0;
+            totalCO2 += co2Value;
+        });
+
+
+        document.getElementById('co2-value').textContent = totalCO2.toFixed(2);
+    }
+
+
+    document.querySelectorAll('.delete-product-btn').forEach(button => {
+        button.addEventListener('click', function () {
+            const rowId = this.getAttribute('data-row-id');
+            const productName = this.getAttribute('data-product-name');
+            const rowElement = document.getElementById(rowId);
+
+
+            if (confirm(`Are you sure you want to delete the product named "${productName}"?`)) {
+                // Remove the row from the form
+                rowElement.remove();
+
+
+                updateTotalCO2();
+            }
+        });
+    });
+
+
+    updateTotalCO2();
+</script>
+{% endblock %}
+
+

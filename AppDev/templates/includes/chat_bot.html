@@ -1,0 +1,21 @@
+<div id="chat-container">
+        <div id="chat-window"></div>
+        <input type="text" id="user-input" placeholder="Type your message here..." />
+        <button id="send-btn">Send</button>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>$(document).ready(function() {$('#send-btn').click(function()
+            {const userMessage = $('#user-input').val();
+            $('#chat-window').append(`<div>User: ${userMessage}</div>`);
+            $.ajax({url: '/chat',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ message: userMessage }),
+                    success: function(response) {
+                    $('#chat-window').append(`<div>Bot: ${response.response}</div>`);
+                    $('#user-input').val('');
+                    }
+                });
+            });
+        });
+    </script>

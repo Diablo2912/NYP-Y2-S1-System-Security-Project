@@ -1,0 +1,71 @@
+<nav class="navbar navbar-expand-xl bg-body-secondary">
+  <div class="container-fluid">
+    <!-- Company Name -->
+    <a class="navbar-brand" href="/">Cropzy</a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse justify-content-between" id="navbarSupportedContent">
+      <!-- Left-aligned menu items -->
+      <ul class="navbar-nav mb-2 mb-lg-0">
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Products</a>
+          <ul class="dropdown-menu">
+           <li><a class="dropdown-item" href="/buyProduct">Buy Products</a></li>
+              <li><a class="dropdown-item" href="/createProduct">Create Products</a></li>
+           <li><a class="dropdown-item" href="/manageProduct">Manage Products</a></li>
+           </ul>
+         </li>
+
+        <li class="nav-item">
+          <a class="nav-link" href="/carbonFootprintTracker">CFT</a>
+        </li>
+
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Resources</a>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="/educationalGuide">Educational Guide</a></li>
+            <li><a class="dropdown-item" href="/farmTools">Farm Management Tools</a></li>
+            <li><a class="dropdown-item" href="/initiatives">Sustainability Initiatives</a></li>
+          </ul>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link" href="/aboutUs">About Us</a>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link" href="/contactUs">Contact Us</a>
+        </li>
+      </ul>
+
+      <!-- Centered search bar -->
+      <form class="d-flex mx-auto w-50" role="search">
+        <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search">
+        <button class="btn btn-outline-success" type="submit">Search</button>
+      </form>
+
+      <!-- Right-aligned Account and Cart -->
+      <ul class="navbar-nav me-3">
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+            <img src="{{ url_for('static', filename='assets/person.svg') }}" width="30" height="30">
+          </a>
+          <ul class="dropdown-menu" style="min-width:8rem" >
+            <li><a class="dropdown-item" href="/accountInfo">Account Info</a></li>
+            <li><a class="dropdown-item" href="/signUp">Sign Up</a></li>
+            <li><a class="dropdown-item" href="/login">Log In</a></li>
+          </ul>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/cart">
+            <img src="{{ url_for('static', filename='assets/cart.svg') }}" width="30" height="30">
+          </a>
+        </li>
+      </ul>
+
+    </div>
+  </div>
+</nav>

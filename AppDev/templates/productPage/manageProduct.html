@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Retrieve Products{% endblock %}
+
+{% block content %}
+<h1 class="display-4">Retrieve Products</h1>
+<div>
+  {% if count == 0 %}
+  <p>There are no products.</p>
+  {% elif count == 1 %}
+  <p>There is 1 product.</p>
+  {% else %}
+  <p>There are {{ count }} product.</p>
+  {% endif %}
+</div>
+<div>
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Product ID</th>
+        <th>Product Name</th>
+        <th>Quantity</th>
+        <th>Category</th>
+        <th>Price</th>
+        <th>Product Description</th>
+        <th></th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for product in product_list %}
+     <tr>
+        <td>{{ product.get_product_id() }}</td>
+        <td>{{ product.get_product_name() }}</td>
+        <td>{{ product.get_quantity() }}</td>
+        <td>{{ product.get_category() }}</td>
+        <td>{{ product.get_price() }}</td>
+        <td>{{ product.get_product_description() }}</td>
+        <td><a href="/updateProduct/{{product.get_product_id()}}" class="btn btn-warning">Update</a></td>
+        <td>
+          <form action="{{url_for('delete_product', id=product.get_product_id())}}" method="POST">
+
+<button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#myModal_{{product.get_product_id()}}">
+  Delete
+</button>
+
+<!-- The Modal -->
+<div class="modal" id="myModal_{{product.get_product_id()}}">
+  <div class="modal-dialog">
+    <div class="modal-content">
+
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Delete Confirmation</h4>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <!-- Modal body -->
+      <div class="modal-body">
+        Are you sure you want to delete {{product.get_product_name()}} {{product.get_quantity()}}?
+      </div>
+
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <input type="submit" value="Delete" class="btn btn-danger">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+          </form>
+        </td>
+     </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+    <form method="POST">
+        <button type="submit" name="export_csv">Export to CSV</button>
+    </form>
+</div>
+{% endblock %}
