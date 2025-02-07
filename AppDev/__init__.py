@@ -31,7 +31,7 @@ app.config['MAIL_PASSWORD'] = 'isgw cesr jdbs oytx'
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
 mail = Mail(app)
-#a
+
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///products.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 sql_db = SQLAlchemy(app)
