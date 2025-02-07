@@ -22,7 +22,7 @@ import base64
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '5791262abcdefg'
-#assd
+
 app.register_blueprint(main_blueprint)
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
