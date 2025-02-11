@@ -1,21 +1,60 @@
-<div id="chat-container">
-        <div id="chat-window"></div>
-        <input type="text" id="user-input" placeholder="Type your message here..." />
-        <button id="send-btn">Send</button>
+<!-- Chatbot Button -->
+<div id="chatbot-btn" class="position-fixed bottom-0 end-0 p-3" style="z-index: 1000;">
+    <button class="btn btn-success rounded-circle" data-bs-toggle="modal" data-bs-target="#chatModal">💬</button>
+</div>
+
+<!-- Chatbot Modal -->
+<div class="modal fade" id="chatModal" tabindex="-1" aria-labelledby="chatModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="width: 550px; height: 550px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="chatModalLabel">Chat with us!</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="chat-messages" class="overflow-auto" style="height: 300px; padding: 10px;">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div><strong>{{ message.sender }}:</strong> {{ message.text }}</div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+                <form id="chat-form" method="POST">
+                    <div class="input-group">
+                        <input type="text" name="user_message" class="form-control" placeholder="Type a message..." required>
+                        <button type="submit" class="btn btn-success">Send</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script>$(document).ready(function() {$('#send-btn').click(function()
-            {const userMessage = $('#user-input').val();
-            $('#chat-window').append(`<div>User: ${userMessage}</div>`);
-            $.ajax({url: '/chat',
-                    method: 'POST',
-                    contentType: 'application/json',
-                    data: JSON.stringify({ message: userMessage }),
-                    success: function(response) {
-                    $('#chat-window').append(`<div>Bot: ${response.response}</div>`);
-                    $('#user-input').val('');
-                    }
-                });
-            });
-        });
-    </script>
+</div>
+
+<!-- JavaScript for AJAX form submission -->
+<script>
+    document.getElementById('chat-form').addEventListener('submit', function (e) {
+        e.preventDefault(); // Prevent default form submission
+
+        const userMessage = document.querySelector('input[name="user_message"]').value;
+
+        // Send the message to Flask via AJAX (fetch)
+        fetch('/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ message: userMessage })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Display the response in the chat window
+            const chatMessages = document.getElementById('chat-messages');
+            const botMessage = `<div><strong>Bot:</strong> ${data.response}</div>`;
+            chatMessages.innerHTML += botMessage;
+
+            // Clear the input field
+            document.querySelector('input[name="user_message"]').value = '';
+        })
+        .catch(error => console.error('Error:', error));
+    });
+</script>

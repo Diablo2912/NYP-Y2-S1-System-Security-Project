@@ -1,24 +1,21 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
-# from pint import matplotlib
 
-from Forms import SignUpForm, CreateProductForm
+from Forms import SignUpForm, CreateProductForm, LoginForm
 import shelve, User, Product
-import openai
 from FeaturedArticles import get_featured_articles
-# from cFt import load_products_cft
 from Filter import main_blueprint
 from seasonalUpdateForm import SeasonalUpdateForm
 from ProductsList import load_products
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask_mail import Mail, Message
 import random
 from flask_sqlalchemy import SQLAlchemy
 import pandas as pd
-import matplotlib
 import matplotlib.pyplot as plt
-# matplotlib.use('Agg')
 from io import BytesIO
 import base64
+from chatbot import generate_response
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '5791262abcdefg'
@@ -35,7 +32,7 @@ mail = Mail(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///products.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 sql_db = SQLAlchemy(app)
-
+app.permanent_session_lifetime = timedelta(minutes=90)
 #CFT on SQL#
 class ProductCFT(sql_db.Model):
     id = sql_db.Column(sql_db.Integer, primary_key=True)
@@ -74,6 +71,10 @@ def add_sample_products():
 
 @app.route('/')
 def home():
+    # if 'logged_in' not in session:
+    #     flash('Please log in to access this page.', 'warning')
+    #     return redirect(url_for('login'))
+
     articles = get_featured_articles()
 
     updates = []
@@ -101,7 +102,9 @@ def home():
     chart_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
     buffer.close()  # Always close the buffer after using it
 
-    return render_template('/home/homePage.html', articles=articles, updates=updates, product=load_products(), chart_data=chart_data)
+    welcome_message = f"Welcome, {session['first_name']}!" if 'first_name' in session else "Welcome!"
+
+    return render_template('/home/homePage.html', articles=articles, updates=updates, product=load_products(), chart_data=chart_data, welcome_message=welcome_message)
 
 @app.route('/buyProduct')
 def product():
@@ -130,7 +133,7 @@ def create_product():
         return redirect(url_for('manageProduct'))
     return render_template('/productPage/createProduct.html', form=create_product_form)
 
-@app.route('/manageProduct', methods=['GET', 'POST'])
+@app.route('/manageProduct')
 def manageProduct():
     product_dict = {}
     db = shelve.open('product.db', 'r')
@@ -141,28 +144,6 @@ def manageProduct():
     for key in product_dict:
         product = product_dict.get(key)
         product_list.append(product)
-
-    if request.method == 'POST' and 'export_csv' in request.form:
-        # Convert users_list to a list of dictionaries (or convert it in the format you need)
-        product_data = []
-        for product in product_list:
-            product_data.append({
-                'Product ID': product.get_product_id(),
-                'Product Name': product.get_product_name(),
-                'Quantity': product.get_quantity(),
-                'Category': product.get_category(),
-                'Price': product.get_price(),
-                'Product Description': product.get_product_description()
-            })
-
-        # Create a DataFrame from the list of user data
-        df = pd.DataFrame(product_data)
-
-        # Export to CSV
-        df.to_csv('products_data.csv', index=False)
-
-        # Return a success message or handle the export feedback to the user
-        return redirect(url_for('manageProduct'))  # Redirect to the same page (or a success page)
 
     return render_template('/productPage/manageProduct.html', count=len(product_list), product_list=product_list)
 
@@ -310,26 +291,64 @@ def accountHist():
 def sign_up():
     sign_up_form = SignUpForm(request.form)
     if request.method == 'POST' and sign_up_form.validate():
-        users_dict = {}
         db = shelve.open('user.db','c')
 
-        try:
-            users_dict = db['Users']
-        except:
-            print("Error in retrieving Users from user.db.")
+        users_dict = db.get('Users', {})
 
-        user = User.User(sign_up_form.first_name.data, sign_up_form.last_name.data, sign_up_form.gender.data, sign_up_form.number.data, sign_up_form.email.data, sign_up_form.pswd.data, sign_up_form.cfm_pswd.data)
+        hashed_password = generate_password_hash(sign_up_form.cfm_pswd.data, method='pbkdf2:sha256')
+
+        user = User.User(sign_up_form.first_name.data,
+                         sign_up_form.last_name.data,
+                         sign_up_form.gender.data,
+                         sign_up_form.number.data,
+                         sign_up_form.email.data,
+                         sign_up_form.pswd.data,
+                         hashed_password)
+
         users_dict[user.get_user_id()] = user
         db['Users'] = users_dict
-
         db.close()
 
+        flash('Sign up successful! Please log in.', 'success')
         return redirect(url_for('complete_signUp'))
     return render_template('/accountPage/signUp.html', form=sign_up_form)
 
-@app.route('/login')
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-   return render_template('/accountPage/login.html')
+    login_form = LoginForm(request.form)
+    if request.method == 'POST' and login_form.validate():
+        db = shelve.open('user.db', 'c')
+
+        users_dict = db.get('Users', {})
+        db.close()
+
+        email = login_form.email.data
+        password = login_form.pswd.data
+
+        # Check if user exists
+        for user in users_dict.values():
+            print("Checking user:", user.get_email())
+            if user.get_email() == email:
+                print("User found, checking password...")
+                if check_password_hash(user.get_cfm_pswd(), password):
+                    session['logged_in'] = True
+                    session['user_id'] = user.get_user_id()
+                    session['email'] = user.get_email()
+                    session['first_name'] = user.get_first_name()
+                    flash('Login successful!', 'success')
+                    return redirect(url_for('home'))  # Redirect to a protected page
+
+                flash('Incorrect password.', 'danger')
+                return redirect(url_for('login'))
+
+        flash('Email not found. Please sign up.', 'danger')
+    return render_template('/accountPage/login.html', form=login_form)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('login'))
 
 @app.route('/cart')
 def cart():
@@ -389,15 +408,6 @@ def delete_user(id):
     db.close()
 
     return redirect(url_for('accountInfo'))
-
-@app.route('/chat', methods=['POST'])
-def chat():
-    user_message = request.json.get('message')
-    bot_response = generate_response(user_message)
-    return jsonify({'response': bot_response})
-
-    # Replace this with your chatbot logic
-    openai.api_key = 'your_openai_api_key'
 
 @app.route("/create_update", methods=['GET', 'POST'])
 def create_update():
@@ -556,29 +566,6 @@ def checkout():
 
     return render_template("/checkout/cart.html", cart=cart, total_price=total_price)
 
-@app.route("/add_to_cart/<int:product_id>")
-def add_to_cart(product_id):
-    products = load_products()
-    cart = get_cart()
-
-    if str(product_id) in cart:
-        cart[str(product_id)]["quantity"] += 1
-    else:
-        product = next((p for p in products if p["id"] == product_id), None)
-        if product:
-            cart[str(product_id)] = {
-                "id": product["id"],
-                "name": product["name"],
-                "price": product["price"],
-                "image": product["image"],
-                "quantity": 1,
-            }
-        else:
-            return jsonify({"error": "Product not found"}), 404
-
-    save_cart(cart)
-    print("Cart after adding product:", cart)
-    return jsonify(cart)
 def get_cart():
     return session.get("cart", {})
 
@@ -586,12 +573,16 @@ def save_cart(cart):
     session["cart"] = cart
     session.modified = True
     print("Cart saved:", session["cart"])
-def generate_response(message):
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": message}])
-    return response['choices'][0]['message']['content']
 
+@app.route('/chat', methods=['POST'])
+def chat():
+    user_message = request.json.get('message')
+
+    if not user_message:
+        return jsonify({'response': "Please provide a message!"})
+
+    bot_response = generate_response(user_message)
+    return jsonify({'response': bot_response})
 
 if __name__ == '__main__':
     app.run(debug=True)
