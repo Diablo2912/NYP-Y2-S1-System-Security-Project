@@ -20,4 +20,7 @@ pip install fuzzywuzzy
 
 python -m spacy download en_core_web_sm
 
-Pip install flask_mail
+pip install flask_mail
+
+pip install google-generativeai
+
