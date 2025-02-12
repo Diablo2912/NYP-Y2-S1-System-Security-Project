@@ -12,6 +12,8 @@
 <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
 
 <!-- Add some spacing to move the table lower -->
+<h2>Plant Database</h2>
+<p>This map shows the best growth condition for each cropx</p>
 <div style="margin-top: 40px;">
   <!-- Table with DataTable functionality -->
   <table id="farmToolsTable" class="table">
@@ -79,7 +81,8 @@
 
 
 <!-- Map -->
-<h3>Soil Information Map</h3>
+<h2>Soil Information Map</h2>
+<p>This map shows soil information on different parts of Singapore</p>
 
 <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 40px">
   <iframe src="{{ url_for('static', filename='/map.html') }}" width="700px" height="500px" frameborder="0"></iframe>
