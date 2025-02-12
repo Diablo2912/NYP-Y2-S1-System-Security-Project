@@ -3,6 +3,19 @@
 {% block content %}
 {% from "includes/_formHelper.html" import render_field %}
 
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="container">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
 <!-- Center the form -->
 <div class="d-flex justify-content-center align-items-center mt-3 p-3">
   <div class="card bg-success-subtle w-100" style="max-width: 500px;">

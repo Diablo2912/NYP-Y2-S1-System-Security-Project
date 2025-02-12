@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
-
+#test
 from Forms import SignUpForm, CreateProductForm, LoginForm
 import shelve, User, Product
 from FeaturedArticles import get_featured_articles
@@ -156,6 +156,7 @@ def update_product(id):
         product_dict = db['Product']
 
         product = product_dict.get(id)
+        product.set_product_image(update_product_form.image.data)
         product.set_product_name(update_product_form.product_name.data)
         product.set_quantity(update_product_form.quantity.data)
         product.set_category(update_product_form.category.data)

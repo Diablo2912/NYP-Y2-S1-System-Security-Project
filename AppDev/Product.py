@@ -3,7 +3,7 @@ class Product:
     count_id = 0
 
     # initializer method
-    def __init__(self, product_name, quantity, category, price, product_description):
+    def __init__(self, product_name, quantity, category, price, product_description,image):
         Product.count_id += 1
         self.__product_id = Product.count_id
         self.__product_name = product_name
@@ -11,6 +11,7 @@ class Product:
         self.__category = category
         self.__price = price
         self.__product_description = product_description
+        self.__image = image
 
     # accessor methods
     def get_product_id(self):
@@ -31,6 +32,9 @@ class Product:
     def get_product_description(self):
         return self.__product_description
 
+    def get_image(self):
+        return self.__image
+
 
     # mutator methods
     def set_product_id(self, product_id):
@@ -50,3 +54,6 @@ class Product:
 
     def set_product_description(self, product_description):
         self.__product_description = product_description
+
+    def set_image(self):
+        return self.__image
