@@ -579,12 +579,9 @@ def checkout():
     return render_template("/checkout/cart.html", cart=cart, total_price=total_price)
 
 def get_cart():
-    return session.get("cart", {})
-
-def save_cart(cart):
-    session["cart"] = cart
-    session.modified = True
-    print("Cart saved:", session["cart"])
+    if "cart" not in session:
+        session["cart"] = {}
+    return session["cart"]
 
 @app.route('/chat', methods=['POST'])
 def chat():
