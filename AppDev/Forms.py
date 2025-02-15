@@ -1,7 +1,7 @@
 from wtforms import *
 import re
 from wtforms import FileField
-from flask_wtf.file import FileAllowed, FileRequired
+from flask_wtf.file import FileAllowed
 class SignUpForm(Form):
     def no_numbers(form, field):
         if re.search(r'\d', field.data):
@@ -38,4 +38,4 @@ class CreateProductForm(Form):
     price = StringField('Price',[validators.Length(min=1, max=150), validators.DataRequired()],
                             render_kw={"placeholder": "e.g. 10.00"})
     product_description = TextAreaField('Product Description', [validators.Optional()])
-    image = FileField('Product Image', validators=[FileAllowed(['jpg', 'png', 'jpeg'], 'Only images allowed!')])
+    product_image = FileField('Product Image', validators=[FileAllowed(['jpg', 'png', 'jpeg'], 'Only images allowed!')])

@@ -2,7 +2,7 @@
 {% block title %}Retrieve Products{% endblock %}
 
 {% block content %}
-<h1 class="display-4">Retrieve Products</h1>
+<h1 class="display-4">Manage Products</h1>
 <div>
   {% if count == 0 %}
   <p>There are no products.</p>
@@ -30,16 +30,19 @@
     <tbody>
     {% for product in product_list %}
      <tr>
-        <td>{{ product.get_product_id() }}</td>
-         <td>{{ product.get_image() }}</td>
-        <td>{{ product.get_product_name() }}</td>
-        <td>{{ product.get_quantity() }}</td>
-        <td>{{ product.get_category() }}</td>
-        <td>{{ product.get_price() }}</td>
-        <td>{{ product.get_product_description() }}</td>
-        <td><a href="/updateProduct/{{product.get_product_id()}}" class="btn btn-warning">Update</a></td>
-        <td>
-          <form action="{{url_for('delete_product', id=product.get_product_id())}}" method="POST">
+         <td>{{ product.get_product_id() }}</td>
+         <td>
+             <img src="{{ url_for('static', filename='uploads/' + product.get_product_image()) }}"
+         alt="Product Image" width="100">
+         </td>
+         <td>{{ product.get_product_name() }}</td>
+         <td>{{ product.get_quantity() }}</td>
+         <td>{{ product.get_category() }}</td>
+         <td>{{ product.get_price() }}</td>
+         <td>{{ product.get_product_description() }}</td>
+         <td><a href="/updateProduct/{{product.get_product_id()}}" class="btn btn-warning">Update</a></td>
+         <td>
+           <form action="{{url_for('delete_product', id=product.get_product_id())}}" method="POST">
 
 <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#myModal_{{product.get_product_id()}}">
   Delete

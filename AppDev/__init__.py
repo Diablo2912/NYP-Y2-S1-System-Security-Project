@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
-#test
+
 from Forms import SignUpForm, CreateProductForm, LoginForm
 import shelve, User, Product
 from FeaturedArticles import get_featured_articles
@@ -16,9 +16,14 @@ from io import BytesIO
 import base64
 from chatbot import generate_response
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_uploads import configure_uploads, IMAGES, UploadSet
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '5791262abcdefg'
+app.config['UPLOADED_IMAGES_DEST'] = 'static/uploads/'
+
+images = UploadSet('images', IMAGES)
+configure_uploads(app, images)
 
 app.register_blueprint(main_blueprint)
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -34,6 +39,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 sql_db = SQLAlchemy(app)
 app.permanent_session_lifetime = timedelta(minutes=90)
 #CFT on SQL#
+
 class ProductCFT(sql_db.Model):
     id = sql_db.Column(sql_db.Integer, primary_key=True)
     name = sql_db.Column(sql_db.String(100), nullable=False)
@@ -67,7 +73,6 @@ def add_sample_products():
     sql_db.session.commit()
 
     return "Sample products added!"
-
 
 @app.route('/')
 def home():
@@ -124,7 +129,14 @@ def create_product():
         except:
             print("Error in retrieving Products from product.db.")
 
-        product = Product.Product(create_product_form.product_name.data, create_product_form.quantity.data, create_product_form.category.data, create_product_form.price.data, create_product_form.product_description.data)
+        image_file = request.files.get('product_image')  # Get the uploaded file
+
+        if image_file and image_file.filename != '':
+            filename = images.save(image_file)  # Save using Flask-Uploads or Flask-Reuploaded
+        else:
+            filename = "default.jpg"
+
+        product = Product.Product(create_product_form.product_name.data, create_product_form.quantity.data, create_product_form.category.data, create_product_form.price.data, create_product_form.product_description.data, filename)
         product_dict[product.get_product_id()] = product
         db['Product'] = product_dict
 
@@ -156,7 +168,6 @@ def update_product(id):
         product_dict = db['Product']
 
         product = product_dict.get(id)
-        product.set_product_image(update_product_form.image.data)
         product.set_product_name(update_product_form.product_name.data)
         product.set_quantity(update_product_form.quantity.data)
         product.set_category(update_product_form.category.data)
