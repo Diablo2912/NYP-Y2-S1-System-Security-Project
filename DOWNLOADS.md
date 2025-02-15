@@ -24,3 +24,5 @@ pip install flask_mail
 
 pip install google-generativeai
 
+pip install flask-uploads
+
