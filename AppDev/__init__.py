@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
-
+from functools import wraps
 import os
 from Forms import SignUpForm, CreateProductForm, LoginForm
 import shelve, User, Product
@@ -56,6 +56,15 @@ class ProductCFT(sql_db.Model):
 
 with app.app_context():
     sql_db.create_all()
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "user_id" not in session:  # Check if user is logged in
+            flash("You must be logged in to access this page.", "warning")
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated_function
 
 #testing for sql
 @app.route('/add_sample_products/')
@@ -286,6 +295,7 @@ def contactUs():
    return render_template('contactUs.html')
 
 @app.route('/accountInfo')
+@login_required
 def accountInfo():
     users_dict = {}
     db = shelve.open('user.db', 'r')
@@ -299,6 +309,7 @@ def accountInfo():
     return render_template('/accountPage/accountInfo.html', count=len(users_list), users_list=users_list)
 
 @app.route('/accountSecurity')
+@login_required
 def accountSecurity():
     users_dict = {}
     db = shelve.open('user.db', 'r')
@@ -314,6 +325,7 @@ def accountSecurity():
     return render_template('/accountPage/accountSecurity.html', count=len(users_list), users_list=users_list, len=len, show_password=show_password)
 
 @app.route('/accountHist')
+@login_required
 def accountHist():
    return render_template('/accountPage/accountHist.html')
 
@@ -610,6 +622,7 @@ def chat():
 
     bot_response = generate_response(user_message)
     return jsonify({'response': bot_response})
+
 
 if __name__ == '__main__':
     app.run(debug=True)
