@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 #asd
+import os
 from Forms import SignUpForm, CreateProductForm, LoginForm
 import shelve, User, Product
 from FeaturedArticles import get_featured_articles
@@ -17,13 +18,14 @@ import base64
 from chatbot import generate_response
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_uploads import configure_uploads, IMAGES, UploadSet
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '5791262abcdefg'
-app.config['UPLOADED_IMAGES_DEST'] = 'static/uploads/'
+UPLOAD_FOLDER = 'static/uploads/'  # Define where images are stored
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 images = UploadSet('images', IMAGES)
-configure_uploads(app, images)
 
 app.register_blueprint(main_blueprint)
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -93,7 +95,7 @@ def home():
     df = pd.DataFrame(data)
 
     plt.figure(figsize=(10, 5))
-    plt.bar(df['name'], df['co2'], color='skyblue')
+    #plt.bar(df['name'], df['co2'], color='skyblue')
     plt.xlabel('Product Name')
     plt.ylabel('CO2 Emissions (kg)')
     plt.title('CO2 Emissions by Product')
@@ -120,6 +122,7 @@ def product():
 @app.route('/createProduct', methods=['GET', 'POST'])
 def create_product():
     create_product_form = CreateProductForm(request.form)
+
     if request.method == 'POST' and create_product_form.validate():
         product_dict = {}
         db = shelve.open('product.db', 'c')
@@ -132,7 +135,9 @@ def create_product():
         image_file = request.files.get('product_image')  # Get the uploaded file
 
         if image_file and image_file.filename != '':
-            filename = images.save(image_file)  # Save using Flask-Uploads or Flask-Reuploaded
+            filename = secure_filename(image_file.filename)  # Sanitize filename
+            filepath = os.path.join(UPLOAD_FOLDER, filename)  # Define path
+            image_file.save(filepath)  # Save image manually
         else:
             filename = "default.jpg"
 
