@@ -17,4 +17,4 @@ def index():
     categories = request.args.getlist("category")
     filtered_products = filter_products(categories)
     all_categories = set(p.category for p in load_products())  # 'products' from ProductsList.py
-    return render_template("buyProduct.html", products=filtered_products, all_categories=all_categories)
+    return render_template("/productPage/buyProduct.html", products=filtered_products, all_categories=all_categories)
