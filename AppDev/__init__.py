@@ -115,9 +115,22 @@ def home():
 
 @app.route('/buyProduct')
 def product():
-    products = load_products()  # Call the function and store the list
-    categories = {product.category for product in products}
-    return render_template('/productPage/buyProduct.html', load_products=products, all_categories=categories)
+    categories = request.args.getlist("category")  # Get selected categories
+    all_products = load_products()  # Load all products
+
+    # Filter products based on selected categories
+    if categories:
+        filtered_products = [p for p in all_products if p.category in categories]
+    else:
+        filtered_products = all_products  # Show all if no filter is applied
+
+    # Extract unique categories for the filter UI
+    all_categories = {product.category for product in all_products}
+
+    return render_template('productPage/buyProduct.html',
+                           products=filtered_products,
+                           all_categories=all_categories,
+                           selected_categories=categories)
 
 @app.route('/createProduct', methods=['GET', 'POST'])
 def create_product():
