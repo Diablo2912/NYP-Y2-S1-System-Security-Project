@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
-
+from functools import wraps
 import os
 from Forms import SignUpForm, CreateProductForm, LoginForm
 import shelve, User, Product
@@ -56,6 +56,15 @@ class ProductCFT(sql_db.Model):
 
 with app.app_context():
     sql_db.create_all()
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "user_id" not in session:  # Check if user is logged in
+            flash("You must be logged in to access this page.", "warning")
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated_function
 
 #testing for sql
 @app.route('/add_sample_products/')
@@ -163,7 +172,7 @@ def create_product():
         return redirect(url_for('manageProduct'))
     return render_template('/productPage/createProduct.html', form=create_product_form)
 
-@app.route('/manageProduct')
+@app.route('/manageProduct', methods=['GET', 'POST'])
 def manageProduct():
     product_dict = {}
     db = shelve.open('product.db', 'r')
@@ -174,6 +183,28 @@ def manageProduct():
     for key in product_dict:
         product = product_dict.get(key)
         product_list.append(product)
+    if request.method == 'POST' and 'export_csv' in request.form:
+        # Convert users_list to a list of dictionaries (or convert it in the format you need)
+        product_data = []
+        for product in product_list:
+            product_data.append({
+                'Product ID': product.get_product_id(),
+                'Product Image': product.get_product_image(),
+                'Product Name': product.get_product_name(),
+                'Quantity': product.get_quantity(),
+                'Category': product.get_category(),
+                'Price': product.get_price(),
+                'Product Description': product.get_product_description()
+            })
+
+        # Create a DataFrame from the list of user data
+        df = pd.DataFrame(product_data)
+
+        # Export to CSV
+        df.to_csv('products_data.csv', index=False)
+
+        # Return a success message or handle the export feedback to the user
+        return redirect(url_for('manageProduct'))  # Redirect to the same page (or a success page)
 
     return render_template('/productPage/manageProduct.html', count=len(product_list), product_list=product_list)
 
@@ -186,6 +217,7 @@ def update_product(id):
         product_dict = db['Product']
 
         product = product_dict.get(id)
+        product.set_product_image(update_product_form.product_image.data)
         product.set_product_name(update_product_form.product_name.data)
         product.set_quantity(update_product_form.quantity.data)
         product.set_category(update_product_form.category.data)
@@ -203,6 +235,7 @@ def update_product(id):
         db.close()
 
         product = product_dict.get(id)
+        update_product_form.product_image.data = product.get_product_image()
         update_product_form.product_name.data = product.get_product_name()
         update_product_form.quantity.data = product.get_quantity()
         update_product_form.category.data = product.get_category()
@@ -211,15 +244,25 @@ def update_product(id):
 
         return render_template('/productPage/updateProduct.html', form=update_product_form)
 
+
+
 @app.route('/deleteProduct/<int:id>', methods=['POST'])
 def delete_product(id):
-    product_dict = {}
     db = shelve.open('product.db', 'w')
-    product_dict = db['Product']
+    product_dict = db.get('Product', {})
 
-    product_dict.pop(id)
+    product = product_dict.get(id)
+    if product:
+        # Delete the image file from static/uploads
+        image_path = os.path.join(UPLOAD_FOLDER, product.get_product_image())
+        if os.path.exists(image_path) and product.get_product_image() != 'default.jpg':
+            os.remove(image_path)
 
-    db['Product'] = product_dict
+        # Remove product data from the dictionary
+        product_dict.pop(id)
+
+        # Save changes to the db
+        db['Product'] = product_dict
     db.close()
 
     return redirect(url_for('manageProduct'))
@@ -286,6 +329,7 @@ def contactUs():
    return render_template('contactUs.html')
 
 @app.route('/accountInfo')
+@login_required
 def accountInfo():
     users_dict = {}
     db = shelve.open('user.db', 'r')
@@ -299,6 +343,7 @@ def accountInfo():
     return render_template('/accountPage/accountInfo.html', count=len(users_list), users_list=users_list)
 
 @app.route('/accountSecurity')
+@login_required
 def accountSecurity():
     users_dict = {}
     db = shelve.open('user.db', 'r')
@@ -314,6 +359,7 @@ def accountSecurity():
     return render_template('/accountPage/accountSecurity.html', count=len(users_list), users_list=users_list, len=len, show_password=show_password)
 
 @app.route('/accountHist')
+@login_required
 def accountHist():
    return render_template('/accountPage/accountHist.html')
 
@@ -610,6 +656,7 @@ def chat():
 
     bot_response = generate_response(user_message)
     return jsonify({'response': bot_response})
+
 
 if __name__ == '__main__':
     app.run(debug=True)
