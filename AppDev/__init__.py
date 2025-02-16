@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
-#asd
+
 import os
 from Forms import SignUpForm, CreateProductForm, LoginForm
 import shelve, User, Product
