@@ -2,18 +2,31 @@
 
 {% block content %}
 
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="container">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
 <div class="container">
   <div class="row">
     <!-- Left Container -->
-    {% if users_list %}
+    {% if 'user_id' in session %}
     <div class="col-lg-4 p-3">
       <div class="card d-flex mb-3 m-3">
         <div class="card-body pb-0">
           <div class="d-flex mb-3">
             <img class="flex" src="{{ url_for('static', filename='assets/person.svg') }}" width="60" height="60">
             <div class="flex-grow-1 ms-3">
-              <h2 class="card-title mb-1">{{ users_list[-1].get_first_name() }}</h2>
-                <h6 class="card-subtitle text-body-secondary">{{ users_list[-1].get_email() }}</h6>
+              <h2 class="card-title mb-1">{{ session['first_name'] }}</h2>
+                <h6 class="card-subtitle text-body-secondary">{{ session['email'] }}</h6>
             </div>
           </div>
 
@@ -50,36 +63,33 @@
             <ul class="list-group list-group-flush">
               <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
                 <label class="col-md-3 m-1 fs-6">Name</label>
-                <span class="fs-5 p-0">{{ users_list[-1].get_first_name() }}</span>
-                <span class="fs-5 ps-1">{{ users_list[-1].get_last_name() }}</span>
-              </li>
+                    <span class="fs-5 p-0">{{ session['first_name'] }}</span>
+                    <span class="fs-5 ps-1">{{ session['last_name'] }}</span>
+                </li>
+                <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
+                  <label class="col-md-3 m-1 fs-6">User ID</label>
+                  <span class="fs-5 p-0">{{ session['user_id'] }}</span>
+                </li>
+                <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
+                    <label class="col-md-3 m-1 fs-6">Gender</label>
+                    <span class="fs-5 p-0">{{ session['gender'] }}</span>
+                </li>
+                <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
+                    <label class="col-md-3 m-1 fs-6">Phone Number</label>
+                    <span class="fs-5 p-0">{{ session['phone'] }}</span>
+                </li>
+                <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
+                    <label class="col-md-3 m-1 fs-6">Email</label>
+                    <span class="fs-5 p-0">{{ session['email'] }}</span>
+                </li>
 
-              <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
-                <label class="col-md-3 m-1 fs-6">User ID</label>
-                <span class="fs-5 p-0">{{ users_list[-1].get_user_id() }}</span>
-              </li>
-
-              <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
-                <label class="col-md-3 m-1 fs-6">Gender</label>
-                <span class="fs-5 p-0">{{ users_list[-1].get_gender() }}</span>
-              </li>
-
-              <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
-                <label class="col-md-3 m-1 fs-6">Phone Number</label>
-                <span class="fs-5 p-0">{{ users_list[-1].get_number() }}</span>
-              </li>
-
-              <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
-                <label class="col-md-3 m-1 fs-6">Email Address</label>
-                <span class="fs-5 p-0">{{ users_list[-1].get_email() }}</span>
-              </li>
             </ul>
               <div class="text-end m-2 mt-5">
-                <a href="/changeDets/{{users_list[-1].get_user_id()}}" class="btn btn-success">Change Details</a>
-                <form action="{{ url_for('delete_user', id=users_list[-1].get_user_id()) }}" method="POST" class="d-inline-block">
-                    <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#myModal_{{ users_list[-1].get_user_id() }}">Delete Account</button>
+                <a href="/changeDets/{{ session['user_id'] }}" class="btn btn-success">Change Details</a>
+                <form action="{{ url_for('delete_user', id=session['user_id']) }}" method="POST" class="d-inline-block">
+                    <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#myModal_{{ session['user_id'] }}">Delete Account</button>
                     <!-- The Modal -->
-                    <div class="modal" id="myModal_{{users_list[-1].get_user_id() }}">
+                    <div class="modal" id="myModal_{{session['user_id']}}">
                       <div class="modal-dialog">
                         <div class="modal-content">
                     <!-- Modal Header -->
@@ -89,7 +99,7 @@
                           </div>
                     <!-- Modal body -->
                             <div class="modal-body text-start">
-                              Are you sure you want to delete {{ users_list[-1].get_first_name() }} {{ users_list[-1].get_last_name() }}?
+                              Are you sure you want to delete {{ session['first_name']}} {{session['last_name']}}?
                             </div>
                         <!-- Modal footer -->
                             <div class="modal-footer">
@@ -103,9 +113,9 @@
               </div>
           </div>
           {% else %}
-          <div class="alert alert-warning mt-5" role="alert">
-            No account information available. Please sign up or log in to access your account.
-          </div>
+          <script>
+              window.location.href = "{{ url_for('home') }}";
+          </script>
         </div>
       </div>
     </div>

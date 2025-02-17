@@ -5,15 +5,15 @@
 <div class="container">
   <div class="row">
     <!-- Left Container -->
-    {% if users_list %}
+    {% if 'user_id' in session %}
     <div class="col-lg-4 p-3">
       <div class="card d-flex mb-3 m-3">
         <div class="card-body pb-0">
           <div class="d-flex mb-3">
             <img class="flex" src="{{ url_for('static', filename='assets/person.svg') }}" width="60" height="60">
             <div class="flex-grow-1 ms-3">
-              <h2 class="card-title mb-1">{{ users_list[-1].get_first_name() }}</h2>
-                <h6 class="card-subtitle text-body-secondary">{{ users_list[-1].get_email() }}</h6>
+              <h2 class="card-title mb-1">{{ session['first_name'] }}</h2>
+                <h6 class="card-subtitle text-body-secondary">{{ session['email'] }}</h6>
             </div>
           </div>
 
@@ -49,23 +49,15 @@
           <div>
             <ul class="list-group list-group-flush">
               <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
+                <div class="d-flex fs-5 m-1 p-0">
                 <label class="col-md-3 m-1 fs-6">Password</label>
-                <span class="fs-5 p-0">
-                  {% if show_password %}
-                    {{ users_list[-1].get_pswd() }}  <!-- Show full password -->
-                  {% else %}
-                    {{ '*' * (len(users_list[-1].get_pswd()) - 1) }} <!-- Mask the password -->
-                  {% endif %}
-                </span>
-
-                <form method="GET" action="{{ url_for('accountSecurity') }}" class="d-inline">
-                  <input type="hidden" name="show" value="{% if show_password %}false{% else %}true{% endif %}">
-                  <button type="submit" class="btn btn-outline-success btn-sm ms-2">
-                    {% if show_password %} Hide {% else %} Show {% endif %}
+                  <input type="password" id="password" class="form-control w-auto" value="{{ session['pswd'] }}" disabled>
+                  <button type="button" class="btn btn-outline-success btn-sm ms-2" onclick="togglePassword()">
+                    <i id="eye-icon" class="fa fa-eye"></i>
                   </button>
-                </form>
-
+                </div>
               </li>
+                <a href="/changePswd/{{ session['user_id'] }}" class="btn btn-success">Change Password</a>
             </ul>
           </div>
           {% else %}
@@ -78,5 +70,24 @@
     {% endif %}
   </div>
 </div>
+<script>
+  function togglePassword() {
+    var passwordField = document.getElementById("password");
+    var eyeIcon = document.getElementById("eye-icon");
+
+    if (passwordField.type === "password") {
+      passwordField.type = "text";
+      eyeIcon.classList.remove("fa-eye");
+      eyeIcon.classList.add("fa-eye-slash");
+    } else {
+      passwordField.type = "password";
+      eyeIcon.classList.remove("fa-eye-slash");
+      eyeIcon.classList.add("fa-eye");
+    }
+  }
+</script>
+
+<!-- Add FontAwesome for the eye icon -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
 {% endblock %}

@@ -57,7 +57,7 @@ class User:
         self.__number = number
 
     def set_email(self, email):
-        self.__number = email
+        self.__email = email
 
     def set_pswd(self, pswd):
         self.__pswd = pswd
