@@ -256,6 +256,10 @@ def update_product(id):
     product = Product.query.get_or_404(id)
     form = CreateProductForm(obj=product)
 
+    categories = db.session.query(Product.category).distinct().all()
+    category_choices = [(cat[0], cat[0]) for cat in categories]
+    form.category.choices = category_choices
+
     if request.method == 'POST' and form.validate_on_submit():
         product.name = form.product_name.data
         product.quantity = int(form.quantity.data)
