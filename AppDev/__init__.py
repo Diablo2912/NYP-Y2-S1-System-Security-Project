@@ -198,11 +198,14 @@ def buy_product():
 
     # Get all unique categories
     all_categories = {product.category for product in Product.query.all()}
+    cart = session.get("cart", {})  # Retrieve cart from session
+    total_price = sum(item["price"] * item["quantity"] for item in cart.values())
 
     return render_template('/productPage/buyProduct.html',
                            products=products,
                            all_categories=all_categories,
-                           selected_categories=selected_categories)
+                           selected_categories=selected_categories,
+                           total_price=total_price)
 
 @app.route('/createProduct', methods=['GET', 'POST'])
 def create_product():
