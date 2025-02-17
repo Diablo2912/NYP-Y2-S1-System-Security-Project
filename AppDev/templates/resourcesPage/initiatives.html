@@ -31,7 +31,9 @@
 
         // If a new end date is provided, update it
         if (newEndDate) {
-          info.event.setEnd(newEndDate);
+          let newEnd = new Date(newEndDate);
+          newEnd.setDate(newEnd.getDate() + 1);  // Add one day to fix exclusive end date issue
+          info.event.setEnd(newEnd.toISOString().split('T')[0]);
         } else {
           alert("End date is required.");
         }
@@ -50,12 +52,15 @@
 
           // Validate that the end date is entered correctly
           if (endDate) {
-            // Add the event with start and end dates
+            let newEnd = new Date(endDate);
+            newEnd.setDate(newEnd.getDate() + 1); // Add one day to fix the issue
+
+            // Add the event with adjusted end date
             calendar.addEvent({
               title: eventTitle,
-              start: startDate,  // Use the clicked date as the start date
-              end: endDate,      // Use the entered end date
-              allDay: true        // Mark as an all-day event
+              start: startDate,
+              end: newEnd.toISOString().split('T')[0], // Adjusted end date
+              allDay: true
             });
           } else {
             alert("End date is required.");
