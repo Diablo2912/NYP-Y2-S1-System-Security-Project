@@ -22,7 +22,7 @@ def generate_response(message):
                 f'<a href="{url_for("initiatives")}" class="dynamic-link">Sustainability Initiatives</a>'
             ],
             "products": [
-                f'<a href="{url_for("product")}" class="dynamic-link">Our Products</a>'
+                f'<a href="{url_for("buy_product")}" class="dynamic-link">Our Products</a>'
             ],
             "carbon": [
                 f'<a href="{url_for("carbonFootprintTracker")}" class="dynamic-link">Carbon Footprint Tracker</a>'

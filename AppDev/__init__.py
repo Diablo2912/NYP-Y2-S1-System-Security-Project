@@ -276,7 +276,7 @@ def update_product(id):
             image_file.save(image_path)
 
             # ✅ Ensure `product.image_filename` is never None
-            product.image_filename = filename if filename else "default.jpg"
+            product.image_filename = filename if filename else "default.png"
 
         db.session.commit()
         return redirect(url_for('manageProduct'))  # ✅ Redirect after update
