@@ -10,14 +10,20 @@
     <div class="collapse navbar-collapse justify-content-between" id="navbarSupportedContent">
       <!-- Left-aligned menu items -->
       <ul class="navbar-nav mb-2 mb-lg-0">
+        {% if 'user_id' in session and session['is_staff'] %}
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Products</a>
-          <ul class="dropdown-menu">
-           <li><a class="dropdown-item" href="/buyProduct">Buy Products</a></li>
-              <li><a class="dropdown-item" href="/createProduct">Create Products</a></li>
-           <li><a class="dropdown-item" href="/manageProduct">Manage Products</a></li>
-           </ul>
-         </li>
+              <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="/buyProduct">Buy Products</a></li>
+                <li><a class="dropdown-item" href="/createProduct">Create Products</a></li>
+                <li><a class="dropdown-item" href="/manageProduct">Manage Products</a></li>
+              </ul>
+          </li>
+          {% else %}
+              <li class="nav-item">
+                <a class="nav-link" href="/buyProduct">Buy Products</a>
+              </li>
+            {% endif %}
 
         <li class="nav-item">
           <a class="nav-link" href="/carbonFootprintTracker">CFT</a>

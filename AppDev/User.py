@@ -2,7 +2,6 @@
 class User:
     count_id = 0
 
-    # initializer method
     def __init__(self, first_name, last_name, gender, number, email, pswd, cfm_pswd):
         User.count_id += 1
         self.__user_id = User.count_id
@@ -13,7 +12,10 @@ class User:
         self.__email = email
         self.__pswd = pswd
         self.__cfm_pswd = cfm_pswd
+        self.__is_staff = self.check_if_staff(email)
 
+    def check_if_staff(self, email):
+        return email.endswith('@cropzy.com')
 
     # accessor methods
     def get_user_id(self):
@@ -40,6 +42,9 @@ class User:
     def get_cfm_pswd(self):
         return self.__cfm_pswd
 
+    def get_is_staff(self):
+        return self.__is_staff
+
     # mutator methods
     def set_user_id(self, user_id):
         self.__user_id = user_id
@@ -64,3 +69,6 @@ class User:
 
     def set_cfm_pswd(self, cfm_pswd):
         self.__cfm_pswd = cfm_pswd
+
+    def set_is_staff(self, is_staff):
+        self.__is_staff = is_staff

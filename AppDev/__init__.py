@@ -435,6 +435,7 @@ def login():
                     session['phone'] = user.get_number()
                     session['email'] = user.get_email()
                     session['pswd'] = password
+                    session['is_staff'] = user.get_is_staff()
 
                     flash('Login successful!', 'success')
                     return redirect(url_for('home'))  # Redirect after login
