@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from functools import wraps
 import os
-from Forms import SignUpForm, CreateProductForm, LoginForm
+from Forms import SignUpForm, CreateProductForm, LoginForm, ChangeDetForm, ChangePswdForm
 import shelve, User, Product
 from FeaturedArticles import get_featured_articles
 from Filter import main_blueprint
@@ -337,26 +337,32 @@ def accountInfo():
     db.close()
 
     users_list = []
+
     for key in users_dict:
         user = users_dict.get(key)
         users_list.append(user)
     return render_template('/accountPage/accountInfo.html', count=len(users_list), users_list=users_list)
 
+
 @app.route('/accountSecurity')
 @login_required
 def accountSecurity():
-    users_dict = {}
-    db = shelve.open('user.db', 'r')
-    users_dict = db['Users']
-    db.close()
+    # Fetch the logged-in user’s ID from the session
+    user_id = session.get('user_id')
 
-    users_list = []
-    show_password = request.args.get('show', 'false') == 'true'
+    # Open the database and fetch user information
+    with shelve.open('user.db', 'r') as db:
+        users_dict = db.get('Users', {})
+        user = users_dict.get(user_id)
 
-    for key in users_dict:
-        user = users_dict.get(key)
-        users_list.append(user)
-    return render_template('/accountPage/accountSecurity.html', count=len(users_list), users_list=users_list, len=len, show_password=show_password)
+    # Check if the user exists in the database
+    if user:
+        return render_template('/accountPage/accountSecurity.html', user=user)
+
+    # If the user is not found in the db (just in case)
+    flash("User data not found.", "danger")
+    return redirect(url_for('login'))
+
 
 @app.route('/accountHist')
 @login_required
@@ -370,6 +376,20 @@ def sign_up():
         db = shelve.open('user.db','c')
 
         users_dict = db.get('Users', {})
+
+        existing_users = list(users_dict.values())
+
+        # Check if email or phone number already exists
+        for user in existing_users:
+            if user.get_email() == sign_up_form.email.data:  # Use get_email()
+                flash('Email is already registered. Please use a different email.', 'danger')
+                db.close()
+                return redirect(url_for('sign_up'))
+
+            if user.get_number() == sign_up_form.number.data:  # Use get_number()
+                flash('Phone number is already registered. Please use a different number.', 'danger')
+                db.close()
+                return redirect(url_for('sign_up'))
 
         hashed_password = generate_password_hash(sign_up_form.cfm_pswd.data, method='pbkdf2:sha256')
 
@@ -385,39 +405,46 @@ def sign_up():
         db['Users'] = users_dict
         db.close()
 
-        flash('Sign up successful! Please log in.', 'success')
+        flash('Sign up successful! Please log in.', 'info')
         return redirect(url_for('complete_signUp'))
     return render_template('/accountPage/signUp.html', form=sign_up_form)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     login_form = LoginForm(request.form)
+
     if request.method == 'POST' and login_form.validate():
-        db = shelve.open('user.db', 'c')
-
-        users_dict = db.get('Users', {})
-        db.close()
-
         email = login_form.email.data
         password = login_form.pswd.data
 
-        # Check if user exists
-        for user in users_dict.values():
-            print("Checking user:", user.get_email())
-            if user.get_email() == email:
-                print("User found, checking password...")
-                if check_password_hash(user.get_cfm_pswd(), password):
+        with shelve.open('user.db', 'c') as db:  # Ensures the DB is closed properly
+            users_dict = db.get('Users', {})
+
+            # Find the user by email
+            user = next((u for u in users_dict.values() if u.get_email() == email), None)
+
+            if user:
+                print(f"User found: {user.get_email()}, checking password...")
+
+                if check_password_hash(user.get_cfm_pswd(), password):  # Correct password field
                     session['logged_in'] = True
                     session['user_id'] = user.get_user_id()
-                    session['email'] = user.get_email()
                     session['first_name'] = user.get_first_name()
+                    session['last_name'] = user.get_last_name()
+                    session['gender'] = user.get_gender()
+                    session['phone'] = user.get_number()
+                    session['email'] = user.get_email()
+                    session['pswd'] = password
+                    session['is_staff'] = user.get_is_staff()
+
                     flash('Login successful!', 'success')
-                    return redirect(url_for('home'))  # Redirect to a protected page
+                    return redirect(url_for('home'))  # Redirect after login
 
                 flash('Incorrect password.', 'danger')
                 return redirect(url_for('login'))
 
         flash('Email not found. Please sign up.', 'danger')
+
     return render_template('/accountPage/login.html', form=login_form)
 
 @app.route('/logout')
@@ -436,54 +463,130 @@ def complete_signUp():
 
 @app.route('/changeDets/<int:id>/', methods=['GET', 'POST'])
 def change_dets(id):
-    change_dets_form = SignUpForm(request.form)
-    users_dict = {}
-    db = shelve.open('user.db', 'r')
-    users_dict = db['Users']
-    db.close()
+    change_dets_form = ChangeDetForm(request.form)
 
-    # Get the user object and the list of all users
+    with shelve.open('user.db', 'r') as db:
+        users_dict = db.get('Users', {})
+
     user = users_dict.get(id)
-    users_list = list(users_dict.values())
+
+    if not user:
+        flash("User not found!", "danger")
+        return redirect(url_for('accountInfo'))
 
     if request.method == 'POST' and change_dets_form.validate():
-        db = shelve.open('user.db', 'w')
-        users_dict = db['Users']
+        entered_password = change_dets_form.pswd.data
+        stored_password_hash = user.get_cfm_pswd()  # Ensure this method returns the hashed password
 
-        # Update the user's details
-        user = users_dict.get(id)
-        user.set_first_name(change_dets_form.first_name.data)
-        user.set_last_name(change_dets_form.last_name.data)
-        user.set_gender(change_dets_form.gender.data)
-        user.set_number(change_dets_form.number.data)
-        user.set_email(change_dets_form.email.data)
+        # Check if the entered password matches the stored hashed password
+        if not check_password_hash(stored_password_hash, entered_password):
+            flash("Incorrect password. Please try again.", "danger")
+            return redirect(url_for('change_dets', id=id))
 
-        db['Users'] = users_dict
-        db.close()
+        with shelve.open('user.db', 'w') as db:
+            users_dict = db['Users']
 
+            # Update user details
+            user = users_dict.get(id)
+            user.set_first_name(change_dets_form.first_name.data)
+            user.set_last_name(change_dets_form.last_name.data)
+            user.set_gender(change_dets_form.gender.data)
+            user.set_number(change_dets_form.number.data)
+            user.set_email(change_dets_form.email.data)
+
+            db['Users'] = users_dict
+
+            # Update session details
+            session['user_id'] = user.get_user_id()
+            session['first_name'] = user.get_first_name()
+            session['last_name'] = user.get_last_name()
+            session['gender'] = user.get_gender()
+            session['phone'] = user.get_number()
+            session['email'] = user.get_email()
+
+        flash("Details updated successfully!", "success")
         return redirect(url_for('accountInfo'))
-    else:
-        # Prepopulate form fields
-        change_dets_form.first_name.data = user.get_first_name()
-        change_dets_form.last_name.data = user.get_last_name()
-        change_dets_form.gender.data = user.get_gender()
-        change_dets_form.number.data = user.get_number()
-        change_dets_form.email.data = user.get_email()
 
-        # Pass both form and users_list to the template
-        return render_template('/accountPage/changeDets.html', form=change_dets_form, users_list=users_list)
+    # Prepopulate form fields
+    change_dets_form.first_name.data = user.get_first_name()
+    change_dets_form.last_name.data = user.get_last_name()
+    change_dets_form.gender.data = user.get_gender()
+    change_dets_form.number.data = user.get_number()
+    change_dets_form.email.data = user.get_email()
+
+    return render_template('/accountPage/changeDets.html', form=change_dets_form)
+
+
+@app.route('/changePswd/<int:id>/', methods=['GET', 'POST'])
+@login_required  # Ensure the user is logged in
+def change_pswd(id):
+    change_pswd_form = ChangePswdForm(request.form)
+
+    # Get the currently logged-in user
+    user_id = session['user_id']
+    with shelve.open('user.db', 'r') as db:
+        users_dict = db.get('Users', {})
+
+    user = users_dict.get(user_id)
+
+    if not user:
+        flash("User not found!", "danger")
+        return redirect(url_for('accountInfo'))
+
+    if request.method == 'POST' and change_pswd_form.validate():
+        current_pswd = change_pswd_form.current_pswd.data
+        stored_pswd_hash = user.get_cfm_pswd()  # Ensure this method returns the hashed password
+
+        # Check if the entered current password matches the stored hashed password
+        if not check_password_hash(stored_pswd_hash, current_pswd):
+            flash("Incorrect current password. Please try again.", "danger")
+            return redirect(url_for('change_pswd', id=id))
+
+        # Get the new password and confirm it
+        new_pswd = change_pswd_form.new_pswd.data
+        confirm_pswd = change_pswd_form.confirm_pswd.data
+
+        if new_pswd != confirm_pswd:
+            flash("New passwords do not match. Please try again.", "danger")
+            return redirect(url_for('change_pswd', id=id))
+
+        # Update password in the database
+        with shelve.open('user.db', 'w') as db:
+            users_dict = db['Users']
+
+            # Hash the new password before saving
+            new_pswd_hash = generate_password_hash(new_pswd)
+            user.set_cfm_pswd(new_pswd_hash)  # Update password hash
+
+            db['Users'] = users_dict
+
+            session['pswd'] = confirm_pswd
+
+        flash("Password changed successfully!", "success")
+        return redirect(url_for('accountInfo'))
+
+    return render_template('/accountPage/changePswd.html', form=change_pswd_form)
+
 
 @app.route('/deleteUser/<int:id>', methods=['POST'])
 def delete_user(id):
-    users_dict = {}
     db = shelve.open('user.db', 'w')
-    users_dict = db['Users']
+    users_dict = db.get('Users', {})
 
-    users_dict.pop(id)
-    db['Users'] = users_dict
+    if id in users_dict:
+        del users_dict[id]  # Remove the user from the database
+        db['Users'] = users_dict
+        db.close()
+
+        # Clear the session after deletion
+        session.clear()
+
+        flash("Account deleted successfully!", "success")
+        return redirect(url_for('home'))  # Redirect to home page after logout
+
     db.close()
-
-    return redirect(url_for('accountInfo'))
+    flash("User not found.", "danger")
+    return redirect(url_for('account_info'))
 
 @app.route("/create_update", methods=['GET', 'POST'])
 def create_update():
