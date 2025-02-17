@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
+from flask import Flask, Response, render_template, request, redirect, url_for, session, jsonify, flash
 from functools import wraps
 import os
 from Forms import SignUpForm, CreateProductForm, LoginForm, ChangeDetForm, ChangePswdForm
@@ -51,7 +51,7 @@ UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# ✅ Ensure Uploads Directory Exists
+# Ensure Uploads Directory Exists
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
@@ -247,10 +247,23 @@ def manageProduct():
 
     if not products:
         print("❌ No products found in the database.")  # Debugging message
+        if request.args.get("export") == "csv":
+            return "No products found.", 404
         return render_template('/productPage/manageProduct.html', products=[])
 
-    print(f"✅ Loaded {len(products)} products for management.")  # Debugging message
+    # Handle CSV Export
+    if request.args.get("export") == "csv":
+        def generate():
+            data = ["Product Name,Quantity,Category,Price,CO2,Description,Image Filename\n"]
+            for product in products:
+                data.append(f"{product.name},{product.quantity},{product.category},{product.price},{product.co2},{product.description},{product.image_filename}\n")
+            return "".join(data)
 
+        response = Response(generate(), mimetype='text/csv')
+        response.headers["Content-Disposition"] = "attachment; filename=products.csv"
+        return response
+
+    print(f"✅ Loaded {len(products)} products for management.")  # Debugging message
     return render_template('/productPage/manageProduct.html', products=products)
 
 @app.route('/updateProduct/<int:id>/', methods=['GET', 'POST'])
@@ -270,14 +283,14 @@ def update_product(id):
         product.co2 = float(form.co2.data)
         product.description = form.product_description.data
 
-        # ✅ Handle Image Upload
+        # Handle Image Upload
         image_file = form.product_image.data
         if image_file and image_file.filename != '':
             filename = secure_filename(image_file.filename)
             image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             image_file.save(image_path)
 
-            # ✅ Ensure `product.image_filename` is never None
+            # Ensure `product.image_filename` is never None
             product.image_filename = filename if filename else "default.png"
 
         db.session.commit()
