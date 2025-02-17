@@ -34,7 +34,6 @@ def generate_response(message):
                 f'<a href="{url_for("contactUs")}" class="dynamic-link">Contact Us</a>'
             ],
             "account": [
-                f'<a href="{url_for("accountInfo")}" class="dynamic-link">View Account Info</a>',
                 f'<a href="{url_for("sign_up")}" class="dynamic-link">Sign Up</a>',
                 f'<a href="{url_for("login")}" class="dynamic-link">Login</a>'
             ],

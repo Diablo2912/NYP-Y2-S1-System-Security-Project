@@ -176,8 +176,10 @@ def home():
     chart3_data = base64.b64encode(buffer3.getvalue()).decode('utf-8')
     buffer3.close()
 
+    welcome_message = f"Welcome, {session['first_name']}!" if 'first_name' in session else "Welcome!"
+
     return render_template('/home/homePage.html', articles=articles, updates=updates, chart1_data=chart1_data,
-                           chart2_data=chart2_data, chart3_data=chart3_data)
+                           chart2_data=chart2_data, chart3_data=chart3_data, welcome_message=welcome_message)
 
 @app.route('/buyProduct', methods=['GET'])
 def buy_product():
