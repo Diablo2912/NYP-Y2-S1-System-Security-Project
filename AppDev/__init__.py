@@ -269,11 +269,16 @@ def manageProduct():
 @app.route('/updateProduct/<int:id>/', methods=['GET', 'POST'])
 def update_product(id):
     product = Product.query.get_or_404(id)
-    form = CreateProductForm(obj=product)
+    form = CreateProductForm(obj=product)  # Prepopulate form fields
 
+    # Ensure category dropdown is populated
     categories = db.session.query(Product.category).distinct().all()
     category_choices = [(cat[0], cat[0]) for cat in categories]
     form.category.choices = category_choices
+
+    if request.method == 'GET':
+        form.product_name.data = product.name
+        form.product_description.data = product.description
 
     if request.method == 'POST' and form.validate_on_submit():
         product.name = form.product_name.data
@@ -281,7 +286,7 @@ def update_product(id):
         product.category = form.category.data
         product.price = float(form.price.data)
         product.co2 = float(form.co2.data)
-        product.description = form.product_description.data
+        product.description = form.product_description.data  # Ensure this is updated
 
         # Handle Image Upload
         image_file = form.product_image.data
@@ -289,12 +294,10 @@ def update_product(id):
             filename = secure_filename(image_file.filename)
             image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             image_file.save(image_path)
-
-            # Ensure `product.image_filename` is never None
             product.image_filename = filename if filename else "default.png"
 
         db.session.commit()
-        return redirect(url_for('manageProduct'))  # ✅ Redirect after update
+        return redirect(url_for('manageProduct'))
 
     return render_template('/productPage/updateProduct.html', form=form, product=product)
 
@@ -310,7 +313,7 @@ def delete_product(id):
 
     db.session.delete(product)
     db.session.commit()
-    return redirect(url_for('manageProduct'))  #
+    return redirect(url_for('manageProduct'))
 
 @app.route('/view_products')
 def view_products():
