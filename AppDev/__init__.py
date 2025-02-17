@@ -28,7 +28,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = '5791262abcdefg'
 UPLOAD_FOLDER = 'static/uploads/'  # Define where images are stored
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-stripe.api_key = "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"
+stripe.api_key = "sk_test_51Qrle9CddzoT6fzjpqNPd1g3UV8ScbnxiiPK5uYT0clGPV82Gn7QPwcakuijNv4diGpcbDadJjzunwRcWo0eOXvb00uDZ2Gnw6"
 
 images = UploadSet('images', IMAGES)
 
