@@ -26,3 +26,5 @@ pip install google-generativeai
 
 pip install flask-uploads
 
+pip install email_validator
+
