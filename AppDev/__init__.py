@@ -2,15 +2,12 @@ from flask import Flask, render_template, request, redirect, url_for, session, j
 from functools import wraps
 import os
 from Forms import SignUpForm, CreateProductForm, LoginForm, ChangeDetForm, ChangePswdForm
-import shelve, User, Product
+import shelve, User
 from FeaturedArticles import get_featured_articles
 from Filter import main_blueprint
 from seasonalUpdateForm import SeasonalUpdateForm
-from ProductsList import load_products
 from datetime import datetime, timedelta
 from flask_mail import Mail, Message
-import random
-from flask_sqlalchemy import SQLAlchemy
 import pandas as pd
 import matplotlib.pyplot as plt
 from io import BytesIO
@@ -18,9 +15,7 @@ import base64
 from chatbot import generate_response
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_uploads import configure_uploads, IMAGES, UploadSet
-from werkzeug.utils import secure_filename
 from modelsProduct import db, Product
-from sqlalchemy import text
 import stripe
 import uuid  # For unique transaction IDs
 import smtplib
@@ -40,15 +35,12 @@ images = UploadSet('images', IMAGES)
 app.register_blueprint(main_blueprint)
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
-app.config['MAIL_USERNAME'] = 'ngiam.brandon3@gmail.com'
+app.config['MAIL_USERNAME'] = 'ngiam.brandon@gmail.com'
 app.config['MAIL_PASSWORD'] = 'isgw cesr jdbs oytx'
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
 mail = Mail(app)
 
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///products.db'
-# app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-# sql_db = SQLAlchemy(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///products.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -69,14 +61,10 @@ EMAIL_SENDER = "sadevdulneth6@gmail.com"
 EMAIL_PASSWORD = "isgw cesr jdbs oytx"
 
 
-
-
-
 with app.app_context():
     db.create_all()
 
 #CFT on SQL#
-
 
 def login_required(f):
     @wraps(f)
@@ -86,7 +74,6 @@ def login_required(f):
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated_function
-
 
 @app.route('/add_sample_products/')
 def add_sample_products():
@@ -192,19 +179,28 @@ def home():
     return render_template('/home/homePage.html', articles=articles, updates=updates, chart1_data=chart1_data,
                            chart2_data=chart2_data, chart3_data=chart3_data)
 
-
 @app.route('/buyProduct', methods=['GET'])
 def buy_product():
-    products = Product.query.all()  # Fetch all products from the database
+    # Get selected categories (list of selected checkboxes)
+    selected_categories = request.args.getlist('category')  # ✅ Use getlist() for multiple selections
 
-    if not products:
-        print("❌ No products found in the database.")  # Debugging message
-        return render_template('/productPage/buyProduct.html', products=[])
+    # Base query
+    query = Product.query
 
-    categories = {product.category for product in products}  # Extract unique categories
-    print(f"✅ Loaded {len(products)} products.")  # Debugging message
+    # Apply category filter (if any category is selected)
+    if selected_categories:
+        query = query.filter(Product.category.in_(selected_categories))
 
-    return render_template('/productPage/buyProduct.html', products=products, all_categories=categories)
+    # Get filtered products
+    products = query.all()
+
+    # Get all unique categories
+    all_categories = {product.category for product in Product.query.all()}
+
+    return render_template('/productPage/buyProduct.html',
+                           products=products,
+                           all_categories=all_categories,
+                           selected_categories=selected_categories)  # ✅ Pass selected categories
 
 @app.route('/createProduct', methods=['GET', 'POST'])
 def create_product():
@@ -283,8 +279,6 @@ def update_product(id):
 
     return render_template('/productPage/updateProduct.html', form=form, product=product)
 
-
-
 @app.route('/deleteProduct/<int:id>', methods=['POST'])
 def delete_product(id):
     product = Product.query.get_or_404(id)
@@ -350,7 +344,6 @@ def clear_products():
         return f"Error: {str(e)}"
 
     return product_list
-
 
 @app.route('/carbonFootprintTracker', methods=['GET', 'POST'])
 def carbonFootprintTracker():
@@ -483,7 +476,6 @@ def accountSecurity():
     flash("User data not found.", "danger")
     return redirect(url_for('login'))
 
-
 @app.route('/accountHist')
 @login_required
 def accountHist():
@@ -573,10 +565,6 @@ def logout():
     flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
 
-# @app.route('/cart')
-# def cart():
-#    return render_template('/checkout/cart.html')
-
 @app.route('/complete_signUp')
 def complete_signUp():
    return render_template('/accountPage/complete_signUp.html')
@@ -636,7 +624,6 @@ def change_dets(id):
 
     return render_template('/accountPage/changeDets.html', form=change_dets_form)
 
-
 @app.route('/changePswd/<int:id>/', methods=['GET', 'POST'])
 @login_required  # Ensure the user is logged in
 def change_pswd(id):
@@ -686,7 +673,6 @@ def change_pswd(id):
         return redirect(url_for('accountInfo'))
 
     return render_template('/accountPage/changePswd.html', form=change_pswd_form)
-
 
 @app.route('/deleteUser/<int:id>', methods=['POST'])
 def delete_user(id):
@@ -981,8 +967,6 @@ def cart():
     total_price = sum(item["price"] * item["quantity"] for item in cart.values())  # Calculate total price
 
     return render_template('/checkout/cart.html', cart=cart, total_price=total_price)
-
-
 
 @app.route('/chat', methods=['POST'])
 def chat():

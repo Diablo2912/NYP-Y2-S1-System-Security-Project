@@ -77,16 +77,18 @@
     <div class="row">
         <!-- Filter Section -->
         <div class="col-lg-3 mb-4">
-            <button class="btn btn-secondary w-100 mb-3" data-bs-toggle="collapse" data-bs-target="#filter-section">FILTER</button>
-            <div id="filter-section" class="collapse">
+    <button class="btn btn-secondary w-100 mb-3" data-bs-toggle="collapse" data-bs-target="#filter-section">
+        FILTER
+    </button>
+        <div id="filter-section" class="collapse">
                 <div class="card p-3">
-                    <form method="GET" action="{{ url_for('buy_product') }}">
+                    <form method="GET" action="{{ url_for('buy_product') }}">  <!-- ✅ Corrected action -->
                         <div class="mb-3">
                             <h5>Product Category</h5>
                             {% for category in all_categories %}
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" name="category" value="{{ category }}" id="{{ category }}"
-                                    {% if category in selected_categories %}checked{% endif %}>
+                                    {% if category in selected_categories %}checked{% endif %}>  <!-- ✅ Keeps selection -->
                                 <label class="form-check-label" for="{{ category }}">{{ category }}</label>
                             </div>
                             {% endfor %}
@@ -127,15 +129,5 @@
         </div>
     </div>
 </div>
-
-<!-- Bootstrap Script to Trigger Sidebar -->
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        {% if session['show_cart'] %}
-        var cartSidebar = new bootstrap.Offcanvas(document.getElementById("cartSidebar"));
-        cartSidebar.show();
-        {% endif %}
-    });
-</script>
 
 {% endblock %}
