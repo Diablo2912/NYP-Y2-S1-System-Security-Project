@@ -4,29 +4,69 @@
 {% block content %}
 {% from "includes/_formHelper.html" import render_field %}
 
-<h1 class="display-4">Create Product</h1>
+<div class="container mt-5">
+    <h1 class="display-4 text-center text-success">Create a New Product</h1>
 
-<form method="POST" action="" enctype="multipart/form-data">
-  <div class="form-group">
-    {{ render_field(form.product_image, class="form-control") }}
-  </div>
-  <div class="form-group">
-    {{ render_field(form.product_name, class="form-control") }}
-  </div>
-  <div class="form-group">
-    {{ render_field(form.quantity, class="form-control", type="number", min="0") }}
-  </div>
-  <div class="form-group">
-    {{ render_field(form.category, class="form-control") }}
-  </div>
-  <div class="form-group">
-    {{ render_field(form.price, class="form-control", type="number", min="0") }}
-  </div>
-  <div id="prof">
-    <div class="form-group">
-      {{ render_field(form.product_description, class="form-control") }}
+    <div class="card shadow-lg p-4 mt-4">
+        <form method="POST" action="" enctype="multipart/form-data">
+            {{ form.hidden_tag() }}
+
+            <!-- Product Image Upload -->
+            <div class="form-group mb-3">
+                <label for="product_image" class="form-label">Product Image</label>
+                <input type="file" class="form-control" id="product_image" name="product_image" accept="image/*">
+            </div>
+
+            <!-- Product Name -->
+            <div class="form-group mb-3">
+                <label for="product_name">Product Name</label>
+                {{ form.product_name(class="form-control", placeholder="e.g. Organic Wheat Seeds") }}
+            </div>
+
+            <!-- Quantity -->
+            <div class="form-group mb-3">
+                <label for="quantity">Quantity</label>
+                {{ form.quantity(class="form-control", type="number", min="0", placeholder="e.g. 10") }}
+            </div>
+
+            <!-- Category Dropdown -->
+            <div class="form-group mb-3">
+                <label for="category">Category</label>
+                <select class="form-control" id="category" name="category">
+                    {% for value, label in form.category.choices %}
+                        <option value="{{ value }}" {% if form.category.data == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Price -->
+            <div class="form-group mb-3">
+                <label for="price">Price ($)</label>
+                {{ form.price(class="form-control", type="number", min="0", step="0.01", placeholder="e.g. 10.00") }}
+            </div>
+
+            <!-- CO₂ Emissions -->
+            <div class="form-group mb-3">
+                <label for="co2">CO₂ Emissions (kg)</label>
+                {{ form.co2(class="form-control", type="number", min="0", step="0.01", placeholder="e.g. 2.5") }}
+            </div>
+
+            <!-- Product Description -->
+            <div class="form-group mb-3">
+                <label for="product_description">Product Description</label>
+                {{ form.product_description(class="form-control", rows="3", placeholder="Provide details about the product") }}
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="btn btn-success w-100">Create Product</button>
+        </form>
     </div>
-  </div>
-  <input type="submit" value="Submit" class="btn btn-primary"/>
-</form>
+
+    <div class="text-center mt-4">
+        <a href="{{ url_for('manageProduct') }}" class="btn btn-outline-secondary">Manage Products</a>
+        <a href="{{ url_for('buy_product') }}" class="btn btn-outline-primary">Back to Shop</a>
+    </div>
+</div>
 {% endblock %}

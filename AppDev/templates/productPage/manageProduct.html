@@ -1,85 +1,55 @@
 {% extends "base.html" %}
-{% block title %}Retrieve Products{% endblock %}
+{% block title %}Manage Products{% endblock %}
 
 {% block content %}
-<h1 class="display-4">Manage Products</h1>
-<div>
-  {% if count == 0 %}
-  <p>There are no products.</p>
-  {% elif count == 1 %}
-  <p>There is 1 product.</p>
-  {% else %}
-  <p>There are {{ count }} product.</p>
-  {% endif %}
-</div>
-<div>
-  <table class="table table-striped">
-    <thead>
-      <tr>
-        <th>Product ID</th>
-        <th>Product Image</th>
-        <th>Product Name</th>
-        <th>Quantity</th>
-        <th>Category</th>
-        <th>Price</th>
-        <th>Product Description</th>
-        <th></th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for product in product_list %}
-     <tr>
-         <td>{{ product.get_product_id() }}</td>
-         <td>
-             <img src="{{ url_for('static', filename='uploads/' + product.get_product_image()) }}"
-         alt="Product Image" width="100">
-         </td>
-         <td>{{ product.get_product_name() }}</td>
-         <td>{{ product.get_quantity() }}</td>
-         <td>{{ product.get_category() }}</td>
-         <td>{{ product.get_price() }}</td>
-         <td>{{ product.get_product_description() }}</td>
-         <td><a href="/updateProduct/{{product.get_product_id()}}" class="btn btn-warning">Update</a></td>
-         <td>
-           <form action="{{url_for('delete_product', id=product.get_product_id())}}" method="POST">
+<div class="container mt-4">
+    <h1 class="display-4 text-center">Manage Products</h1>
 
-<button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#myModal_{{product.get_product_id()}}">
-  Delete
-</button>
+    {% if products %}
+    <table class="table table-bordered table-hover mt-4">
+        <thead class="thead-dark">
+            <tr>
+                <th>ID</th>
+                <th>Image</th>
+                <th>Name</th>
+                <th>Quantity</th>
+                <th>Category</th>
+                <th>Price ($)</th>
+                <th>CO₂ (kg)</th>
+                <th>Description</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in products %}
+            <tr>
+                <td>{{ product.id }}</td>
+                <td>
+                    <img src="{{ url_for('static', filename='uploads/' + product.image_filename) }}"
+                         alt="Product Image" width="80" class="rounded">
+                </td>
+                <td>{{ product.name }}</td>
+                <td>{{ product.quantity }}</td>
+                <td>{{ product.category }}</td>
+                <td>${{ "%.2f"|format(product.price) }}</td>
+                <td>{{ product.co2 }} kg</td>
+                <td>{{ product.description }}</td>
+                <td>
+                    <a href="{{ url_for('update_product', id=product.id) }}" class="btn btn-warning btn-sm">Edit</a>
+                    <form action="{{ url_for('delete_product', id=product.id) }}" method="POST" class="d-inline">
+                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete {{ product.name }}?');">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-center text-danger">No products found in inventory!</p>
+    {% endif %}
 
-<!-- The Modal -->
-<div class="modal" id="myModal_{{product.get_product_id()}}">
-  <div class="modal-dialog">
-    <div class="modal-content">
-
-      <!-- Modal Header -->
-      <div class="modal-header">
-        <h4 class="modal-title">Delete Confirmation</h4>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-
-      <!-- Modal body -->
-      <div class="modal-body">
-        Are you sure you want to delete {{product.get_product_name()}} {{product.get_quantity()}}?
-      </div>
-
-      <!-- Modal footer -->
-      <div class="modal-footer">
-        <input type="submit" value="Delete" class="btn btn-danger">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-      </div>
+    <div class="text-center mt-4">
+        <a href="{{ url_for('create_product') }}" class="btn btn-success">Add New Product</a>
     </div>
-  </div>
-</div>
-          </form>
-        </td>
-     </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-    <form method="POST">
-        <button type="submit" name="export_csv">Export to CSV</button>
-    </form>
 </div>
 {% endblock %}

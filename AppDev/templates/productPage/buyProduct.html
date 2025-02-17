@@ -4,20 +4,59 @@
 <div class="container">
     <h1 class="text-center my-4">Products</h1>
 
+    <!-- Sidebar Cart Button -->
+    <div class="d-flex justify-content-end mb-3">
+        <button class="btn btn-outline-success" type="button" data-bs-toggle="offcanvas" data-bs-target="#cartSidebar">
+            🛒 View Cart
+        </button>
+    </div>
+
+    <!-- Bootstrap Offcanvas Sidebar Cart -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="cartSidebar">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title text-success">Your Cart</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body">
+            {% if session['cart'] %}
+                <ul class="list-group">
+                    {% for product_id, item in session['cart'].items() %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <img src="{{ item.image }}" width="50" class="rounded">
+                        <div>
+                            <h6 class="mb-0">{{ item.name }}</h6>
+                            <small>${{ item.price }} x {{ item.quantity }}</small>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+
+                <div class="text-end mt-3">
+                    <h5 class="text-success">Total: ${{ total_price }}</h5>
+                </div>
+
+                <form action="{{ url_for('clear_cart') }}" method="POST" class="mt-3">
+                    <button type="submit" class="btn btn-danger w-100">Clear Cart</button>
+                </form>
+
+                <a href="{{ url_for('checkout') }}" class="btn btn-primary w-100 mt-2">Checkout</a>
+            {% else %}
+                <p class="text-center text-danger">Your cart is empty!</p>
+            {% endif %}
+        </div>
+    </div>
+
     <!-- Featured Products Section -->
     <div class="row mb-4">
         <div class="col-12">
             <h2 class="text-center">Featured Products</h2>
         </div>
-        {% for product in products[:3] %}  <!-- Use 'products' instead of 'load_products' -->
+        {% for product in products[:3] %}
         <div class="col-md-4 mb-4">
             <div class="card h-100">
                 <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 180px;">
-                    {% if product.image_filename %}
-                        <img src="{{ url_for('static', filename='uploads/' ~ product.image_filename) }}" alt="{{ product.name }}" class="img-fluid" style="max-height: 180px;">
-                    {% else %}
-                        <img src="{{ url_for('static', filename='uploads/default.jpg') }}" alt="Default Image" class="img-fluid" style="max-height: 180px;">
-                    {% endif %}
+                    <img src="{{ url_for('static', filename='uploads/' + (product.image_filename or 'default.jpg')) }}"
+                         alt="{{ product.name }}" class="img-fluid" style="max-height: 180px;">
                 </div>
                 <div class="card-body">
                     <h5 class="card-title">{{ product.name }}</h5>
@@ -26,7 +65,9 @@
                     <p class="card-text">PRICE: ${{ "%.2f"|format(product.price) }}</p>
                 </div>
                 <div class="card-footer text-center">
-                    <button class="btn btn-success w-100">Add to Cart</button>
+                    <form action="{{ url_for('add_to_cart', product_id=product.id) }}" method="POST">
+                        <button type="submit" class="btn btn-success w-100">Add to Cart</button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -39,7 +80,7 @@
             <button class="btn btn-secondary w-100 mb-3" data-bs-toggle="collapse" data-bs-target="#filter-section">FILTER</button>
             <div id="filter-section" class="collapse">
                 <div class="card p-3">
-                    <form method="GET" action="{{ url_for('product') }}">
+                    <form method="GET" action="{{ url_for('buy_product') }}">
                         <div class="mb-3">
                             <h5>Product Category</h5>
                             {% for category in all_categories %}
@@ -63,11 +104,8 @@
                 <div class="col-md-4 mb-4">
                     <div class="card h-100">
                         <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 180px;">
-                            {% if product.image_filename %}
-                                <img src="{{ url_for('static', filename='uploads/' ~ product.image_filename) }}" alt="{{ product.name }}" class="img-fluid" style="max-height: 180px;">
-                            {% else %}
-                                <img src="{{ url_for('static', filename='uploads/default.jpg') }}" alt="Default Image" class="img-fluid" style="max-height: 180px;">
-                            {% endif %}
+                            <img src="{{ url_for('static', filename='uploads/' + (product.image_filename or 'default.jpg')) }}"
+                                 alt="{{ product.name }}" class="img-fluid" style="max-height: 180px;">
                         </div>
                         <div class="card-body">
                             <h5 class="card-title">{{ product.name }}</h5>
@@ -76,7 +114,9 @@
                             <p class="card-text">PRICE: ${{ "%.2f"|format(product.price) }}</p>
                         </div>
                         <div class="card-footer text-center">
-                            <button class="btn btn-success w-100">Add to Cart</button>
+                            <form action="{{ url_for('add_to_cart', product_id=product.id) }}" method="POST">
+                                <button type="submit" class="btn btn-success w-100">Add to Cart</button>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -87,4 +127,15 @@
         </div>
     </div>
 </div>
+
+<!-- Bootstrap Script to Trigger Sidebar -->
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        {% if session['show_cart'] %}
+        var cartSidebar = new bootstrap.Offcanvas(document.getElementById("cartSidebar"));
+        cartSidebar.show();
+        {% endif %}
+    });
+</script>
+
 {% endblock %}

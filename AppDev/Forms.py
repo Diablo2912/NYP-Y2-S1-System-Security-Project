@@ -2,6 +2,7 @@ from wtforms import *
 import re
 from wtforms import FileField
 from flask_wtf.file import FileAllowed
+from flask_wtf import FlaskForm
 class SignUpForm(Form):
     def no_numbers(form, field):
         if re.search(r'\d', field.data):
@@ -44,13 +45,17 @@ class LoginForm(Form):
     email = EmailField('Email*',[validators.Email(), validators.DataRequired()])
     pswd = PasswordField('Password*', [validators.Length(min=8, message='Password must be at least 8 characters.'), validators.DataRequired()])
 
-class CreateProductForm(Form):
-    product_name = StringField('Product Name',[validators.Length(min=1, max=150), validators.DataRequired()],
-                             render_kw={"placeholder": "e.g. Wheat Seeds"})
-    quantity = StringField('Quantity',[validators.Length(min=1, max=150), validators.DataRequired()],
-                            render_kw={"placeholder": "e.g. 10"})
-    category = SelectField('Category', [validators.DataRequired()], choices=[('', 'Select'), ('Fruits', 'Fruits'), ('Cereal Crops', 'Cereal Crops')], default='')
-    price = StringField('Price',[validators.Length(min=1, max=150), validators.DataRequired()],
-                            render_kw={"placeholder": "e.g. 10.00"})
+class CreateProductForm(FlaskForm):
+    product_name = StringField('Product Name', [validators.Length(min=1, max=150), validators.DataRequired()],
+                               render_kw={"placeholder": "e.g. Wheat Seeds"})
+    quantity = IntegerField('Quantity', [validators.DataRequired()], render_kw={"placeholder": "e.g. 10"})
+
+    # ✅ Ensure category field has correct choices
+    category = SelectField('Category', [validators.DataRequired()], choices=[])
+
+    price = DecimalField('Price', [validators.DataRequired()], render_kw={"placeholder": "e.g. 10.00"})
+    co2 = DecimalField('CO₂ Emissions (kg)', [validators.Optional()], render_kw={"placeholder": "e.g. 2.5"})
     product_description = TextAreaField('Product Description', [validators.Optional()])
     product_image = FileField('Product Image', validators=[FileAllowed(['jpg', 'png', 'jpeg'], 'Only images allowed!')])
+
+    submit = SubmitField('Create Product')

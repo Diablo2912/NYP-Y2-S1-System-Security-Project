@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="text-center text-success">Thank You for Your Order!</h2>
+    <p class="text-center text-dark">Your order has been placed successfully.</p>
+
+    <!-- Order Details -->
+    <h4 class="text-dark mt-4">Order Summary</h4>
+    <div class="border p-3 bg-light">
+        {% for product_id, item in order.items() %}
+        <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+            <img src="{{ item.image }}" width="50" alt="{{ item.name }}">
+            <div>
+                <h6 class="text-success">{{ item.name }}</h6>
+                <p class="text-dark">${{ "%.2f"|format(item.price) }} x {{ item.quantity }}</p>
+            </div>
+        </div>
+        {% endfor %}
+        <h5 class="text-success mt-3">Total: ${{ "%.2f"|format(total_price) }}</h5>
+    </div>
+
+    <!-- Customer Information -->
+    <h4 class="text-dark mt-4">Shipping Information</h4>
+    <ul class="list-group">
+        <li class="list-group-item"><strong>Name:</strong> {{ customer.name }}</li>
+        <li class="list-group-item"><strong>Email:</strong> {{ customer.email }}</li>
+        <li class="list-group-item"><strong>Phone:</strong> {{ customer.phone }}</li>
+        <li class="list-group-item"><strong>Address:</strong> {{ customer.address_line1 }}, {{ customer.region }}</li>
+        <li class="list-group-item"><strong>Order Date:</strong> {{ order_date }}</li>
+    </ul>
+
+    <a href="{{ url_for('buy_product') }}" class="btn btn-primary mt-4">Continue Shopping</a>
+</div>
+{% endblock %}

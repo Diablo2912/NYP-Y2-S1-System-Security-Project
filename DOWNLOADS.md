@@ -28,3 +28,4 @@ pip install flask-uploads
 
 pip install email_validator
 
+pip install stripe

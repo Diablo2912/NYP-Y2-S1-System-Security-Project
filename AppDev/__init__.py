@@ -19,11 +19,21 @@ from chatbot import generate_response
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_uploads import configure_uploads, IMAGES, UploadSet
 from werkzeug.utils import secure_filename
+from modelsProduct import db, Product
+from sqlalchemy import text
+import stripe
+import uuid  # For unique transaction IDs
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+import os
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '5791262abcdefg'
 UPLOAD_FOLDER = 'static/uploads/'  # Define where images are stored
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+stripe.api_key = "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"
 
 images = UploadSet('images', IMAGES)
 
@@ -36,26 +46,37 @@ app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
 mail = Mail(app)
 
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///products.db'
+# app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# sql_db = SQLAlchemy(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///products.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-sql_db = SQLAlchemy(app)
+
+db.init_app(app)
 app.permanent_session_lifetime = timedelta(minutes=90)
-#CFT on SQL#
 
-class ProductCFT(sql_db.Model):
-    id = sql_db.Column(sql_db.Integer, primary_key=True)
-    name = sql_db.Column(sql_db.String(100), nullable=False)
-    quantity = sql_db.Column(sql_db.Integer, nullable=False)
-    category = sql_db.Column(sql_db.String(50), nullable=False)
-    price = sql_db.Column(sql_db.Float, nullable=False)
-    co2 = sql_db.Column(sql_db.Float, nullable=False)
+UPLOAD_FOLDER = 'static/uploads'  # ✅ Ensure your static folder has 'uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-    def __repr__(self):
-        return f'<Product {self.name}>'
+# ✅ Ensure Uploads Directory Exists
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+EMAIL_SENDER = "sadevdulneth6@gmail.com"
+EMAIL_PASSWORD = "isgw cesr jdbs oytx"
+
+
+
 
 
 with app.app_context():
-    sql_db.create_all()
+    db.create_all()
+
+#CFT on SQL#
+
 
 def login_required(f):
     @wraps(f)
@@ -66,247 +87,346 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-#testing for sql
+
 @app.route('/add_sample_products/')
 def add_sample_products():
     sample_products = [
-        ProductCFT(name="Corn", quantity=100, category="Crops", price=2.50, co2=10),
-        ProductCFT(name="Apple", quantity=100, category="Fruits", price=1.50, co2=5),
-        ProductCFT(name="Rice", quantity=100, category="Crops", price=3.50, co2=8),
-        ProductCFT(name="Potato", quantity=100, category="Roots", price=2.00, co2=6),
-        ProductCFT(name="Banana", quantity=100, category="Fruits", price=1.75, co2=4),
-        ProductCFT(name="Tomato", quantity=80, category="Vegetables", price=2.25, co2=7),
-        ProductCFT(name="Carrot", quantity=120, category="Vegetables", price=1.95, co2=5),
-        ProductCFT(name="Strawberry", quantity=60, category="Berries", price=3.00, co2=9)
+        # Organic Seeds
+        Product(name="Organic Wheat Seeds", quantity=50, category="Organic Seeds", price=5.99, co2=2.5),
+        Product(name="Organic Corn Seeds", quantity=60, category="Organic Seeds", price=4.99, co2=3.0),
+        Product(name="Organic Tomato Seeds", quantity=40, category="Organic Seeds", price=6.49, co2=1.8),
+
+        # Natural Fertilizers
+        Product(name="Organic Compost", quantity=100, category="Natural Fertilizers", price=12.99, co2=0.8),
+        Product(name="Vermicompost", quantity=80, category="Natural Fertilizers", price=15.99, co2=0.6),
+        Product(name="Seaweed Fertilizer", quantity=50, category="Natural Fertilizers", price=18.49, co2=1.2),
+
+        # Biodegradable Pest Control
+        Product(name="Neem Oil Spray", quantity=70, category="Biodegradable Pest Control", price=9.99, co2=0.4),
+        Product(name="Diatomaceous Earth", quantity=90, category="Biodegradable Pest Control", price=7.99, co2=0.5),
+
+        # Eco-Friendly Farming Tools
+        Product(name="Bamboo Hand Trowel", quantity=30, category="Eco-Friendly Farming Tools", price=8.99, co2=1.0),
+        Product(name="Solar-Powered Irrigation Timer", quantity=20, category="Eco-Friendly Farming Tools", price=34.99, co2=2.2),
+
+        # Regenerative Agriculture Products
+        Product(name="Cover Crop Mix", quantity=25, category="Regenerative Agriculture", price=14.99, co2=2.8),
+        Product(name="Biochar Soil Amendment", quantity=35, category="Regenerative Agriculture", price=19.99, co2=1.5)
     ]
 
-    sql_db.session.add_all(sample_products)
-    sql_db.session.commit()
-
-    return "Sample products added!"
+    db.session.add_all(sample_products)
+    db.session.commit()
+    return "Sample sustainable agricultural products added!"
 
 @app.route('/')
 def home():
-    # if 'logged_in' not in session:
-    #     flash('Please log in to access this page.', 'warning')
-    #     return redirect(url_for('login'))
-
     articles = get_featured_articles()
-
     updates = []
+
     with shelve.open('seasonal_updates.db') as db:
         updates = db.get('updates', [])
 
-    products = ProductCFT.query.all()
+    # Retrieve all products
+    products = Product.query.all()
 
-    # pandas code
-    data = [{'name': product.name, 'co2': product.co2} for product in products]
+    if not products:
+        return render_template('/home/homePage.html', articles=articles, updates=updates, chart1_data=None,
+                               chart2_data=None, chart3_data=None)
+
+    # Convert product data to Pandas DataFrame
+    data = [{'name': product.name, 'category': product.category, 'co2': product.co2} for product in products]
     df = pd.DataFrame(data)
 
+    # Ensure there is data before plotting
+    if df.empty:
+        return render_template('/home/homePage.html', articles=articles, updates=updates, chart1_data=None,
+                               chart2_data=None, chart3_data=None)
+
+    # ✅ 1️⃣ Chart: Total CO₂ Emissions Per Product
     plt.figure(figsize=(10, 5))
-    #plt.bar(df['name'], df['co2'], color='skyblue')
+    plt.bar(df['name'], df['co2'], color='skyblue')
     plt.xlabel('Product Name')
-    plt.ylabel('CO2 Emissions (kg)')
-    plt.title('CO2 Emissions by Product')
+    plt.ylabel('CO₂ Emissions (kg)')
+    plt.title('CO₂ Emissions by Product')
     plt.xticks(rotation=45)
     plt.tight_layout()
 
-    # Save plot to a buffer
-    buffer = BytesIO()
-    plt.savefig(buffer, format='png')
-    buffer.seek(0)
-    chart_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
-    buffer.close()  # Always close the buffer after using it
+    buffer1 = BytesIO()
+    plt.savefig(buffer1, format='png')
+    buffer1.seek(0)
+    chart1_data = base64.b64encode(buffer1.getvalue()).decode('utf-8')
+    buffer1.close()
 
-    welcome_message = f"Welcome, {session['first_name']}!" if 'first_name' in session else "Welcome!"
+    # ✅ 2️⃣ Chart: CO₂ Emissions by Product Category
+    category_totals = df.groupby('category')['co2'].sum()
+    plt.figure(figsize=(8, 5))
+    plt.pie(category_totals, labels=category_totals.index, autopct='%1.1f%%', startangle=140)
+    plt.title('CO₂ Emissions by Product Category')
 
-    return render_template('/home/homePage.html', articles=articles, updates=updates, product=load_products(), chart_data=chart_data, welcome_message=welcome_message)
+    buffer2 = BytesIO()
+    plt.savefig(buffer2, format='png')
+    buffer2.seek(0)
+    chart2_data = base64.b64encode(buffer2.getvalue()).decode('utf-8')
+    buffer2.close()
 
-@app.route('/buyProduct')
-def product():
-    categories = request.args.getlist("category")  # Get selected categories
-    all_products = load_products()  # Load all products
+    # ✅ 3️⃣ Chart: Highest vs. Lowest CO₂ Emission Products
+    highest = df.nlargest(3, 'co2')
+    lowest = df.nsmallest(3, 'co2')
 
-    # Filter products based on selected categories
-    if categories:
-        filtered_products = [p for p in all_products if p.category in categories]
-    else:
-        filtered_products = all_products  # Show all if no filter is applied
+    plt.figure(figsize=(10, 5))
+    plt.bar(highest['name'], highest['co2'], color='red', label="Highest CO₂")
+    plt.bar(lowest['name'], lowest['co2'], color='green', label="Lowest CO₂")
+    plt.xlabel('Product Name')
+    plt.ylabel('CO₂ Emissions (kg)')
+    plt.title('Highest vs. Lowest CO₂ Emission Products')
+    plt.xticks(rotation=45)
+    plt.legend()
+    plt.tight_layout()
 
-    # Extract unique categories for the filter UI
-    all_categories = {product.category for product in all_products}
+    buffer3 = BytesIO()
+    plt.savefig(buffer3, format='png')
+    buffer3.seek(0)
+    chart3_data = base64.b64encode(buffer3.getvalue()).decode('utf-8')
+    buffer3.close()
 
-    return render_template('productPage/buyProduct.html',
-                           products=filtered_products,
-                           all_categories=all_categories,
-                           selected_categories=categories)
+    return render_template('/home/homePage.html', articles=articles, updates=updates, chart1_data=chart1_data,
+                           chart2_data=chart2_data, chart3_data=chart3_data)
+
+
+@app.route('/buyProduct', methods=['GET'])
+def buy_product():
+    products = Product.query.all()  # Fetch all products from the database
+
+    if not products:
+        print("❌ No products found in the database.")  # Debugging message
+        return render_template('/productPage/buyProduct.html', products=[])
+
+    categories = {product.category for product in products}  # Extract unique categories
+    print(f"✅ Loaded {len(products)} products.")  # Debugging message
+
+    return render_template('/productPage/buyProduct.html', products=products, all_categories=categories)
 
 @app.route('/createProduct', methods=['GET', 'POST'])
 def create_product():
-    create_product_form = CreateProductForm(request.form)
+    form = CreateProductForm()
 
-    if request.method == 'POST' and create_product_form.validate():
-        product_dict = {}
-        db = shelve.open('product.db', 'c')
+    # ✅ Fetch unique categories from database
+    categories = db.session.query(Product.category).distinct().all()
+    category_choices = [(category[0], category[0]) for category in categories]
 
-        try:
-            product_dict = db['Product']
-        except:
-            print("Error in retrieving Products from product.db.")
+    # ✅ Ensure there is a default option in dropdown
+    form.category.choices = [('', 'Select Category')] + category_choices
 
-        image_file = request.files.get('product_image')  # Get the uploaded file
+    if request.method == 'POST' and form.validate_on_submit():
+        name = form.product_name.data
+        quantity = int(form.quantity.data)
+        category = form.category.data
+        price = float(form.price.data)
+        co2 = float(form.co2.data)
+        description = form.product_description.data
 
+        # ✅ Handle Image Upload
+        image_file = form.product_image.data
         if image_file and image_file.filename != '':
-            filename = secure_filename(image_file.filename)  # Sanitize filename
-            filepath = os.path.join(UPLOAD_FOLDER, filename)  # Define path
-            image_file.save(filepath)  # Save image manually
+            filename = secure_filename(image_file.filename)
+            image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            image_file.save(image_path)
         else:
             filename = "default.jpg"
 
-        product = Product.Product(create_product_form.product_name.data, create_product_form.quantity.data, create_product_form.category.data, create_product_form.price.data, create_product_form.product_description.data, filename)
-        product_dict[product.get_product_id()] = product
-        db['Product'] = product_dict
+        new_product = Product(name=name, quantity=quantity, category=category, price=price, co2=co2,
+                              description=description, image_filename=filename)
 
-        db.close()
+        db.session.add(new_product)
+        db.session.commit()
+        return redirect(url_for('buy_product'))
 
-        return redirect(url_for('manageProduct'))
-    return render_template('/productPage/createProduct.html', form=create_product_form)
+    return render_template('/productPage/createProduct.html', form=form)
 
-@app.route('/manageProduct', methods=['GET', 'POST'])
+@app.route('/manageProduct')
 def manageProduct():
-    product_dict = {}
-    db = shelve.open('product.db', 'r')
-    product_dict = db['Product']
-    db.close()
+    products = Product.query.all()  # Fetch all products from the database
 
-    product_list = []
-    for key in product_dict:
-        product = product_dict.get(key)
-        product_list.append(product)
-    if request.method == 'POST' and 'export_csv' in request.form:
-        # Convert users_list to a list of dictionaries (or convert it in the format you need)
-        product_data = []
-        for product in product_list:
-            product_data.append({
-                'Product ID': product.get_product_id(),
-                'Product Image': product.get_product_image(),
-                'Product Name': product.get_product_name(),
-                'Quantity': product.get_quantity(),
-                'Category': product.get_category(),
-                'Price': product.get_price(),
-                'Product Description': product.get_product_description()
-            })
+    if not products:
+        print("❌ No products found in the database.")  # Debugging message
+        return render_template('/productPage/manageProduct.html', products=[])
 
-        # Create a DataFrame from the list of user data
-        df = pd.DataFrame(product_data)
+    print(f"✅ Loaded {len(products)} products for management.")  # Debugging message
 
-        # Export to CSV
-        df.to_csv('products_data.csv', index=False)
-
-        # Return a success message or handle the export feedback to the user
-        return redirect(url_for('manageProduct'))  # Redirect to the same page (or a success page)
-
-    return render_template('/productPage/manageProduct.html', count=len(product_list), product_list=product_list)
+    return render_template('/productPage/manageProduct.html', products=products)
 
 @app.route('/updateProduct/<int:id>/', methods=['GET', 'POST'])
 def update_product(id):
-    update_product_form = CreateProductForm(request.form)
-    if request.method == 'POST' and update_product_form.validate():
-        product_dict = {}
-        db = shelve.open('product.db', 'w')
-        product_dict = db['Product']
+    product = Product.query.get_or_404(id)
+    form = CreateProductForm(obj=product)
 
-        product = product_dict.get(id)
-        product.set_product_image(update_product_form.product_image.data)
-        product.set_product_name(update_product_form.product_name.data)
-        product.set_quantity(update_product_form.quantity.data)
-        product.set_category(update_product_form.category.data)
-        product.set_price(update_product_form.price.data)
-        product.set_product_description(update_product_form.product_description.data)
+    if request.method == 'POST' and form.validate_on_submit():
+        product.name = form.product_name.data
+        product.quantity = int(form.quantity.data)
+        product.category = form.category.data
+        product.price = float(form.price.data)
+        product.co2 = float(form.co2.data)
+        product.description = form.product_description.data
 
-        db['Product'] = product_dict
-        db.close()
+        # ✅ Handle Image Upload
+        image_file = form.product_image.data
+        if image_file and image_file.filename != '':
+            filename = secure_filename(image_file.filename)
+            image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            image_file.save(image_path)
 
-        return redirect(url_for('manageProduct'))
-    else:
-        product_dict = {}
-        db = shelve.open('product.db', 'r')
-        product_dict = db['Product']
-        db.close()
+            # ✅ Ensure `product.image_filename` is never None
+            product.image_filename = filename if filename else "default.jpg"
 
-        product = product_dict.get(id)
-        update_product_form.product_image.data = product.get_product_image()
-        update_product_form.product_name.data = product.get_product_name()
-        update_product_form.quantity.data = product.get_quantity()
-        update_product_form.category.data = product.get_category()
-        update_product_form.price.data = product.get_price()
-        update_product_form.product_description.data = product.get_product_description()
+        db.session.commit()
+        return redirect(url_for('manageProduct'))  # ✅ Redirect after update
 
-        return render_template('/productPage/updateProduct.html', form=update_product_form)
+    return render_template('/productPage/updateProduct.html', form=form, product=product)
 
 
 
 @app.route('/deleteProduct/<int:id>', methods=['POST'])
 def delete_product(id):
-    db = shelve.open('product.db', 'w')
-    product_dict = db.get('Product', {})
+    product = Product.query.get_or_404(id)
 
-    product = product_dict.get(id)
-    if product:
-        # Delete the image file from static/uploads
-        image_path = os.path.join(UPLOAD_FOLDER, product.get_product_image())
-        if os.path.exists(image_path) and product.get_product_image() != 'default.jpg':
+    # ✅ Delete image if it's not default
+    if product.image_filename != "default.jpg":
+        image_path = os.path.join(app.config['UPLOAD_FOLDER'], product.image_filename)
+        if os.path.exists(image_path):
             os.remove(image_path)
 
-        # Remove product data from the dictionary
-        product_dict.pop(id)
-
-        # Save changes to the db
-        db['Product'] = product_dict
-    db.close()
-
-    return redirect(url_for('manageProduct'))
+    db.session.delete(product)
+    db.session.commit()
+    return redirect(url_for('manageProduct'))  # ✅ Redirect after delete
 
 @app.route('/view_products')
 def view_products():
-    productsCFT = ProductCFT.query.all()
-    if not productsCFT:
-        return "<p>No products found in the database!</p>"
+    products = Product.query.all()  # Fetch all products from the database
 
-    # Display each product's details in HTML
-    product_list = "<h1>Product List</h1><ul>"
-    for product in productsCFT:
-        product_list += f"<li>{product.name}: Quantity={product.quantity}, CO2={product.co2} kg</li>"
-    product_list += "</ul>"
+    if not products:
+        return "<p style='color: red; font-size: 20px; text-align: center;'>No products found in the database!</p>"
+
+    # Display products as an HTML list
+    product_list = """
+    <div style="text-align: center; font-family: Arial;">
+        <h1 style="color: green;">Product List</h1>
+        <table border="1" style="margin: auto; width: 80%; border-collapse: collapse;">
+            <tr style="background-color: #f2f2f2;">
+                <th>ID</th>
+                <th>Name</th>
+                <th>Quantity</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>CO₂ Emissions (kg)</th>
+                <th>Description</th>
+            </tr>
+    """
+
+    for product in products:
+        product_list += f"""
+            <tr>
+                <td>{product.id}</td>
+                <td>{product.name}</td>
+                <td>{product.quantity}</td>
+                <td>{product.category}</td>
+                <td>${"{:.2f}".format(product.price)}</td>
+                <td>{product.co2} kg</td>
+                <td>{product.description}</td>
+            </tr>
+        """
+
+    product_list += "</table></div>"
 
     return product_list
 
+@app.route('/clearProducts', methods=['POST', 'GET'])
+def clear_products():
+    try:
+        num_deleted = db.session.query(Product).delete()  # Deletes all products
+        db.session.commit()
+        return f"Successfully deleted {num_deleted} products!"
+    except Exception as e:
+        db.session.rollback()
+        return f"Error: {str(e)}"
+
+    return product_list
+
+
 @app.route('/carbonFootprintTracker', methods=['GET', 'POST'])
 def carbonFootprintTracker():
-    selected_products = []
-    total_co2 = 0
+    if 'selected_products' not in session:
+        session['selected_products'] = []  # Initialize session storage
 
-    productsCFT = ProductCFT.query.all()
+    products = Product.query.all()
 
     if request.method == 'POST':
-        product_names = request.form.getlist('product[]')
+        product_name = request.form.get('product')
 
-        # Query selected products from the database
-        for name in product_names:
-            product = ProductCFT.query.filter_by(name=name).first()
-            if product:
-                selected_products.append(product)
-                total_co2 += product.co2
+        # Find the product from the database
+        product = Product.query.filter_by(name=product_name).first()
 
-        return render_template('carbonFootprintTracker.html',
-                               productsCFT=productsCFT,
-                               selected_products=selected_products,
-                               total_co2=total_co2)
+        if product:
+            # ✅ Store full product details in session storage
+            session['selected_products'].append({
+                'id': product.id,
+                'name': product.name,
+                'category': product.category,
+                'co2': product.co2
+            })
+            session.modified = True  # ✅ Save session changes
+
+    # ✅ Recalculate total CO₂ emissions AFTER session update
+    selected_products = session['selected_products']
+    total_co2 = sum(product['co2'] for product in selected_products)  # ✅ Fix CO₂ calculation
+
+    co2_equivalent = ""
+    goal_status = ""
+
+    # 1️⃣ CO₂ Impact Comparisons (Real-world equivalents)
+    if total_co2 > 0:
+        if total_co2 < 10:
+            co2_equivalent = "Equivalent to charging a smartphone 1,200 times."
+        elif total_co2 < 30:
+            co2_equivalent = "Equivalent to driving a car for 10 miles."
+        elif total_co2 < 50:
+            co2_equivalent = "Equivalent to running an AC for 3 hours."
+        else:
+            co2_equivalent = "Equivalent to 100kg of CO₂ emitted!"
+
+    # 2️⃣ Suggest Low-Emission Alternatives
+    suggested_alternatives = []
+    for product in selected_products:
+        if 'category' in product:  # ✅ Ensure category exists before querying
+            low_co2_alternative = Product.query.filter(
+                Product.category == product['category'], Product.co2 < product['co2']
+            ).order_by(Product.co2).first()
+
+            if low_co2_alternative:
+                suggested_alternatives.append((product, low_co2_alternative))
+
+    # 3️⃣ CO₂ Reduction Goal Tracker
+    target_co2_limit = 30  # Set a sustainable benchmark
+    if total_co2 < target_co2_limit:
+        goal_status = f"✅ You are within the sustainable limit! ({total_co2}kg CO₂)"
+    else:
+        goal_status = f"⚠️ Reduce emissions! Try staying under {target_co2_limit}kg CO₂."
 
     return render_template('carbonFootprintTracker.html',
-                           productsCFT=productsCFT,
-                           selected_products=[],
-                           total_co2=0)
+                           products=products,
+                           selected_products=selected_products,
+                           total_co2=total_co2,  # ✅ Correctly updated CO₂ total
+                           co2_equivalent=co2_equivalent,
+                           suggested_alternatives=suggested_alternatives,
+                           goal_status=goal_status)
+
+# Route to delete a selected product from the tracker
+@app.route('/deleteSelectedProduct/<int:product_id>', methods=['POST'])
+def deleteSelectedProduct(product_id):
+    if 'selected_products' in session:
+        session['selected_products'] = [p for p in session['selected_products'] if p['id'] != product_id]
+        session.modified = True  # Save session changes
+
+    return redirect(url_for('carbonFootprintTracker'))  # Redirect back
 
 @app.route('/educationalGuide')
 def educationalGuide():
@@ -453,9 +573,9 @@ def logout():
     flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
 
-@app.route('/cart')
-def cart():
-   return render_template('/checkout/cart.html')
+# @app.route('/cart')
+# def cart():
+#    return render_template('/checkout/cart.html')
 
 @app.route('/complete_signUp')
 def complete_signUp():
@@ -672,83 +792,197 @@ def request_delete(index):
             flash('Invalid update index.', 'danger')
             return redirect(url_for('home'))
 
-@app.route("/checkout", methods=["GET", "POST"])
-def checkout():
-    cart = get_cart()
-    total_price = sum(item["price"] * item["quantity"] for item in cart.values())
+@app.route('/update_cart', methods=['POST'])
+def update_cart():
+    product_id = request.form.get("product_id")
+    action = request.form.get("action")
+    cart = session.get("cart", {})
 
-    if request.method == "POST":
-        customer_name = request.form['customer_name']
-        phone_number = request.form['phone_number']
-        email_address = request.form['email_address']
-        customer_address = request.form['customer_address']
-        postal_code = request.form['postal_code']
-        customer_city = request.form['customer_city']
-        order_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        transaction_id = str(random.randint(10000, 99999))
+    if product_id in cart:
+        if action == "increase":
+            cart[product_id]['quantity'] += 1
+        elif action == "decrease":
+            cart[product_id]['quantity'] -= 1
+            if cart[product_id]['quantity'] <= 0:
+                del cart[product_id]
 
-        order = {
-            'id': transaction_id,
-            'customer_name': customer_name,
-            'phone_number': phone_number,
-            'email_address': email_address,
-            'customer_address': customer_address,
-            'postal_code': postal_code,
-            'customer_city': customer_city,
-            'cart': cart,
-            'total_price': total_price,
-            'order_date': order_date  # Added order_date field here
+    session["cart"] = cart  # ✅ Update the session cart
+    session.modified = True  # ✅ Save changes
+    return redirect(url_for('buy_product'))
+
+@app.route('/add_to_cart/<int:product_id>', methods=['POST'])
+def add_to_cart(product_id):
+    cart = session.get("cart", {})
+
+    product = Product.query.get(product_id)
+    if not product:
+        flash("❌ Product not found!", "danger")
+        return redirect(url_for('buy_product'))
+
+    if str(product_id) in cart:
+        cart[str(product_id)]['quantity'] += 1
+    else:
+        cart[str(product_id)] = {
+            "name": product.name,
+            "price": float(product.price),
+            "image": url_for('static', filename='uploads/' + (product.image_filename or 'default.jpg')),  # ✅ Include Image
+            "quantity": 1
         }
 
-        if "transactions" not in session:
-            session["transactions"] = []
-        session["transactions"].append(order)
-        session.modified = True
+    session["cart"] = cart
+    session["show_cart"] = True  # ✅ Ensure sidebar opens after adding
+    session.modified = True
 
-        # Send the confirmation email
-        msg = Message("Order Confirmation",
-                      sender="ngiam.brandon@gmail.com",
-                      recipients=[email_address])
-        msg.body = f"""
-        Dear {customer_name},
+    flash(f"✅ {product.name} added to cart!", "success")
+    return redirect(url_for('buy_product'))
 
-        Thank you for your order!
+@app.route('/clear_cart', methods=['POST'])
+def clear_cart():
+    session["cart"] = {}  # ✅ Clear the cart
+    session.modified = True  # ✅ Save session changes
+    flash("🛒 Cart cleared!", "info")
+    return redirect(url_for('buy_product'))  # ✅ Redirect back to the Buy Product page
 
-        Order Details:
-        ---------------------------
-        Transaction ID: {transaction_id}
-        Name: {customer_name}
-        Phone: {phone_number}
-        Email: {email_address}
-        Address: {customer_address}
-        Postal Code: {postal_code}
-        City: {customer_city}
-        Date: {order_date}
-        Total: ${total_price}
+@app.route('/create-checkout-session', methods=['POST'])
+def create_checkout_session():
+    cart = session.get("cart", {})
 
-        Ordered Items:
-        """
-        for item in cart.values():
-            msg.body += f"\n- {item['name']} (x{item['quantity']}) - ${item['price'] * item['quantity']}"
-        msg.body += "\n\nThank you for shopping with us!"
+    if not cart:
+        return redirect(url_for('buy_product'))
 
-        try:
-            mail.send(msg)
-            print("Order confirmation email sent successfully.")
-        except Exception as e:
-            print(f"Error sending email: {e}")
+    session["customer"] = {
+        "name": request.form.get("name"),
+        "email": request.form.get("email"),
+        "phone": request.form.get("phone"),
+        "address_line1": request.form.get("address_line1"),
+        "address_line2": request.form.get("address_line2"),
+        "province": request.form.get("province"),
+        "postal_code": request.form.get("postal_code"),
+    }
+    session.modified = True
 
-        session.pop("cart", None)
+    # ✅ Use real product data
+    line_items = [
+        {
+            "price_data": {
+                "currency": "usd",
+                "product_data": {"name": item["name"]},
+                "unit_amount": int(item["price"] * 100),
+            },
+            "quantity": item["quantity"],
+        }
+        for item in cart.values()
+    ]
 
-        # Pass the order data to the order_success page
-        return render_template("/checkout/order_success.html", order=order)
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=line_items,
+            mode="payment",
+            customer_email=request.form.get("email"),
+            success_url=url_for('thank_you', _external=True) + "?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=url_for('checkout', _external=True),
+        )
+        return redirect(checkout_session.url)
+    except Exception as e:
+        return f"Error: {str(e)}", 500
 
-    return render_template("/checkout/cart.html", cart=cart, total_price=total_price)
+@app.route('/checkout', methods=['GET'])
+def checkout():
+    cart = session.get("cart", {})  # Get cart from session
+    total_price = sum(item["price"] * item["quantity"] for item in cart.values())  # Calculate total price
 
-def get_cart():
-    if "cart" not in session:
-        session["cart"] = {}
-    return session["cart"]
+    return render_template('/checkout/checkout.html', cart=cart, total_price=total_price)
+
+def send_email(to_email, subject, message):
+    """Send an email using SMTP."""
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = EMAIL_SENDER
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(message, 'plain'))
+
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server.sendmail(EMAIL_SENDER, to_email, msg.as_string())
+        server.quit()
+        print(f"✅ Email sent successfully to {to_email}")
+
+    except Exception as e:
+        print(f"❌ Email failed to send: {e}")
+
+@app.route('/thank_you')
+def thank_you():
+    session_id = request.args.get('session_id')
+    if not session_id:
+        return "Invalid request", 400
+
+    try:
+        stripe_session = stripe.checkout.Session.retrieve(session_id)
+
+        if stripe_session.payment_status == "paid":
+            order = session.get("cart", {})
+            customer = session.get("customer", {})
+            total_price = sum(item['price'] * item['quantity'] for item in order.values())
+            order_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+            transaction_id = str(uuid.uuid4())[:6]  # Generate a random transaction ID
+
+            if "transactions" not in session:
+                session["transactions"] = []
+            session["transactions"].append({
+                "id": transaction_id,
+                "name": customer.get("name", "N/A"),
+                "email": customer.get("email", "N/A"),
+                "total": total_price,
+                "date": order_date
+            })
+            session.modified = True
+
+            # ✅ Send Confirmation Email (if email is provided)
+            if customer.get("email"):
+                email_subject = "Order Confirmation"
+                email_message = f"""
+                Thank you for your purchase, {customer.get('name', 'Customer')}!\n
+                Transaction ID: {transaction_id}
+                Total Price: ${total_price}
+                Date: {order_date}
+                """
+                send_email(customer.get("email"), email_subject, email_message)
+
+            # ✅ Clear the cart after successful payment
+            session.pop("cart", None)
+            session.pop("customer", None)
+
+            return render_template('checkout/thanks.html', order=order, customer=customer,
+                                   total_price=total_price, order_date=order_date,
+                                   transaction_id=transaction_id)
+        else:
+            return "Payment not confirmed", 400
+    except Exception as e:
+        return f"Error retrieving session: {str(e)}", 500
+
+@app.route('/transactions', methods=['GET'])
+def transactions():
+    transactions = session.get("transactions", [])  # Get transaction history from session
+
+    # ✅ Search Filter (If user enters a search term)
+    search_query = request.args.get("search", "").strip().lower()
+    if search_query:
+        transactions = [t for t in transactions if search_query in t["id"].lower() or search_query in t["name"].lower()]
+
+    return render_template('checkout/transaction.html', transactions=transactions, search_query=search_query)
+
+@app.route('/cart', methods=['GET', 'POST'])
+def cart():
+    cart = session.get("cart", {})  # Retrieve cart from session
+    total_price = sum(item["price"] * item["quantity"] for item in cart.values())  # Calculate total price
+
+    return render_template('/checkout/cart.html', cart=cart, total_price=total_price)
+
+
 
 @app.route('/chat', methods=['POST'])
 def chat():

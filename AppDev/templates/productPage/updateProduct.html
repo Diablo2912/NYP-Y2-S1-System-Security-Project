@@ -4,29 +4,52 @@
 {% block content %}
 {% from "includes/_formHelper.html" import render_field %}
 
-<h1 class="display-4">Update Product</h1>
+<div class="container mt-4">
+    <h1 class="display-4 text-center">Update Product</h1>
 
-<form method="POST" action="" enctype="multipart/form-data">
-  <div class="form-group">
-    {{ render_field(form.product_image, class="form-control") }}
-  </div>
-  <div class="form-group">
-    {{ render_field(form.product_name, class="form-control") }}
-  </div>
-  <div class="form-group">
-    {{ render_field(form.quantity, class="form-control") }}
-  </div>
-  <div class="form-group">
-    {{ render_field(form.category, class="form-control") }}
-  </div>
-  <div class="form-group">
-    {{ render_field(form.price, class="form-check", style="list-style-type:none") }}
-  </div>
-  <div id="prof">
-    <div class="form-group">
-      {{ render_field(form.product_description, class="form-control") }}
+    <form method="POST" action="" enctype="multipart/form-data">
+        {{ form.hidden_tag() }}
+
+        <div class="form-group text-center">
+            <label>Current Product Image:</label><br>
+            <img src="{{ url_for('static', filename='uploads/' + (product.image_filename or 'default.jpg')) }}"
+                 alt="Product Image" width="150" class="rounded">
+        </div>
+
+        <div class="form-group">
+            {{ render_field(form.product_image, class="form-control") }}
+        </div>
+
+        <div class="form-group">
+            {{ render_field(form.product_name, class="form-control") }}
+        </div>
+
+        <div class="form-group">
+            {{ render_field(form.quantity, class="form-control", type="number", min="0") }}
+        </div>
+
+        <div class="form-group">
+            {{ render_field(form.category, class="form-control") }}
+        </div>
+
+        <div class="form-group">
+            {{ render_field(form.price, class="form-control", type="number", min="0") }}
+        </div>
+
+        <div class="form-group">
+            {{ render_field(form.co2, class="form-control", type="number", min="0") }}
+        </div>
+
+        <div class="form-group">
+            {{ render_field(form.product_description, class="form-control") }}
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">Update Product</button>
+    </form>
+
+    <div class="text-center mt-3">
+        <a href="{{ url_for('manageProduct') }}" class="btn btn-secondary">Back to Inventory</a>
     </div>
-  </div>
-  <input type="submit" value="Submit" class="btn btn-primary"/>
-</form>
+</div>
 {% endblock %}
+
