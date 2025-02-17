@@ -50,7 +50,7 @@ class CreateProductForm(FlaskForm):
                                render_kw={"placeholder": "e.g. Wheat Seeds"})
     quantity = IntegerField('Quantity', [validators.DataRequired()], render_kw={"placeholder": "e.g. 10"})
 
-    # ✅ Ensure category field has correct choices
+    # ensure category field has correct choices
     category = SelectField('Category', [validators.DataRequired()], choices=[])
 
     price = DecimalField('Price', [validators.DataRequired()], render_kw={"placeholder": "e.g. 10.00"})

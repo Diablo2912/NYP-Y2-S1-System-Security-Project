@@ -2,7 +2,7 @@
 
 {% block content %}
 
-<!-- Bootstrap-styled Home Page -->
+
 <h1 class="text-center my-4">{{ welcome_message if welcome_message else "Home" }}</h1>
 <div class="container">
     <header class="mb-4">
@@ -137,7 +137,7 @@
         <div class="card p-4 shadow">
             <h2 class="text-success mb-3">CO₂ Emissions Insights</h2>
 
-            <!-- 1️⃣ CO₂ Emissions Per Product -->
+            <!-- co2 emissions per product -->
             <div class="text-center">
                 <h4>CO₂ Emissions by Product</h4>
                 {% if chart1_data %}
@@ -147,7 +147,7 @@
                 {% endif %}
             </div>
 
-            <!-- 2️⃣ CO₂ Emissions Per Category -->
+            <!-- co2 emission for category -->
             <div class="text-center mt-4">
                 <h4>CO₂ Emissions by Product Category</h4>
                 {% if chart2_data %}
@@ -157,7 +157,7 @@
                 {% endif %}
             </div>
 
-            <!-- 3️⃣ High vs. Low CO₂ Products -->
+            <!-- 3rd chart -->
             <div class="text-center mt-4">
                 <h4>Highest vs. Lowest CO₂ Emission Products</h4>
                 {% if chart3_data %}

@@ -47,7 +47,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 app.permanent_session_lifetime = timedelta(minutes=90)
 
-UPLOAD_FOLDER = 'static/uploads'  # ✅ Ensure your static folder has 'uploads'
+UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
@@ -129,7 +129,7 @@ def home():
         return render_template('/home/homePage.html', articles=articles, updates=updates, chart1_data=None,
                                chart2_data=None, chart3_data=None)
 
-    # ✅ 1️⃣ Chart: Total CO₂ Emissions Per Product
+    # chart 1
     plt.figure(figsize=(10, 5))
     plt.bar(df['name'], df['co2'], color='skyblue')
     plt.xlabel('Product Name')
@@ -144,7 +144,7 @@ def home():
     chart1_data = base64.b64encode(buffer1.getvalue()).decode('utf-8')
     buffer1.close()
 
-    # ✅ 2️⃣ Chart: CO₂ Emissions by Product Category
+    # chart 2
     category_totals = df.groupby('category')['co2'].sum()
     plt.figure(figsize=(8, 5))
     plt.pie(category_totals, labels=category_totals.index, autopct='%1.1f%%', startangle=140)
@@ -156,7 +156,7 @@ def home():
     chart2_data = base64.b64encode(buffer2.getvalue()).decode('utf-8')
     buffer2.close()
 
-    # ✅ 3️⃣ Chart: Highest vs. Lowest CO₂ Emission Products
+    # chart 3
     highest = df.nlargest(3, 'co2')
     lowest = df.nsmallest(3, 'co2')
 
@@ -184,7 +184,7 @@ def home():
 @app.route('/buyProduct', methods=['GET'])
 def buy_product():
     # Get selected categories (list of selected checkboxes)
-    selected_categories = request.args.getlist('category')  # ✅ Use getlist() for multiple selections
+    selected_categories = request.args.getlist('category')  # for multiple sections
 
     # Base query
     query = Product.query
@@ -202,17 +202,17 @@ def buy_product():
     return render_template('/productPage/buyProduct.html',
                            products=products,
                            all_categories=all_categories,
-                           selected_categories=selected_categories)  # ✅ Pass selected categories
+                           selected_categories=selected_categories)
 
 @app.route('/createProduct', methods=['GET', 'POST'])
 def create_product():
     form = CreateProductForm()
 
-    # ✅ Fetch unique categories from database
+    # fetch categories from database
     categories = db.session.query(Product.category).distinct().all()
     category_choices = [(category[0], category[0]) for category in categories]
 
-    # ✅ Ensure there is a default option in dropdown
+
     form.category.choices = [('', 'Select Category')] + category_choices
 
     if request.method == 'POST' and form.validate_on_submit():
@@ -223,7 +223,7 @@ def create_product():
         co2 = float(form.co2.data)
         description = form.product_description.data
 
-        # ✅ Handle Image Upload
+        # image upload
         image_file = form.product_image.data
         if image_file and image_file.filename != '':
             filename = secure_filename(image_file.filename)
@@ -289,7 +289,7 @@ def update_product(id):
 def delete_product(id):
     product = Product.query.get_or_404(id)
 
-    # ✅ Delete image if it's not default
+    # delete image if its not default
     if product.image_filename != "default.jpg":
         image_path = os.path.join(app.config['UPLOAD_FOLDER'], product.image_filename)
         if os.path.exists(image_path):
@@ -297,7 +297,7 @@ def delete_product(id):
 
     db.session.delete(product)
     db.session.commit()
-    return redirect(url_for('manageProduct'))  # ✅ Redirect after delete
+    return redirect(url_for('manageProduct'))  #
 
 @app.route('/view_products')
 def view_products():
@@ -306,7 +306,7 @@ def view_products():
     if not products:
         return "<p style='color: red; font-size: 20px; text-align: center;'>No products found in the database!</p>"
 
-    # Display products as an HTML list
+
     product_list = """
     <div style="text-align: center; font-family: Arial;">
         <h1 style="color: green;">Product List</h1>
@@ -365,23 +365,23 @@ def carbonFootprintTracker():
         product = Product.query.filter_by(name=product_name).first()
 
         if product:
-            # ✅ Store full product details in session storage
+            # store product details
             session['selected_products'].append({
                 'id': product.id,
                 'name': product.name,
                 'category': product.category,
                 'co2': product.co2
             })
-            session.modified = True  # ✅ Save session changes
+            session.modified = True  # save session changes
 
-    # ✅ Recalculate total CO₂ emissions AFTER session update
+    # calculate co2 emission
     selected_products = session['selected_products']
-    total_co2 = sum(product['co2'] for product in selected_products)  # ✅ Fix CO₂ calculation
+    total_co2 = sum(product['co2'] for product in selected_products)
 
     co2_equivalent = ""
     goal_status = ""
 
-    # 1️⃣ CO₂ Impact Comparisons (Real-world equivalents)
+    # co2 impact comparison
     if total_co2 > 0:
         if total_co2 < 10:
             co2_equivalent = "Equivalent to charging a smartphone 1,200 times."
@@ -392,10 +392,10 @@ def carbonFootprintTracker():
         else:
             co2_equivalent = "Equivalent to 100kg of CO₂ emitted!"
 
-    # 2️⃣ Suggest Low-Emission Alternatives
+    # co2 alternative suggestions
     suggested_alternatives = []
     for product in selected_products:
-        if 'category' in product:  # ✅ Ensure category exists before querying
+        if 'category' in product:
             low_co2_alternative = Product.query.filter(
                 Product.category == product['category'], Product.co2 < product['co2']
             ).order_by(Product.co2).first()
@@ -403,7 +403,7 @@ def carbonFootprintTracker():
             if low_co2_alternative:
                 suggested_alternatives.append((product, low_co2_alternative))
 
-    # 3️⃣ CO₂ Reduction Goal Tracker
+    # co2 goal tracker
     target_co2_limit = 30  # Set a sustainable benchmark
     if total_co2 < target_co2_limit:
         goal_status = f"✅ You are within the sustainable limit! ({total_co2}kg CO₂)"
@@ -413,7 +413,7 @@ def carbonFootprintTracker():
     return render_template('carbonFootprintTracker.html',
                            products=products,
                            selected_products=selected_products,
-                           total_co2=total_co2,  # ✅ Correctly updated CO₂ total
+                           total_co2=total_co2,
                            co2_equivalent=co2_equivalent,
                            suggested_alternatives=suggested_alternatives,
                            goal_status=goal_status)
@@ -798,8 +798,8 @@ def update_cart():
             if cart[product_id]['quantity'] <= 0:
                 del cart[product_id]
 
-    session["cart"] = cart  # ✅ Update the session cart
-    session.modified = True  # ✅ Save changes
+    session["cart"] = cart  # update session cart
+    session.modified = True  # save changes
     return redirect(url_for('buy_product'))
 
 @app.route('/add_to_cart/<int:product_id>', methods=['POST'])
@@ -822,7 +822,7 @@ def add_to_cart(product_id):
         }
 
     session["cart"] = cart
-    session["show_cart"] = True  # ✅ Ensure sidebar opens after adding
+    session["show_cart"] = True
     session.modified = True
 
     flash(f"✅ {product.name} added to cart!", "success")
@@ -830,10 +830,10 @@ def add_to_cart(product_id):
 
 @app.route('/clear_cart', methods=['POST'])
 def clear_cart():
-    session["cart"] = {}  # ✅ Clear the cart
-    session.modified = True  # ✅ Save session changes
+    session["cart"] = {}
+    session.modified = True
     flash("🛒 Cart cleared!", "info")
-    return redirect(url_for('buy_product'))  # ✅ Redirect back to the Buy Product page
+    return redirect(url_for('buy_product'))
 
 @app.route('/create-checkout-session', methods=['POST'])
 def create_checkout_session():
@@ -853,7 +853,7 @@ def create_checkout_session():
     }
     session.modified = True
 
-    # ✅ Use real product data
+
     line_items = [
         {
             "price_data": {
@@ -933,7 +933,7 @@ def thank_you():
             })
             session.modified = True
 
-            # ✅ Send Confirmation Email (if email is provided)
+            # send confirmation email
             if customer.get("email"):
                 email_subject = "Order Confirmation"
                 email_message = f"""
@@ -944,7 +944,7 @@ def thank_you():
                 """
                 send_email(customer.get("email"), email_subject, email_message)
 
-            # ✅ Clear the cart after successful payment
+            # clear cart after payment
             session.pop("cart", None)
             session.pop("customer", None)
 
@@ -960,7 +960,7 @@ def thank_you():
 def transactions():
     transactions = session.get("transactions", [])  # Get transaction history from session
 
-    # ✅ Search Filter (If user enters a search term)
+    # Search Filter (If user enters a search term)
     search_query = request.args.get("search", "").strip().lower()
     if search_query:
         transactions = [t for t in transactions if search_query in t["id"].lower() or search_query in t["name"].lower()]
