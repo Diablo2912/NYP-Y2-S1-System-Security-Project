@@ -437,7 +437,6 @@ def carbonFootprintTracker():
                            suggested_alternatives=suggested_alternatives,
                            goal_status=goal_status)
 
-# Route to delete a selected product from the tracker
 @app.route('/deleteSelectedProduct/<int:product_id>', methods=['POST'])
 def deleteSelectedProduct(product_id):
     if 'selected_products' in session:
@@ -462,9 +461,21 @@ def initiatives():
 def aboutUs():
    return render_template('aboutUs.html')
 
-@app.route('/contactUs')
+@app.route('/contactUs', methods=['GET', 'POST'])
 def contactUs():
-   return render_template('contactUs.html')
+    if request.method == 'POST':
+        # first_name = request.form.get('inputFirstname')
+        # last_name = request.form.get('inputLastname')
+        # email = request.form.get('inputEmail')
+        # phone = request.form.get('inputNumber')
+        # purpose = request.form.get('flexRadioDefault')
+        # additional_info = request.form.get('addInfo')
+
+        flash('Your form has been submitted successfully!', 'success')
+        return redirect(url_for('home'))  # Redirect to clear form
+
+    return render_template('contactUs.html')
+
 
 @app.route('/accountInfo')
 @login_required
@@ -899,6 +910,7 @@ def create_checkout_session():
         return f"Error: {str(e)}", 500
 
 @app.route('/checkout', methods=['GET'])
+@login_required
 def checkout():
     cart = session.get("cart", {})  # Get cart from session
     total_price = sum(item["price"] * item["quantity"] for item in cart.values())  # Calculate total price

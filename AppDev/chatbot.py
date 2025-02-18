@@ -63,9 +63,26 @@ def generate_response(message):
         if keyword in message:
             matched_links.extend(resource_links[category])
 
+    if any(word in message for word in ["hello", "hi", "hey"]):
+        return "Hey there! Welcome to Cropzy, where we bring innovation and sustainability to farming. How can I assist you today?"
+    elif "thank you" in message or "thanks" in message:
+        return "You're very welcome! Cropzy is always here to support you in growing the future of farming."
+
+    if "who are you" in message or "what is your name" in message:
+        return (
+            "I'm Cropzy's AI assistant! 🌿 I represent Cropzy, a forward-thinking agricultural enterprise based in Singapore. "
+            "We are committed to revolutionizing farming with sustainable practices, innovative solutions, and premium-quality products. "
+            "How can I assist you today?"
+        )
+
     # If relevant links are found, generate response
     if matched_links:
-        prompt = f"Provide a short and concise answer for the following query: {message}"
+        prompt = (
+            f"As Cropzy, a forward-thinking agricultural enterprise in Singapore, "
+            f"respond in a warm, knowledgeable, and professional manner. "
+            f"Emphasize sustainability, innovation, and premium agricultural solutions. "
+            f"Now, provide a short and concise answer for this user query: {message}"
+        )
         response = chat.send_message(prompt)
         bot_response = response.text
 
@@ -74,6 +91,4 @@ def generate_response(message):
         return bot_response
 
     # Default response for unrelated topics
-    return "Sorry, I do not understand."
-
-
+    return ("Sorr I don't understand as I am only able to help with all things agriculture!")

@@ -37,9 +37,9 @@ class ChangeDetForm(Form):
     pswd = PasswordField('Enter Password to Confirm:', [validators.Length(min=8, message='Password must be at least 8 characters.'),validators.DataRequired()])
 
 class ChangePswdForm(Form):
-    current_pswd = PasswordField('Current Password*',[validators.Length(min=8, message='Password must be at least 8 characters.'),validators.DataRequired()])
-    new_pswd = PasswordField('New Password*',[validators.Length(min=8, message='Password must be at least 8 characters.'),validators.DataRequired()])
-    confirm_pswd = PasswordField('Confirm New Password*',[validators.Length(min=8, message='Password must be at least 8 characters.'),validators.DataRequired()])
+    current_pswd = PasswordField('Current Password:',[validators.Length(min=8, message='Password must be at least 8 characters.'),validators.DataRequired()])
+    new_pswd = PasswordField('New Password:',[validators.Length(min=8, message='Password must be at least 8 characters.'),validators.DataRequired()])
+    confirm_pswd = PasswordField('Confirm New Password:',[validators.Length(min=8, message='Password must be at least 8 characters.'),validators.DataRequired()])
 
 class LoginForm(Form):
     email = EmailField('Email*',[validators.Email(), validators.DataRequired()])

@@ -32,7 +32,7 @@
                 </ul>
 
                 <div class="text-end mt-3">
-                    <h5 class="text-success">Total: ${{ total_price }}</h5>
+                    <h5 class="text-success">Total: ${{ "%.2f"|format(total_price) }}</h5>
                 </div>
 
                 <form action="{{ url_for('clear_cart') }}" method="POST" class="mt-3">

@@ -2,6 +2,17 @@
 
 {% block content %}
 
+{% with messages = get_flashed_messages(with_categories=True) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
 <div class="container">
   <div class="row">
     <!-- Left Container -->
@@ -18,7 +29,7 @@
 
             <li class="list-group-item">
               <img class="me-2" src="{{ url_for('static', filename='assets/mail.svg') }}" width="30" height="30">
-              cropzy@gmail.com</li>
+              contact@cropzy.com</li>
 
             <li class="list-group-item">
               <img class="me-2" src="{{ url_for('static', filename='assets/location.svg') }}" width="30" height="30">
@@ -33,7 +44,7 @@
       <div class="card d-flex mb-3 m-3 bg-success-subtle">
         <div class="card-body">
           <h1>Submit Form</h1>
-          <form class="row g-3">
+          <form class="row g-3" method="POST">
             <div class="col-md-6">
               <label for="inputFirstname" class="form-label mb-1">First Name</label>
               <input type="text" class="form-control" id="inputFirstname" placeholder="e.g. Glen">

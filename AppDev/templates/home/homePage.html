@@ -2,6 +2,18 @@
 
 {% block content %}
 
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="container">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
 
 <h1 class="text-center my-4">{{ welcome_message if welcome_message else "Home" }}</h1>
 <div class="container">
@@ -13,7 +25,7 @@
                     Cropzy is an innovative agricultural solutions company dedicated to empowering farmers with advanced tools and technologies
                     to maximize crop yields, ensure sustainability, and drive efficiency from seed to harvest.
                 </p>
-                <a href="/aboutUs" class="btn btn-success">Link to About Us page</a>
+                <a href="/aboutUs" class="btn btn-success">About Us</a>
             </div>
             <div class="col-lg-6 text-center">
                 <img src="{{ url_for('static', filename='assets/crops-growing-in-thailand.jpg') }}" alt="Placeholder Image" class="img-fluid rounded shadow">
