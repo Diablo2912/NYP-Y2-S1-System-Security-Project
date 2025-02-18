@@ -40,15 +40,26 @@
         </div>
 
         <div class="form-group col-md-12">
-          {{ render_field(form.email, class="form-control") }}
+          <div class="input-group">
+            {{ render_field(form.email, class="form-control") }}</div>
         </div>
 
         <div class="form-group col-md-12">
-          {{ render_field(form.pswd, class="form-control") }}
+          <div class="input-group">
+            {{ render_field(form.pswd, class="form-control ms-1", id="confirmPasswordField") }}
+            <button type="button" class="btn btn-outline-success btn-sm" onclick="togglePassword('confirmPasswordField', 'confirmEyeIcon')">
+              <i id="EyeIcon" class="fa fa-eye"></i>
+            </button>
+          </div>
         </div>
 
         <div class="form-group col-md-12">
-          {{ render_field(form.cfm_pswd, class="form-control") }}
+          <div class="input-group">
+            {{ render_field(form.cfm_pswd, class="form-control ms-1", id="confirmPasswordField") }}
+            <button type="button" class="btn btn-outline-success btn-sm" onclick="togglePassword('confirmPasswordField', 'confirmEyeIcon')">
+              <i id="confirmEyeIcon" class="fa fa-eye"></i>
+            </button>
+          </div>
         </div>
         <input type="submit" value="Submit" class="btn btn-success mt-4"/>
       </form>
@@ -56,5 +67,27 @@
     </div>
   </div>
 </div>
+
+<script>
+  function togglePassword(passwordFieldId, eyeIconId) {
+    var passwordField = document.getElementById(passwordFieldId);
+    var eyeIcon = document.getElementById(eyeIconId);
+
+    // Toggle password visibility
+    if (passwordField.type === "password") {
+      passwordField.type = "text";  // Show password
+      eyeIcon.classList.remove("fa-eye");  // Change icon to "eye-slash"
+      eyeIcon.classList.add("fa-eye-slash");
+    } else {
+      passwordField.type = "password";  // Hide password
+      eyeIcon.classList.remove("fa-eye-slash");  // Change icon back to "eye"
+      eyeIcon.classList.add("fa-eye");
+    }
+  }
+</script>
+
+
+<!-- Add FontAwesome for the eye icon -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
 {% endblock %}
