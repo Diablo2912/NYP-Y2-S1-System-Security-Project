@@ -59,40 +59,42 @@
     <div class="card d-flex mb-3 m-3 bg-success-subtle">
         <div class="card-body">
             <h1>Purchase History</h1>
-            <table class="table table-bordered table-hover">
-                <thead class="thead-dark">
-                    <tr>
-                        <th>Transaction ID</th>
-                        <th>Transaction Name</th>
-                        <th>Total Amount ($)</th>
-                        <th>Date</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for transaction in transactions if transaction.email == current_user.email %}
-                    <tr>
-                        <td>{{ transaction.id }}</td>
-                        <td>{{ transaction.name }}</td>
-                        <td>${{ "%.2f"|format(transaction.total) }}</td>
-                        <td>{{ transaction.date }}</td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="3" class="text-center text-danger">No transactions found</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            {% if transactions %}
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Transaction ID</th>
+                <th>Product Name</th>
+                <th>Quantity</th>
+                <th>Unit Price</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for transaction in transactions %}
+                {% for product in transaction.products %}
+                <tr>
+                    <td>{{ transaction.id }}</td>
+                    <td>{{ product.product_name }}</td>
+                    <td>{{ product.quantity }}</td>
+                    <td>${{ "%.2f"|format(product.price) }}</td>
+                    <td>{{ transaction.date }}</td>
+                </tr>
+                {% endfor %}
+            {% endfor %}
+        </tbody>
+
+
+    </table>
+    {% else %}
+    <p class="text-center text-muted">No transactions found.</p>
+    {% endif %}
         </div>
     </div>
 </div>
         {% else %}
             <div class="alert alert-info text-center">No purchases found.</div>
         {% endif %}
-
-        <div class="text-center mt-4">
-            <a href="{{ url_for('buy_product') }}" class="btn btn-primary">Back to Products</a>
-        </div>
     </div>
         </div>
       </div>
