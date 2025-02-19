@@ -512,10 +512,33 @@ def accountSecurity():
     flash("User data not found.", "danger")
     return redirect(url_for('login'))
 
+
 @app.route('/accountHist')
 @login_required
 def accountHist():
-   return render_template('/accountPage/accountHist.html')
+    user_id = session.get("email")  # Get logged-in user ID
+
+    # Get all transactions from session (if not found, return empty list)
+    all_transactions = session.get("transactions", [])
+
+    # DEBUGGING: Print transactions for testing
+    print(f"All Transactions: {all_transactions}")
+    print(f"Logged-in User ID: {user_id}")
+
+    # Ensure transactions are correctly structured and filter them
+    user_transactions = [t for t in all_transactions if t.get("email") == user_id]
+
+    # DEBUGGING: Check filtered transactions
+    print(f"User Transactions: {user_transactions}")
+
+    # Apply Search Filter (if applicable)
+    search_query = request.args.get("search", "").strip().lower()
+    if search_query:
+        user_transactions = [t for t in user_transactions if
+                             search_query in t["id"].lower() or search_query in t["name"].lower()]
+
+    return render_template('/accountPage/accountHist.html', transactions=user_transactions, search_query=search_query)
+
 
 @app.route('/signUp', methods=['GET', 'POST'])
 def sign_up():
@@ -883,7 +906,6 @@ def create_checkout_session():
     }
     session.modified = True
 
-
     line_items = [
         {
             "price_data": {
@@ -955,12 +977,22 @@ def thank_you():
 
             if "transactions" not in session:
                 session["transactions"] = []
+
             session["transactions"].append({
                 "id": transaction_id,
+                "user_id": session.get("user_id"),  # Store the logged-in user ID
                 "name": customer.get("name", "N/A"),
                 "email": customer.get("email", "N/A"),
                 "total": total_price,
-                "date": order_date
+                "date": order_date,
+                "products": [
+                    {
+                        "product_name": item["name"],
+                        "price": item["price"],
+                        "quantity": item["quantity"]
+                    }
+                    for item in order.values()
+                ]
             })
             session.modified = True
 
