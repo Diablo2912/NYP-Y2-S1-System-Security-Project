@@ -1,29 +1,30 @@
 <nav class="navbar navbar-expand-xl bg-body-secondary">
   <div class="container-fluid">
-    <!-- Company Name -->
     <a class="navbar-brand" href="/">Cropzy</a>
 
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
 
     <div class="collapse navbar-collapse justify-content-between" id="navbarSupportedContent">
       <!-- Left-aligned menu items -->
       <ul class="navbar-nav mb-2 mb-lg-0">
-        {% if 'user_id' in session and session['is_staff'] %}
+
+        {% if current_user and current_user.status in ['admin', 'manager'] %}
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Products</a>
-              <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="/buyProduct">Buy Products</a></li>
-                <li><a class="dropdown-item" href="/createProduct">Create Products</a></li>
-                <li><a class="dropdown-item" href="/manageProduct">Manage Products</a></li>
-              </ul>
-          </li>
-          {% else %}
-              <li class="nav-item">
-                <a class="nav-link" href="/buyProduct">Buy Products</a>
-              </li>
-            {% endif %}
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="/buyProduct">Buy Products</a></li>
+            <li><a class="dropdown-item" href="/createProduct">Create Products</a></li>
+            <li><a class="dropdown-item" href="/manageProduct">Manage Products</a></li>
+          </ul>
+        </li>
+        {% else %}
+        <li class="nav-item">
+          <a class="nav-link" href="/buyProduct">Buy Products</a>
+        </li>
+        {% endif %}
 
         <li class="nav-item">
           <a class="nav-link" href="/carbonFootprintTracker">CFT</a>
@@ -59,18 +60,17 @@
           <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
             <img src="{{ url_for('static', filename='assets/person.svg') }}" width="30" height="30">
           </a>
-          <ul class="dropdown-menu" style="min-width:8rem" >
-            {% if 'user_id' in session %}
-        <!-- Show these only if the user is logged in -->
-                <li><a class="dropdown-item" href="/accountInfo">Account Info</a></li>
-                {% if 'user_id' in session and session['is_staff'] %}
-                      <li><a class="dropdown-item" href="/transactions">Transactions</a></li>
-                    {% endif %}
-                <li><a class="dropdown-item bg-danger-subtle text-danger" href="{{ url_for('logout') }}">Logout</a></li>
+          <ul class="dropdown-menu" style="min-width:8rem">
+            {% if current_user %}
+              <li><a class="dropdown-item" href="/accountInfo">Account Info</a></li>
+              {% if current_user.status == 'admin' %}
+                <li><a class="dropdown-item" href="/transactions">Transactions</a></li>
+                <li><a class="dropdown-item" href="/dashboard">Dashboard</a></li>
+              {% endif %}
+              <li><a class="dropdown-item bg-danger-subtle text-danger" href="{{ url_for('logout') }}">Logout</a></li>
             {% else %}
-                <!-- Show these only if the user is logged out -->
-                <li><a class="dropdown-item" href="/signUp">Sign Up</a></li>
-                <li><a class="dropdown-item" href="/login">Login</a></li>
+              <li><a class="dropdown-item" href="/signUp">Sign Up</a></li>
+              <li><a class="dropdown-item" href="/login">Login</a></li>
             {% endif %}
           </ul>
         </li>
@@ -80,7 +80,6 @@
           </a>
         </li>
       </ul>
-
     </div>
   </div>
 </nav>

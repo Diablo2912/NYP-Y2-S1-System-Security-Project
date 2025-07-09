@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="container">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<div class="container">
+  <div class="row">
+    <!-- Left Container -->
+    <div class="col-lg-4 p-3">
+      <div class="card d-flex mb-3 m-3">
+        <div class="card-body pb-0">
+          <div class="d-flex mb-3">
+            <div class="flex-grow-1 ms-3">
+              <h2 class="card-title mb-1">Admin Dashboard</h2>
+              <h6 class="card-subtitle text-body-secondary">{{ current_user.email }}</h6>
+            </div>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="/roleManagement" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Role Management</span></a>
+            </li>
+            <li class="list-group-item">
+              <a href="/createAdmin" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
+                <span class="badge bg-success p-2 fs-5 align-middle shadow">Create Admin</span></a>
+            </li>
+            <li class="list-group-item">
+              <a href="/logging" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Logs</span></a>
+            </li>
+            <li class="list-group-item">
+              <a href="/logging_analytics" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Logging Analytics</span></a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Form -->
+    <div class="col-lg-8 d-flex justify-content-center align-items-center mt-3 p-3">
+      <div class="card bg-success-subtle w-100" style="max-width: 600px;">
+        <div class="card-body">
+          <h1 class="text-center mb-4">Create Staff Account</h1>
+
+          <form method="POST" action="" class="row g-3">
+
+            <div class="form-group col-md-6">
+              {{ form.first_name.label(class="form-label") }}
+              {{ form.first_name(class="form-control") }}
+              {% for error in form.first_name.errors %}
+                <div class="text-danger">{{ error }}</div>
+              {% endfor %}
+            </div>
+
+            <div class="form-group col-md-6">
+              {{ form.last_name.label(class="form-label") }}
+              {{ form.last_name(class="form-control") }}
+              {% for error in form.last_name.errors %}
+                <div class="text-danger">{{ error }}</div>
+              {% endfor %}
+            </div>
+
+            <!-- Gender -->
+            <div class="form-group col-md-6">
+              {{ form.gender.label(class="form-label") }}
+              {{ form.gender(class="form-select") }}
+              {% for error in form.gender.errors %}
+                <div class="text-danger">{{ error }}</div>
+              {% endfor %}
+            </div>
+
+            <!-- Role -->
+            <div class="form-group col-md-6">
+              {{ form.status.label(class="form-label") }}
+              {{ form.status(class="form-select") }}
+              {% for error in form.status.errors %}
+                <div class="text-danger">{{ error }}</div>
+              {% endfor %}
+            </div>
+
+            <div class="form-group col-md-6">
+              {{ form.number.label(class="form-label") }}
+              {{ form.number(class="form-control") }}
+              {% for error in form.number.errors %}
+                <div class="text-danger">{{ error }}</div>
+              {% endfor %}
+            </div>
+
+            <div class="form-group col-md-12">
+              {{ form.email.label(class="form-label") }}
+              {{ form.email(class="form-control") }}
+              {% for error in form.email.errors %}
+                <div class="text-danger">{{ error }}</div>
+              {% endfor %}
+            </div>
+
+            <!-- Password -->
+            <div class="form-group col-md-12">
+              {{ form.pswd.label(class="form-label") }}
+              <div class="input-group">
+                {{ form.pswd(class="form-control ms-1", id="passwordField") }}
+                <button type="button" class="btn btn-outline-success btn-sm" onclick="togglePassword('passwordField', 'eyeIcon1')">
+                  <i id="eyeIcon1" class="fa-solid fa-eye"></i>
+                </button>
+              </div>
+              {% for error in form.pswd.errors %}
+                <div class="text-danger">{{ error }}</div>
+              {% endfor %}
+            </div>
+
+            <!-- Confirm Password -->
+            <div class="form-group col-md-12">
+              {{ form.cfm_pswd.label(class="form-label") }}
+              <div class="input-group">
+                {{ form.cfm_pswd(class="form-control ms-1", id="confirmPasswordField") }}
+                <button type="button" class="btn btn-outline-success btn-sm" onclick="togglePassword('confirmPasswordField', 'eyeIcon2')">
+                  <i id="eyeIcon2" class="fa-solid fa-eye"></i>
+                </button>
+              </div>
+              {% for error in form.cfm_pswd.errors %}
+                <div class="text-danger">{{ error }}</div>
+              {% endfor %}
+            </div>
+
+            <div class="col-12">
+              <input type="submit" value="Submit" class="btn btn-success mt-4 w-100" />
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FontAwesome CDN -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<script>
+  function togglePassword(passwordFieldId, eyeIconId) {
+    const passwordField = document.getElementById(passwordFieldId);
+    const eyeIcon = document.getElementById(eyeIconId);
+
+    if (passwordField.type === "password") {
+      passwordField.type = "text";
+      eyeIcon.classList.remove("fa-eye");
+      eyeIcon.classList.add("fa-eye-slash");
+    } else {
+      passwordField.type = "password";
+      eyeIcon.classList.remove("fa-eye-slash");
+      eyeIcon.classList.add("fa-eye");
+    }
+  }
+</script>
+
+{% endblock %}
