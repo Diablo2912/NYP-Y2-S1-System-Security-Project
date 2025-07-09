@@ -17,8 +17,8 @@
 
 <div class="container">
   <div class="row">
-    <!-- Left Container -->
     {% if 'user_id' in session %}
+    <!-- Left Container -->
     <div class="col-lg-4 p-3">
       <div class="card d-flex mb-3 m-3">
         <div class="card-body pb-0">
@@ -26,7 +26,7 @@
             <img class="flex" src="{{ url_for('static', filename='assets/person.svg') }}" width="60" height="60">
             <div class="flex-grow-1 ms-3">
               <h2 class="card-title mb-1">{{ session['first_name'] }}</h2>
-                <h6 class="card-subtitle text-body-secondary">{{ session['email'] }}</h6>
+              <h6 class="card-subtitle text-body-secondary">{{ session['email'] }}</h6>
             </div>
           </div>
 
@@ -34,22 +34,28 @@
             <li class="list-group-item">
               <a href="/accountInfo" class="link-underline link-underline-opacity-0">
                 <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
-                <span class="badge bg-success p-2 fs-5 align-middle shadow" >Your Info</span></a>
+                <span class="badge bg-success p-2 fs-5 align-middle shadow">Your Info</span>
+              </a>
             </li>
-
             <li class="list-group-item">
               <a href="/accountSecurity" class="link-underline link-underline-opacity-0">
                 <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
-                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Security Settings</span></a>
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Security Settings</span>
+              </a>
             </li>
-
             <li class="list-group-item">
               <a href="/accountHist" class="link-underline link-underline-opacity-0">
                 <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
-                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Purchase History</span></a>
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Purchase History</span>
+              </a>
+            </li>
+            <li class="list-group-item">
+              <a href="/sessionHistory" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Session History</span>
+              </a>
             </li>
           </ul>
-
         </div>
       </div>
     </div>
@@ -59,66 +65,62 @@
       <div class="card d-flex mb-3 m-3 bg-success-subtle">
         <div class="card-body">
           <h1 class="card-title">Account Info</h1>
-          <div>
-            <ul class="list-group list-group-flush">
-              <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
-                <label class="col-md-3 m-1 fs-6">Name</label>
-                    <span class="fs-5 p-0">{{ session['first_name'] }}</span>
-                    <span class="fs-5 ps-1">{{ session['last_name'] }}</span>
-                </li>
-                <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
-                  <label class="col-md-3 m-1 fs-6">User ID</label>
-                  <span class="fs-5 p-0">{{ session['user_id'] }}</span>
-                </li>
-                <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
-                    <label class="col-md-3 m-1 fs-6">Gender</label>
-                    <span class="fs-5 p-0">{{ session['gender'] }}</span>
-                </li>
-                <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
-                    <label class="col-md-3 m-1 fs-6">Phone Number</label>
-                    <span class="fs-5 p-0">{{ session['phone'] }}</span>
-                </li>
-                <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
-                    <label class="col-md-3 m-1 fs-6">Email</label>
-                    <span class="fs-5 p-0">{{ session['email'] }}</span>
-                </li>
 
-            </ul>
-              <div class="text-end m-2 mt-5">
-                <a href="/changeDets/{{ session['user_id'] }}" class="btn btn-success">Change Details</a>
-                <form action="{{ url_for('delete_user', id=session['user_id']) }}" method="POST" class="d-inline-block">
-                    <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#myModal_{{ session['user_id'] }}">Delete Account</button>
-                    <!-- The Modal -->
-                    <div class="modal" id="myModal_{{session['user_id']}}">
-                      <div class="modal-dialog">
-                        <div class="modal-content">
-                    <!-- Modal Header -->
-                          <div class="modal-header">
-                            <h4 class="modal-title">Delete Confirmation</h4>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                          </div>
-                    <!-- Modal body -->
-                            <div class="modal-body text-start">
-                              Are you sure you want to delete {{ session['first_name']}} {{session['last_name']}}?
-                            </div>
-                        <!-- Modal footer -->
-                            <div class="modal-footer">
-                              <input type="submit" value="Delete" class="btn btn-danger">
-                              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            </div>
-                        </div>
-                      </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
+              <label class="col-md-3 m-1 fs-6">Name</label>
+              <span class="fs-5 p-0">{{ session['first_name'] }}</span>
+              <span class="fs-5 ps-1">{{ session['last_name'] }}</span>
+            </li>
+            <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
+              <label class="col-md-3 m-1 fs-6">User ID</label>
+              <span class="fs-5 p-0">{{ session['user_id'] }}</span>
+            </li>
+            <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
+              <label class="col-md-3 m-1 fs-6">Gender</label>
+              <span class="fs-5 p-0">{{ session['gender'] }}</span>
+            </li>
+            <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
+              <label class="col-md-3 m-1 fs-6">Phone Number</label>
+              <span class="fs-5 p-0">{{ session['phone'] }}</span>
+            </li>
+            <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
+              <label class="col-md-3 m-1 fs-6">Email</label>
+              <span class="fs-5 p-0">{{ session['email'] }}</span>
+            </li>
+          </ul>
+
+          <div class="text-end m-2 mt-5">
+            <a href="/changeDets/{{ session['user_id'] }}" class="btn btn-success">Change Details</a>
+            <form action="{{ url_for('delete_user', id=session['user_id']) }}" method="POST" class="d-inline-block">
+              <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#myModal_{{ session['user_id'] }}">Delete Account</button>
+              <div class="modal" id="myModal_{{session['user_id']}}">
+                <div class="modal-dialog">
+                  <div class="modal-content">
+                    <div class="modal-header">
+                      <h4 class="modal-title">Delete Confirmation</h4>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                </form>
+                    <div class="modal-body text-start">
+                      Are you sure you want to delete {{ session['first_name'] }} {{ session['last_name'] }}?
+                    </div>
+                    <div class="modal-footer">
+                      <input type="submit" value="Delete" class="btn btn-danger">
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                  </div>
+                </div>
               </div>
+            </form>
           </div>
-          {% else %}
-          <script>
-              window.location.href = "{{ url_for('home') }}";
-          </script>
+
         </div>
       </div>
     </div>
+    {% else %}
+      <script>
+        window.location.href = "{{ url_for('home') }}";
+      </script>
     {% endif %}
   </div>
 </div>

@@ -24,12 +24,18 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import os
 from werkzeug.utils import secure_filename
+from dotenv import load_dotenv
+import requests
+from flask_mysqldb import MySQL
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '5791262abcdefg'
 UPLOAD_FOLDER = 'static/uploads/'  # Define where images are stored
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 stripe.api_key = "sk_test_51Qrle9CddzoT6fzjpqNPd1g3UV8ScbnxiiPK5uYT0clGPV82Gn7QPwcakuijNv4diGpcbDadJjzunwRcWo0eOXvb00uDZ2Gnw6"
+
+load_dotenv()
+print("Loaded ENV value for TEST_VAR =", os.getenv("TEST_VAR"))
 
 images = UploadSet('images', IMAGES)
 
@@ -41,6 +47,13 @@ app.config['MAIL_PASSWORD'] = 'isgw cesr jdbs oytx'
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
 mail = Mail(app)
+
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+app.config['MYSQL_DB'] = 'sspCropzy'
+
+mysql = MySQL(app)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///products.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -73,6 +86,16 @@ def login_required(f):
         if "user_id" not in session:  # Check if user is logged in
             flash("You must be logged in to access this page.", "warning")
             return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('is_staff'):
+            # Optional: render 403.html instead of redirect
+            from flask import abort
+            abort(403)
         return f(*args, **kwargs)
     return decorated_function
 
@@ -320,12 +343,12 @@ def delete_product(id):
     return redirect(url_for('manageProduct'))
 
 @app.route('/view_products')
+@admin_required
 def view_products():
-    products = Product.query.all()  # Fetch all products from the database
+    products = Product.query.all()
 
     if not products:
         return "<p style='color: red; font-size: 20px; text-align: center;'>No products found in the database!</p>"
-
 
     product_list = """
     <div style="text-align: center; font-family: Arial;">
@@ -356,9 +379,7 @@ def view_products():
         """
 
     product_list += "</table></div>"
-
     return product_list
-
 @app.route('/clearProducts', methods=['POST', 'GET'])
 def clear_products():
     try:
@@ -609,6 +630,28 @@ def login():
                     session['pswd'] = password
                     session['is_staff'] = user.get_is_staff()
 
+                    # ✅ STEP 5: Add session logging block here
+                    try:
+                        session_id = str(uuid.uuid4())[:12]
+                        session['session_id'] = session_id
+
+                        cursor = mysql.connection.cursor()
+                        cursor.execute("""
+                            INSERT INTO user_sessions (id, user_id, ip_address, user_agent, login_time, is_active)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                        """, (
+                            session_id,
+                            session['user_id'],
+                            request.remote_addr,
+                            request.user_agent.string,
+                            datetime.now(),
+                            True
+                        ))
+                        mysql.connection.commit()
+                        cursor.close()
+                    except Exception as e:
+                        print("⚠️ Session log insert error (safe to ignore during testing):", e)
+
                     flash('Login successful!', 'success')
                     return redirect(url_for('home'))  # Redirect after login
 
@@ -618,6 +661,38 @@ def login():
         flash('Email not found. Please sign up.', 'danger')
 
     return render_template('/accountPage/login.html', form=login_form)
+
+
+@app.route('/sessionHistory')
+def session_history():
+    if 'user_id' not in session:
+        flash("Please log in to view session history.", "warning")
+        return redirect(url_for('login'))
+
+    cursor = mysql.connection.cursor()
+    cursor.execute("""
+        SELECT id, ip_address, user_agent, login_time, is_active
+        FROM user_sessions
+        WHERE user_id = %s
+        ORDER BY login_time DESC
+    """, (session['user_id'],))
+    data = cursor.fetchall()
+    cursor.close()
+
+    sessions = []
+    for row in data:
+        sessions.append({
+            'id': row[0],
+            'ip': row[1],
+            'agent': row[2],
+            'time': row[3].strftime('%Y-%m-%d %H:%M:%S'),
+            'active': row[4]
+        })
+
+    return render_template('/accountPage/sessionHistory.html',
+                           sessions=sessions,
+                           current_id=session.get('session_id'))
+
 
 @app.route('/logout')
 def logout():
@@ -757,7 +832,22 @@ def delete_user(id):
 @app.route("/create_update", methods=['GET', 'POST'])
 def create_update():
     form = SeasonalUpdateForm()
+    site_key = os.getenv("RECAPTCHA_SITE_KEY")
+
     if form.validate_on_submit():
+
+        recaptcha_response = request.form.get('g-recaptcha-response')  # Token from frontend
+        secret_key = os.getenv("RECAPTCHA_SECRET_KEY")  # Secure backend key
+
+        verify_url = "https://www.google.com/recaptcha/api/siteverify"
+        payload = {'secret': secret_key, 'response': recaptcha_response}
+        r = requests.post(verify_url, data=payload)
+        result = r.json()
+
+        if not result.get('success'):
+            flash("reCAPTCHA verification failed. Please try again.", 'danger')
+            return render_template('/home/update.html', title='Update', form=form, site_key=site_key)
+
         update_data = {
             'title': form.update.data,
             'content': form.content.data,
@@ -1048,6 +1138,23 @@ def chat():
     bot_response = generate_response(user_message)
     return jsonify({'response': bot_response})
 
+@app.errorhandler(400)
+def bad_request_error(error):
+    return render_template('errors/400.html'), 400
+@app.errorhandler(401)
+def unauthorized_error(error):
+    return render_template('errors/401.html'), 401
+@app.errorhandler(404)
+def not_found_error(error):
+    return render_template('errors/404.html'), 404
+
+@app.errorhandler(403)
+def forbidden_error(error):
+    return render_template('errors/403.html'), 403
+
+@app.errorhandler(500)
+def internal_error(error):
+    return render_template('errors/500.html'), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
