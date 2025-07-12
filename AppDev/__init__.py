@@ -1251,7 +1251,6 @@ def recovery_auth(id):
         input_code = request.form.get('recovery_code')
 
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # Get recovery code from database for the user
         cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
         result = cursor.fetchone()
 
@@ -1275,10 +1274,16 @@ def recovery_auth(id):
                 response = make_response(redirect(url_for('home')))
                 response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
 
+                # ✅ Corrected this line: passed actual user ID instead of ['id']
+                log_session_activity(result['id'], 'login')
+
+                # ✅ Optional: Also log that they used recovery code
+                log_session_activity(result['id'], "Logged in via recovery code")
+
                 flash('Recovery successful. You are now logged in.', 'success')
                 return response
-    return render_template('/accountPage/recovery_code.html',id=id)
 
+    return render_template('/accountPage/recovery_code.html', id=id)
 @app.route('/setup_face_id/<int:id>', methods=['GET', 'POST'])
 def setup_face_id(id):
 
