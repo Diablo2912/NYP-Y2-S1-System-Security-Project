@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4 text-center">Session Activity History</h2>
+
+    {% if sessions %}
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped text-center">
+            <thead class="table-primary">
+                <tr>
+                    <th>Login Time (UTC)</th>
+                    <th>Logout Time (UTC)</th>
+                    <th>IP Address</th>
+                    <th>Device Info</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for session in sessions %}
+                <tr>
+                    <td>{{ session.login_time or 'N/A' }}</td>
+                    <td>{{ session.logout_time or 'Active Now' }}</td>
+                    <td>{{ session.ip_address }}</td>
+                    <td style="max-width: 300px; word-break: break-word;">
+                        {{ session.user_agent }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-warning text-center">No session activity found.</div>
+    {% endif %}
+
+    <div class="text-center mt-4">
+        <a href="{{ url_for('accountInfo') }}" class="btn btn-secondary">Back to Account</a>
+    </div>
+</div>
+{% endblock %}

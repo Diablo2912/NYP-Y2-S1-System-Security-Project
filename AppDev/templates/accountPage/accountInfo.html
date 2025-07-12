@@ -17,7 +17,7 @@
 
 <div class="container">
   <div class="row">
-    {% if 'user_id' in session %}
+    {% if current_user %}
     <!-- Left Container -->
     <div class="col-lg-4 p-3">
       <div class="card d-flex mb-3 m-3">
@@ -25,34 +25,34 @@
           <div class="d-flex mb-3">
             <img class="flex" src="{{ url_for('static', filename='assets/person.svg') }}" width="60" height="60">
             <div class="flex-grow-1 ms-3">
-              <h2 class="card-title mb-1">{{ session['first_name'] }}</h2>
-              <h6 class="card-subtitle text-body-secondary">{{ session['email'] }}</h6>
+              <h2 class="card-title mb-1">{{ current_user.first_name }}</h2>
+              <h6 class="card-subtitle text-body-secondary">{{ current_user.email }}</h6>
             </div>
           </div>
 
           <ul class="list-group list-group-flush">
             <li class="list-group-item">
-              <a href="/accountInfo" class="link-underline link-underline-opacity-0">
+              <a href="{{ url_for('accountInfo') }}" class="link-underline link-underline-opacity-0">
                 <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
                 <span class="badge bg-success p-2 fs-5 align-middle shadow">Your Info</span>
               </a>
             </li>
             <li class="list-group-item">
-              <a href="/accountSecurity" class="link-underline link-underline-opacity-0">
+              <a href="{{ url_for('accountSecurity') }}" class="link-underline link-underline-opacity-0">
                 <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
                 <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Security Settings</span>
               </a>
             </li>
             <li class="list-group-item">
-              <a href="/accountHist" class="link-underline link-underline-opacity-0">
+              <a href="{{ url_for('accountHist') }}" class="link-underline link-underline-opacity-0">
                 <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
                 <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Purchase History</span>
               </a>
             </li>
             <li class="list-group-item">
-              <a href="/sessionHistory" class="link-underline link-underline-opacity-0">
+              <a href="{{ url_for('activity_history') }}" class="link-underline link-underline-opacity-0">
                 <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
-                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Session History</span>
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Session Activity</span>
               </a>
             </li>
           </ul>
@@ -69,32 +69,35 @@
           <ul class="list-group list-group-flush">
             <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
               <label class="col-md-3 m-1 fs-6">Name</label>
-              <span class="fs-5 p-0">{{ session['first_name'] }}</span>
-              <span class="fs-5 ps-1">{{ session['last_name'] }}</span>
+              <span class="fs-5 p-0">{{ current_user.first_name }}</span>
+              <span class="fs-5 ps-1">{{ current_user.last_name }}</span>
             </li>
             <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
               <label class="col-md-3 m-1 fs-6">User ID</label>
-              <span class="fs-5 p-0">{{ session['user_id'] }}</span>
+              <span class="fs-5 p-0">{{ current_user.user_id }}</span>
             </li>
             <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
               <label class="col-md-3 m-1 fs-6">Gender</label>
-              <span class="fs-5 p-0">{{ session['gender'] }}</span>
+              <span class="fs-5 p-0">{{ current_user.gender }}</span>
             </li>
             <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
               <label class="col-md-3 m-1 fs-6">Phone Number</label>
-              <span class="fs-5 p-0">{{ session['phone'] }}</span>
+              <span class="fs-5 p-0">{{ current_user.phone }}</span>
             </li>
             <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
               <label class="col-md-3 m-1 fs-6">Email</label>
-              <span class="fs-5 p-0">{{ session['email'] }}</span>
+              <span class="fs-5 p-0">{{ current_user.email }}</span>
             </li>
           </ul>
 
           <div class="text-end m-2 mt-5">
-            <a href="/changeDets/{{ session['user_id'] }}" class="btn btn-success">Change Details</a>
-            <form action="{{ url_for('delete_user', id=session['user_id']) }}" method="POST" class="d-inline-block">
-              <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#myModal_{{ session['user_id'] }}">Delete Account</button>
-              <div class="modal" id="myModal_{{session['user_id']}}">
+            <a href="{{ url_for('change_dets', id=current_user.user_id) }}" class="btn btn-success">Change Details</a>
+
+            <form action="{{ url_for('delete_user', id=current_user.user_id) }}" method="POST" class="d-inline-block">
+              <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal_{{ current_user.user_id }}">
+                Delete Account
+              </button>
+              <div class="modal" id="deleteModal_{{ current_user.user_id }}">
                 <div class="modal-dialog">
                   <div class="modal-content">
                     <div class="modal-header">
@@ -102,7 +105,7 @@
                       <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body text-start">
-                      Are you sure you want to delete {{ session['first_name'] }} {{ session['last_name'] }}?
+                      Are you sure you want to delete {{ current_user.first_name }} {{ current_user.last_name }}?
                     </div>
                     <div class="modal-footer">
                       <input type="submit" value="Delete" class="btn btn-danger">
@@ -112,15 +115,88 @@
                 </div>
               </div>
             </form>
+
+            <!-- 2FA Section -->
+            {% if user.two_factor_status == 'enabled' %}
+              <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#disable2FAModal_{{ user.id }}">
+                Disable 2FA
+              </button>
+              <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#viewCodeModal_{{ user.id }}">
+                View Recovery Code
+              </button>
+              <a href="{{ url_for('setup_face_id', id=user.id) }}" class="btn btn-warning">
+                Setup Face ID
+              </a>
+
+              <div class="modal fade" id="disable2FAModal_{{ user.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                  <div class="modal-content">
+                    <form action="{{ url_for('disable_two_factor', id=user.id) }}" method="POST">
+                      <div class="modal-header">
+                        <h5 class="modal-title">Disable 2FA</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                      </div>
+                      <div class="modal-body text-start">
+                        <strong>Disabling 2FA will reduce this account’s security.</strong><br><br>
+                        Are you sure you want to <strong>disable</strong> 2FA for {{ user.email }}?
+                      </div>
+                      <div class="modal-footer">
+                        <button type="submit" class="btn btn-danger">Disable</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+
+              <div class="modal fade" id="viewCodeModal_{{ user.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                  <div class="modal-content">
+                    <div class="modal-header">
+                      <h5 class="modal-title">Recovery Code</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body text-start">
+                      Use this recovery code to log in if you lose access to your email or cannot receive OTP.<br><br>
+                      <strong>Recovery Code:</strong><br>{{ user.recovery_code }}
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% else %}
+              <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#enable2FAModal_{{ user.id }}">
+                Enable 2FA
+              </button>
+
+              <form action="{{ url_for('enable_two_factor', id=user.id) }}" method="POST" class="d-inline">
+                <div class="modal fade" id="enable2FAModal_{{ user.id }}" tabindex="-1" aria-hidden="true">
+                  <div class="modal-dialog">
+                    <div class="modal-content">
+                      <div class="modal-header">
+                        <h5 class="modal-title">Enable 2FA</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                      </div>
+                      <div class="modal-body text-start">
+                        <strong>Enabling 2FA adds extra protection to your account.</strong><br><br>
+                        Are you sure you want to <strong>enable</strong> 2FA for email: <strong>{{ current_user.email }}</strong>?
+                      </div>
+                      <div class="modal-footer">
+                        <button type="submit" class="btn btn-success">Confirm</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            {% endif %}
           </div>
 
         </div>
       </div>
     </div>
-    {% else %}
-      <script>
-        window.location.href = "{{ url_for('home') }}";
-      </script>
     {% endif %}
   </div>
 </div>

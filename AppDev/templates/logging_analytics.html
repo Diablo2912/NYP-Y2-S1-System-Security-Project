@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="container">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<div class="container-fluid pt-4">
+  <div class="row">
+
+    <!-- Left Panel -->
+    <div class="col-lg-2 col-md-3 col-sm-12 px-1">
+      <div class="card mb-3 ms-0">
+        <div class="card-body pb-0">
+          <div class="d-flex mb-3">
+            <div class="flex-grow-1 ms-2">
+              <h5 class="card-title mb-1">Admin</h5>
+              <h6 class="card-subtitle text-body-secondary small">{{ current_user.email }}</h6>
+            </div>
+          </div>
+          <ul class="list-group list-group-flush small">
+            <li class="list-group-item px-2 py-1"><a href="/roleManagement" class="d-flex align-items-center text-decoration-none text-dark"><img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Role Management</a></li>
+            <li class="list-group-item px-2 py-1"><a href="/createAdmin" class="d-flex align-items-center text-decoration-none text-dark"><img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Create Staff</a></li>
+            <li class="list-group-item px-2 py-1"><a href="/logging" class="d-flex align-items-center text-decoration-none text-dark"><img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Logs</a></li>
+            <li class="list-group-item px-2 py-1"><a href="/logging_analytics" class="d-flex align-items-center text-decoration-none text-dark"><img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Logging Analytics</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="col-lg-10 col-md-9 col-sm-12">
+      <div class="container mt-3">
+        <h2 class="mb-3">Log Overview</h2>
+        <p>Last Refresh Time: {{ current_time }}</p>
+        <h5>Total Logs: </h5>
+
+        <!-- Log Summary Cards -->
+        <div class="row justify-content-center g-3">
+          {% for category in ['Info', 'Warning', 'Error', 'Critical'] %}
+          <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+            <div class="card text-white bg-{{ 'info' if category == 'Info' else 'warning' if category == 'Warning' else 'danger' if category == 'Error' else 'dark' }}">
+              <div class="card-body py-2 px-2 text-center">
+                <h6 class="card-title mb-1">{{ category }}</h6>
+                <p class="card-text fs-6 mb-0">{{ category_summary[category] }}</p>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+        </div>
+
+        <!-- Line Chart -->
+        <div class="mt-5">
+          <h4 class="mb-3">Log Category Distribution</h4>
+        </div>
+
+        <!-- Pie Chart -->
+        <div class="mt-5">
+          <h4 class="mb-3">Log Category Trend</h4>
+          <canvas id="logChart" height="120"></canvas>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const datesISO = {{ dates_iso | tojson }};
+  const datesDisplay = {{ dates_display | tojson }};
+  const categories = {{ categories | tojson }};
+  const chartData = {{ chart_data | tojson }};
+
+  function getColor(category) {
+    const colors = {
+      Info: '#36A2EB',
+      Warning: '#FFCE56',
+      Error: '#FF6384',
+      Critical: '#8B0000'
+    };
+    return colors[category] || '#000';
+  }
+
+  const datasets = categories.map(cat => ({
+    label: cat,
+    data: datesISO.map(date => chartData[date][cat]),
+    borderColor: getColor(cat),
+    backgroundColor: getColor(cat),
+    fill: false,
+    tension: 0.3
+  }));
+
+  const ctx = document.getElementById('logChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: datesDisplay,  //
+      datasets: datasets
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: 'Number of Logs Per Category'
+        },
+        legend: {
+          position: 'top'
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            precision: 0
+          }
+        }
+      }
+    }
+  });
+</script>
+
+{% endblock %}
