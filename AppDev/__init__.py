@@ -134,7 +134,7 @@ def jwt_required(f):
             flash("Invalid or expired token. Please log in again.", "danger")
             return redirect(url_for('login'))
 
-        # Store user info in `g` for access within the request
+        # Store user info in g for access within the request
         from flask import g
         g.user = user_data
         return f(*args, **kwargs)
@@ -1076,6 +1076,10 @@ def log_session_activity(user_id, action):
                 request.headers.get('User-Agent')
             ))
 
+            session_id = cursor.lastrowid
+            session['current_session_id'] = session_id  # ✅ Save for future action logging
+            session['user_id'] = user_id  # Optional: reinforce user_id in session
+
         elif action == 'logout':
             cursor.execute('''
                 UPDATE user_session_activity
@@ -1097,6 +1101,27 @@ def log_session_activity(user_id, action):
     except Exception as e:
         print("[ERROR] Session log failed:", e)
 
+
+def log_user_action(user_id, action):
+    session_id = session.get('current_session_id')
+    if not user_id or not session_id:
+        print("[WARN] Missing user_id or session_id, skipping action log")
+        return
+
+    try:
+        cursor = mysql.connection.cursor()
+        cursor.execute('''
+            INSERT INTO user_actions_log (user_id, session_id, action)
+            VALUES (%s, %s, %s)
+        ''', (user_id, session_id, action))
+        mysql.connection.commit()
+        cursor.close()
+        print(f"[DEBUG] Action logged: {action}")
+    except Exception as e:
+        print("[ERROR] Action log failed:", e)
+
+
+
 @app.route('/test-log')
 def test_log():
     log_session_activity(3, 'login')
@@ -1107,17 +1132,31 @@ def test_log():
 def activity_history():
     user_id = g.user['user_id']
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    # Fetch session activity logs
     cursor.execute("""
-        SELECT login_time, logout_time, ip_address, user_agent
+        SELECT id, login_time, logout_time, ip_address, user_agent
         FROM user_session_activity
         WHERE user_id = %s
         ORDER BY login_time DESC
         LIMIT 50
     """, (user_id,))
     sessions = cursor.fetchall()
+
+    # For each session, fetch related actions
+    for s in sessions:
+        cursor.execute("""
+            SELECT action, timestamp
+            FROM user_actions_log
+            WHERE session_id = %s
+            ORDER BY timestamp ASC
+        """, (s['id'],))
+        s['actions'] = cursor.fetchall()
+
     cursor.close()
 
     return render_template('/accountPage/activity.html', sessions=sessions)
+
 
 
 # A helper function to verify JWT token
@@ -1415,6 +1454,10 @@ def change_dets(id):
             ))
 
             mysql.connection.commit()
+
+            if 'user_id' in session:
+                log_user_action(session['user_id'], "Changed account details")
+
             cursor.close()
 
             # Update session
@@ -1438,11 +1481,11 @@ def change_dets(id):
     return render_template('/accountPage/changeDets.html', form=change_dets_form)
 
 @app.route('/changePswd/<int:id>/', methods=['GET', 'POST'])
-@login_required
+@jwt_required
 def change_pswd(id):
     change_pswd_form = ChangePswdForm(request.form)
+    user_id = g.user['user_id']  # ✅ Get from JWT
 
-    user_id = session.get('user_id')
     if not user_id or user_id != id:
         flash("Unauthorized access.", "danger")
         return redirect(url_for('login'))
@@ -1461,8 +1504,7 @@ def change_pswd(id):
         new_pswd = change_pswd_form.new_pswd.data
         confirm_pswd = change_pswd_form.confirm_pswd.data
 
-        # Using plaintext comparison (insecure; follow your current code pattern)
-        if user['password'] != current_pswd:
+        if not verify_password(current_pswd, user['password']):
             flash("Incorrect current password.", "danger")
             cursor.close()
             return redirect(url_for('change_pswd', id=id))
@@ -1472,18 +1514,19 @@ def change_pswd(id):
             cursor.close()
             return redirect(url_for('change_pswd', id=id))
 
-        # Update new password in the DB (still plaintext)
-        cursor.execute("UPDATE accounts SET password = %s WHERE id = %s", (confirm_pswd, id))
+        new_hashed_password = hash_password(confirm_pswd)
+        cursor.execute("UPDATE accounts SET password = %s WHERE id = %s", (new_hashed_password, id))
         mysql.connection.commit()
         cursor.close()
 
-        # Update session value too
-        session['password'] = confirm_pswd
+        # ✅ Log user action
+        log_user_action(user_id, "Changed password")
 
         flash("Password changed successfully!", "success")
         return redirect(url_for('accountInfo'))
 
     return render_template('/accountPage/changePswd.html', form=change_pswd_form)
+
 
 @app.route('/deleteUser/<int:id>', methods=['POST'])
 @jwt_required
@@ -1554,6 +1597,9 @@ def create_update():
             updates.append(update_data)  # Append the new update
             db['updates'] = updates  # Save the updated list back to the database
 
+        if 'user_id' in session:
+            log_user_action(session['user_id'], f"Created seasonal update: {form.update.data}")
+
 
         flash(f'Update "{form.update.data}" created successfully!', 'success')
         return redirect(url_for('home'))
@@ -1567,6 +1613,9 @@ def delete_update(index):
             if 0 <= index < len(updates):
                 removed_update = updates.pop(index)
                 db['updates'] = updates  # Save the updated list
+                if 'user_id' in session:
+                    log_user_action(session['user_id'], f'Deleted seasonal update: {removed_update["title"]}')
+
                 flash(f'Update "{removed_update["title"]}" deleted successfully!', 'success')
             else:
                 flash('Invalid update index.', 'danger')
@@ -1596,6 +1645,9 @@ def edit_update(index):
         }
         with shelve.open('seasonal_updates.db') as db:
             db['updates'] = updates  # Save the updated list back to the database
+
+            if 'user_id' in session:
+                log_user_action(session['user_id'], f'Edited seasonal update: {form.update.data}')
 
         flash(f'Update "{form.update.data}" updated successfully!', 'success')
         return redirect(url_for('home'))
