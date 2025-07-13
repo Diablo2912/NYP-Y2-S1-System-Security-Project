@@ -13,6 +13,7 @@
                     <th>Logout Time (UTC)</th>
                     <th>IP Address</th>
                     <th>Device Info</th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -24,9 +25,18 @@
                     <td style="max-width: 300px; word-break: break-word;">
                         {{ session.user_agent }}
                     </td>
+                    <td>
+                        {% if not session.logout_time %}
+                        <form method="POST" action="{{ url_for('revoke_session', session_id=session.id) }}">
+                            <button type="submit" class="btn btn-danger btn-sm">Revoke</button>
+                        </form>
+                        {% else %}
+                        <button class="btn btn-secondary btn-sm" disabled>Revoked</button>
+                        {% endif %}
+                    </td>
                 </tr>
                 <tr>
-                    <td colspan="4">
+                    <td colspan="5">
                         <details>
                             <summary>View Actions</summary>
                             {% if session.actions %}

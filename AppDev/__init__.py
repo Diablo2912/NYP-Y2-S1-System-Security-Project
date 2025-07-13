@@ -1061,6 +1061,8 @@ def login():
 
     return render_template('/accountPage/login.html', form=login_form)
 
+
+
 def log_session_activity(user_id, action):
     print(f"[DEBUG] Logging {action} for user_id={user_id}")
     try:
@@ -1156,6 +1158,29 @@ def activity_history():
     cursor.close()
 
     return render_template('/accountPage/activity.html', sessions=sessions)
+
+@app.route('/revoke_session/<session_id>', methods=['POST'])
+@jwt_required
+def revoke_session(session_id):
+    user_id = g.user['user_id']
+    if not user_id:
+        flash("Unauthorized action.", "danger")
+        return redirect(url_for('login'))
+
+    cursor = mysql.connection.cursor()
+    cursor.execute("""
+        UPDATE user_session_activity
+        SET logout_time = %s
+        WHERE id = %s AND user_id = %s AND logout_time IS NULL
+    """, (datetime.utcnow(), session_id, user_id))
+    mysql.connection.commit()
+    cursor.close()
+
+    log_user_action(user_id, f"Manually revoked session {session_id}")
+    flash("Session revoked successfully.", "success")
+    return redirect(url_for('activity_history'))
+
+
 
 
 
@@ -1569,10 +1594,9 @@ def create_update():
     site_key = os.getenv("RECAPTCHA_SITE_KEY")
 
     if form.validate_on_submit():
-
-        recaptcha_response = request.form.get('g-recaptcha-response')  # Token from frontend
-        secret_key = os.getenv("RECAPTCHA_SECRET_KEY")  # Secure backend key
-
+        # reCAPTCHA validation
+        recaptcha_response = request.form.get('g-recaptcha-response')
+        secret_key = os.getenv("RECAPTCHA_SECRET_KEY")
         verify_url = "https://www.google.com/recaptcha/api/siteverify"
         payload = {'secret': secret_key, 'response': recaptcha_response}
         r = requests.post(verify_url, data=payload)
@@ -1582,6 +1606,26 @@ def create_update():
             flash("reCAPTCHA verification failed. Please try again.", 'danger')
             return render_template('/home/update.html', title='Update', form=form, site_key=site_key)
 
+        # ✅ Decode JWT token from cookie
+        token = request.cookies.get('jwt_token')
+        if not token:
+            flash("User not authenticated. No token found.", "danger")
+            return redirect(url_for('login'))
+
+        try:
+            decoded = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+            user_email = decoded['email']
+            user_id = decoded['user_id']
+            print("[DEBUG] Decoded user:", decoded)
+        except jwt.ExpiredSignatureError:
+            flash("Session expired. Please log in again.", "danger")
+            return redirect(url_for('login'))
+        except Exception as e:
+            flash("Invalid session token. Please log in again.", "danger")
+            print(f"[ERROR] JWT decoding failed: {e}")
+            return redirect(url_for('login'))
+
+        # Prepare update data
         update_data = {
             'title': form.update.data,
             'content': form.content.data,
@@ -1589,21 +1633,133 @@ def create_update():
             'season': form.season.data,
         }
 
-        # Save the update_data to the shelve database
-        with shelve.open('seasonal_updates.db') as db:
-            if 'updates' not in db:
-                db['updates'] = []  # Initialize a list if it doesn't exist
-            updates = db['updates']  # Get the existing list
-            updates.append(update_data)  # Append the new update
-            db['updates'] = updates  # Save the updated list back to the database
-
-        if 'user_id' in session:
-            log_user_action(session['user_id'], f"Created seasonal update: {form.update.data}")
-
-
-        flash(f'Update "{form.update.data}" created successfully!', 'success')
+        # ✅ Send confirmation email
+        send_update_confirmation_email(
+            email=user_email,
+            user_id=user_id,
+            update_data=update_data
+        )
+        flash("A confirmation email has been sent. Please verify to complete the update.", "info")
         return redirect(url_for('home'))
-    return render_template('/home/update.html', title='Update', form=form)
+
+    return render_template('/home/update.html', title='Update', form=form, site_key=site_key)
+
+
+
+def send_update_confirmation_email(email, user_id, update_data):
+    token_data = {
+        'user_id': user_id,
+        'update_id': str(uuid.uuid4()),
+        'update_data': update_data,
+        'exp': datetime.utcnow() + timedelta(minutes=15)
+    }
+    token = jwt.encode(token_data, SECRET_KEY, algorithm='HS256')
+
+    confirm_url = url_for('confirm_update', token=token, _external=True)
+    reject_url = url_for('reject_update', token=token, _external=True)
+
+    html = f"""
+    <html>
+    <body>
+    <p>Hello,</p>
+    <p>You attempted to create the following seasonal update:</p>
+    <ul>
+        <li><strong>Title:</strong> {update_data['title']}</li>
+        <li><strong>Content:</strong> {update_data['content']}</li>
+        <li><strong>Date:</strong> {update_data['date']}</li>
+        <li><strong>Season:</strong> {update_data['season']}</li>
+    </ul>
+    <p>Please confirm your identity:</p>
+    <p>
+        <a href="{confirm_url}" style="padding:10px 15px;background-color:green;color:white;text-decoration:none;">Yes, this is me</a>
+        &nbsp;
+        <a href="{reject_url}" style="padding:10px 15px;background-color:red;color:white;text-decoration:none;">This is not me</a>
+    </p>
+    </body>
+    </html>
+    """
+
+    sender_email = "sadevdulneth6@gmail.com"
+    receiver_email = email
+    sender_password = "isgw cesr jdbs oytx"
+
+    message = MIMEMultipart("alternative")
+    message["Subject"] = "Confirm Your Seasonal Update"
+    message["From"] = sender_email
+    message["To"] = receiver_email
+
+    # ✅ Attach HTML with proper UTF-8 encoding
+    message.attach(MIMEText(html, "html", _charset="utf-8"))
+
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, receiver_email, message.as_string())
+        server.quit()
+        print("[DEBUG] Email confirmation sent.")
+    except Exception as e:
+        print(f"[ERROR] Failed to send email: {e}")
+
+
+
+
+
+@app.route('/confirm_update/<token>')
+def confirm_update(token):
+    try:
+        # Decode the token
+        decoded = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+        update_data = decoded['update_data']
+        user_id = decoded['user_id']
+
+        # ✅ Fetch user from DB to restore session
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('SELECT * FROM accounts WHERE id = %s', (user_id,))
+        user = cursor.fetchone()
+        cursor.close()
+
+        if user:
+            # ✅ Restore session
+            session['user_id'] = user['id']
+            session['email'] = user['email']
+            session['first_name'] = user['first_name']
+            session['last_name'] = user['last_name']
+            session['gender'] = user['gender']
+            session['phone'] = user['phone_number']
+            session['status'] = user['status']
+
+            # ✅ Save the update
+            with shelve.open('seasonal_updates.db') as db:
+                updates = db.get('updates', [])
+                updates.append(update_data)
+                db['updates'] = updates
+
+            log_user_action(user['id'], f"Confirmed and created seasonal update: {update_data['title']}")
+            flash("Seasonal update created successfully!", "success")
+        else:
+            flash("User not found. Cannot restore session.", "danger")
+
+    except jwt.ExpiredSignatureError:
+        flash("Confirmation link expired.", "danger")
+    except Exception as e:
+        flash(f"Failed to confirm update: {e}", "danger")
+
+    return redirect(url_for('home'))
+
+
+@app.route('/reject_update/<token>')
+def reject_update(token):
+    try:
+        decoded = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+        update_data = decoded['update_data']
+        user_id = decoded['user_id']
+
+        log_user_action(user_id, f"Rejected seasonal update: {update_data['title']}")
+        flash("Update rejected and not saved.", "info")
+    except Exception as e:
+        flash(f"Error processing rejection: {e}", "danger")
+    return redirect(url_for('home'))
 
 @app.route('/delete_update/<int:index>', methods=['POST'])
 def delete_update(index):
