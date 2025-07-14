@@ -33,6 +33,8 @@ import time
 from datetime import datetime, timedelta
 import jwt
 import socket
+import requests
+from twilio.rest import Client
 import json
 import numpy as np
 from deepface import DeepFace
@@ -584,11 +586,35 @@ def accountInfo():
     cursor.close()
     return render_template('/accountPage/accountInfo.html', user=user)
 
-@app.route('/accountSecurity')
+@app.route('/accountSecurity', methods=['GET', 'POST'])
 @jwt_required
 def accountSecurity():
-    user_id = g.user['user_id']  # Should now be safe
+    user_id = g.user['user_id']
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    if request.method == 'POST':
+        selected_countries = request.form.getlist('allowed_countries')
+
+        # Validation: Ensure at least one country is selected
+        if not selected_countries:
+            flash("You must select at least one country.", "danger")
+            # Reload user to show current settings
+            cursor.execute("SELECT * FROM accounts WHERE id = %s", (user_id,))
+            user = cursor.fetchone()
+            cursor.close()
+            return render_template('/accountPage/accountSecurity.html', user=user)
+
+        country_str = ','.join(selected_countries)
+
+        try:
+            cursor.execute("UPDATE accounts SET countries = %s WHERE id = %s", (country_str, user_id))
+            mysql.connection.commit()
+            flash("Allowed countries updated successfully.", "success")
+        except Exception as e:
+            mysql.connection.rollback()
+            flash(f"Update failed: {str(e)}", "danger")
+
+    # Always load user after possible update
     cursor.execute("SELECT * FROM accounts WHERE id = %s", (user_id,))
     user = cursor.fetchone()
     cursor.close()
@@ -927,6 +953,36 @@ def verify_password(password, password_hash):
     compare_hash = hash_password(password, salt, iterations)
     return secrets.compare_digest(password_hash, compare_hash)
 
+def admin_log_activity(mysql, activity, category="Info"):
+    # Default value for logs is Info
+    """
+    Logs an activity to the logs table.
+
+    Args:
+        mysql: The MySQL connection object.
+        activity (str): Description of the activity to log.
+        category (str): Log category (default: 'Info').
+
+    Returns:
+        None
+    """
+    if not mysql:
+        raise ValueError("MySQL connection object is required.")
+
+    hostname = socket.gethostname()
+    ip_addr = socket.gethostbyname(hostname)
+    date = datetime.now().strftime('%Y-%m-%d')
+    time = datetime.now().strftime('%I:%M %p')
+
+    cursor = mysql.connection.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO logs (date, time, category, activity, ip_address)
+            VALUES (%s, %s, %s, %s, %s)
+        ''', (date, time, category, activity, ip_addr))
+        mysql.connection.commit()
+    finally:
+        cursor.close()
 
 @app.route('/signUp', methods=['GET', 'POST'])
 def sign_up():
@@ -956,51 +1012,44 @@ def sign_up():
 
         # Determine status based on email domain
         email = sign_up_form.email.data
-        status = 'staff' if email.endswith('@cropzy.com') else 'user'
+        status = 'admin' if email.endswith('@cropzy.com') else 'user'
 
-        # Hash the password before storing
+        # Hash the password
         hashed_password = hash_password(sign_up_form.pswd.data)
 
-        # Insert new user with hashed password
+        # Hardcoded IP (Singapore - SG) for testing purposes
+        ip_address = '183.90.84.148'
+
+        # Get user IP address (with proxy support)
+        # ip_address = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+
+        # Get country code using IP
+        user_country = get_user_country(ip_address)
+
+        #  Insert user with country into DB
         cursor.execute('''
-            INSERT INTO accounts (first_name, last_name, gender, phone_number, email, password, status, two_factor_status) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO accounts (first_name, last_name, gender, phone_number, email, password, status, two_factor_status, countries) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         ''', (
             first_name,
             last_name,
             gender,
-            phone_number,
+            '+65' + str(phone_number),
             email,
             hashed_password,
             status,
-            'disabled'
+            'disabled',
+            user_country  # this is the country code like 'SG', 'MY', etc.
         ))
 
-        hostname = socket.gethostname()
-        ip_addr = socket.gethostbyname(hostname)
-        date = datetime.now().strftime('%Y-%m-%d')
-        time = datetime.now().strftime('%I:%M %p')
-        category = "Info"
-        activity = "User registration successful"
-
-        cursor.execute('''
-                    INSERT INTO logs (date, time, category, activity, ip_address) 
-                    VALUES (%s, %s, %s, %s, %s)
-                ''', (
-            date,
-            time,
-            category,
-            activity,
-            ip_addr
-        ))
+        # Log registration
+        admin_log_activity(mysql, "User logged in successfully")
 
         mysql.connection.commit()
         cursor.close()
 
         flash('Sign up successful! Please log in.', 'info')
         return redirect(url_for('complete_signUp'))
-
-    return render_template('/accountPage/signUp.html', form=sign_up_form)
 
 
 SECRET_KEY = 'asdsa8f7as8d67a8du289p1eu89hsad7y2189eha8'  # You can change this to a more secure value
@@ -1011,13 +1060,24 @@ def inject_user():
     user = verify_jwt_token(token) if token else None
     return dict(current_user=user)
 
+def get_user_country(ip_address):
+    try:
+        res = requests.get(f"https://ipwho.is/{ip_address}")
+        data = res.json()
+        if data.get('success', False):
+            return data.get('country_code', 'Unknown')
+        return "Unknown"
+    except Exception as e:
+        print("GeoIP Error:", e)
+        return "Unknown"
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     login_form = LoginForm(request.form)
 
     if request.method == 'POST' and login_form.validate():
         email = sanitize_input(login_form.email.data.lower())
-        password = login_form.pswd.data  # no need to sanitize passwords
+        password = login_form.pswd.data
 
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cursor.execute('SELECT * FROM accounts WHERE email = %s', (email,))
@@ -1025,15 +1085,32 @@ def login():
         cursor.close()
 
         if user:
-            stored_password_hash = user['password']
+            # Hardcoded IP (Singapore - SG) for testing purposes
+            ip_address = '183.90.84.148'
+            # Hardcoded IP (Malaysia - MYS) for testing purposes
+            # Hardcoded IP (Japan - JPN) for testing purposes
+            # #Uncomment if not run on code editor, but on Proxy or Load Balancer
+            # Eg: Nginx, Heroku, Apache, Cloudflare
+            # ip_address = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+            current_country = get_user_country(ip_address)
+            print(f"User IP: {ip_address}, Country: {current_country}")
 
+            # Ensure 'countries' is not None
+            allowed_countries = user.get('countries') or ''
+            allowed_list = [c.strip() for c in allowed_countries.split(',')] if allowed_countries else []
+
+            if current_country not in allowed_list:
+                flash("Login from your region is not allowed.", "danger")
+                return redirect(url_for('login'))
+
+            # Password validation
+            stored_password_hash = user['password']
             if verify_password(password, stored_password_hash):
                 if user.get('two_factor_status') == 'enabled':
                     send_otp_email(user['email'], user['id'], user['first_name'], user['last_name'])
                     session['pending_2fa_user_id'] = user['id']
                     return redirect(url_for('verify_otp', id=user['id']))
                 else:
-                    # Generate JWT token
                     payload = {
                         'user_id': user['id'],
                         'first_name': user['first_name'],
@@ -1042,22 +1119,17 @@ def login():
                         'gender': user['gender'],
                         'phone': user['phone_number'],
                         'status': user['status'],
-                        'exp': datetime.utcnow() + timedelta(hours=1)  # Token expiration time
+                        'exp': datetime.utcnow() + timedelta(hours=1)
                     }
                     token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
-
-                    # Set JWT token in cookies (with secure flag and HttpOnly flag)
                     response = make_response(redirect(url_for('home')))
                     response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
-
-                    # Flash success message and redirect
                     flash('Login successful!', 'success')
                     return response
 
             flash('Incorrect password.', 'danger')
-            return redirect(url_for('login'))
-
-        flash('Email not found. Please sign up.', 'danger')
+        else:
+            flash('Email not found. Please sign up.', 'danger')
 
     return render_template('/accountPage/login.html', form=login_form)
 
@@ -1071,7 +1143,6 @@ def verify_jwt_token(token):
         return None  # Token expired
     except jwt.InvalidTokenError:
         return None  # Invalid token
-
 
 
 otp_store = {}
@@ -1102,10 +1173,33 @@ def send_otp_email(email, user_id, first_name, last_name):
                f"Thanks,\nCropzy Support Team")
 
 
-    # Call your existing email sending function
+    # Call existing email sending function
     send_email(email, subject, message)
 
-# def send_otp_sms():
+# Twilio credentials (use environment variables in production!)
+account_sid = 'AC69fe3693aeb2b86b276600293ab078d5'
+auth_token = '53bd48449584c66310867cf380f2efb6'
+twilio_phone = '+13072882468'
+
+# Twilio client setup
+client = Client(account_sid, auth_token)
+
+def send_otp_sms(phone_number,user_id, first_name, last_name):
+    otp = f"{random.randint(0, 999999):06d}"
+    expires = time.time() + 60  # OTP valid for 60 seconds
+
+    # Store OTP and expiry time
+    otp_store[user_id] = {"otp": otp, "expires": expires}
+
+    try:
+        message = client.messages.create(
+            from_=twilio_phone,
+            body=f'\n Use verification code {otp} for Cropzy authentication.',
+            to=phone_number
+        )
+        print(f" SMS sent: {message.sid}") #Debugger msg
+    except Exception as e:
+        print(f" Failed to send SMS: {e}") #Debugger msg
 
 @app.route('/verify-otp/<int:id>', methods=['GET', 'POST'])
 def verify_otp(id):
@@ -1149,7 +1243,7 @@ def verify_otp(id):
                 'gender': user['gender'],
                 'phone': user['phone_number'],
                 'status': user['status'],
-                'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)
+                'exp': datetime.utcnow() + timedelta(hours=1)
             }
             token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
             response = make_response(redirect(url_for('home')))
@@ -1162,9 +1256,79 @@ def verify_otp(id):
 
     return render_template('/accountPage/two_factor.html', id=id)
 
+@app.route('/sms-verify-otp/<int:id>', methods=['GET', 'POST'])
+def sms_verify_otp(id):
+    if 'pending_2fa_user_id' not in session or session['pending_2fa_user_id'] != id:
+        flash("Unauthorized access.", "error")
+        return redirect(url_for('login'))
+
+    # Send OTP on GET request
+    if request.method == 'GET':
+        # Generate and send OTP
+        otp = f"{random.randint(0, 999999):06d}"
+        expires = time.time() + 60  # 60 seconds expiry
+        otp_store[id] = {"otp": otp, "expires": expires}
+
+        # Fetch user phone
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
+        user = cursor.fetchone()
+        cursor.close()
+
+        if user:
+            send_otp_sms(user['phone_number'], id, user['first_name'], user['last_name'])
+
+    if request.method == 'POST':
+        entered_otp = request.form.get('otp')
+        record = otp_store.get(id)
+
+        if not record:
+            flash("No OTP found. Please login again.", "error")
+            return redirect(url_for('login'))
+
+        if time.time() > record['expires']:
+            flash("OTP expired. Please login again.", "error")
+            otp_store.pop(id, None)
+            session.pop('pending_2fa_user_id', None)
+            return redirect(url_for('login'))
+
+        if entered_otp == record['otp']:
+            cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+            cursor.execute('SELECT * FROM accounts WHERE id = %s', (id,))
+            user = cursor.fetchone()
+            cursor.close()
+
+            if not user:
+                flash("User not found. Please login again.", "error")
+                return redirect(url_for('login'))
+
+            otp_store.pop(id, None)
+            session.pop('pending_2fa_user_id', None)
+
+            payload = {
+                'user_id': user['id'],
+                'first_name': user['first_name'],
+                'last_name': user['last_name'],
+                'email': user['email'],
+                'gender': user['gender'],
+                'phone': user['phone_number'],
+                'status': user['status'],
+                'exp': datetime.utcnow() + timedelta(hours=1)
+            }
+            token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+            response = make_response(redirect(url_for('home')))
+            response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
+
+            flash("Login successful!", "success")
+            return response
+        else:
+            flash("Invalid OTP. Please try again.", "error")
+
+    return render_template('/accountPage/sms_auth.html', id=id)
+
 
 def generate_recovery_code(id):
-    code = f"{random.randint(0, 999999):06d}"  # Generate 6-digit code
+    code = f"{random.randint(0, 999999):012d}"  # Generate 12-digit code
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
@@ -1207,7 +1371,7 @@ def recovery_auth(id):
                     'gender': result['gender'],
                     'phone': result['phone_number'],
                     'status': result['status'],
-                    'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)
+                    'exp': datetime.utcnow() + timedelta(hours=1)
                 }
                 token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
                 response = make_response(redirect(url_for('home')))
@@ -1219,13 +1383,77 @@ def recovery_auth(id):
 
 @app.route('/setup_face_id/<int:id>', methods=['GET', 'POST'])
 def setup_face_id(id):
+    if request.method == 'POST':
+        base64_img = request.form.get('face_image')
 
-    return render_template("/accountPage/setup_face_id.html", id=id)
+        if not base64_img or "," not in base64_img:
+            flash("Face capture failed. Please try again.", "danger")
+            return redirect(request.url)
+
+        image_data = base64_img.split(",")[1]
+        img_bytes = base64.b64decode(image_data)
+
+        # Save image bytes to database directly
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute("UPDATE accounts SET face = %s WHERE id = %s", (img_bytes, id))
+        mysql.connection.commit()
+        cursor.close()
+
+        flash("Face ID registered successfully!", "success")
+        return redirect(url_for('accountInfo'))
+
+    return render_template("accountPage/setup_face_id.html", id=id)
 
 @app.route('/face_id/<int:id>', methods=['GET', 'POST'])
 def face_id(id):
+    if request.method == 'POST':
+        base64_img = request.form.get('face_image')
+        if not base64_img or "," not in base64_img:
+            flash("Face not captured. Please click 'Capture Face' before submitting.", "danger")
+            return redirect(request.url)
 
-    return render_template('/accountPage/face_id.html', id=id)
+        # Save the newly captured face as a temporary file
+        image_data = base64_img.split(",")[1]
+        temp_filename = f"temp_face_scan_user_{id}.png"
+        temp_path = os.path.join(app.config['UPLOAD_FOLDER'], temp_filename)
+        with open(temp_path, 'wb') as f:
+            f.write(base64.b64decode(image_data))
+
+        # Retrieve the stored face blob from the database
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute("SELECT face FROM accounts WHERE id = %s", (id,))
+        user = cursor.fetchone()
+        cursor.close()
+
+        if not user or not user['face']:
+            flash("No registered face found. Please set up Face ID first.", "danger")
+            return redirect(url_for('setup_face_id', id=id))
+
+        # Save blob image from DB into a temp file
+        registered_path = os.path.join(app.config['UPLOAD_FOLDER'], f"user_{id}_face.png")
+        with open(registered_path, 'wb') as f:
+            f.write(user['face'])
+
+        try:
+            result = DeepFace.verify(
+                img1_path=temp_path,
+                img2_path=registered_path,
+                model_name='VGG-Face',
+                enforce_detection=False
+            )
+
+            if result["verified"]:
+                flash("Face matched. Logged in successfully!", "success")
+                # Optionally remove temp files here
+                return redirect(url_for('home'))
+            else:
+                flash("Face does not match. Access denied.", "danger")
+
+        except Exception as e:
+            flash(f"Error during face verification: {str(e)}", "danger")
+
+    return render_template("accountPage/face_id.html", id=id)
+
 
 @app.route('/more_auth/<int:id>', methods=['GET'])
 def more_auth(id):
@@ -1276,7 +1504,7 @@ def disable_two_factor(id):
     if user['two_factor_status'] == 'disabled':
         flash("2FA is already disabled for this account.", "info")
     else:
-        cursor.execute("UPDATE accounts SET two_factor_status = %s WHERE id = %s", ('disabled', id))
+        cursor.execute("UPDATE accounts SET two_factor_status = %s, recovery_code = NULL WHERE id = %s", ('disabled', id))
         mysql.connection.commit()
         flash("2FA has been disabled for this account.", "success")
 
@@ -1639,7 +1867,7 @@ def send_email(to_email, subject, message):
         server.login(EMAIL_SENDER, EMAIL_PASSWORD)
         server.sendmail(EMAIL_SENDER, to_email, msg.as_string())
         server.quit()
-        print(f"✅ Email sent successfully to {to_email}")
+        print(f"Email sent successfully to {to_email}")
 
     except Exception as e:
         print(f"❌ Email failed to send: {e}")
