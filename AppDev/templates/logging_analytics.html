@@ -43,6 +43,17 @@
       <div class="container mt-3">
         <h2 class="mb-3">Log Overview</h2>
         <p>Last Refresh Time: {{ current_time }}</p>
+
+        <!-- Slider Control -->
+        <div class="mb-4">
+          <label for="logRange" class="form-label"><h5>Logs From Past Days</h5></label>
+        <div style="max-width: 250px;">
+          <input type="range" class="form-range" min="1" max="20" step="1" id="logRange"
+                 value="{{ num_days or 10 }}" oninput="rangeOutput.value = logRange.value">
+        </div>
+        <p>Showing last <output id="rangeOutput">{{ num_days or 10 }}</output> day(s) </p>
+      </div>
+
         <h4>Total Logs: </h4>
 
         <!-- Log Summary Cards -->
@@ -164,6 +175,19 @@
       }
     }
   });
+
+
+  let timeout;
+  const slider = document.getElementById('logRange');
+
+  slider.addEventListener('change', function () {
+    const days = this.value;
+    clearTimeout(timeout);
+    timeout = setTimeout(() => {
+      window.location.href = `/logging_analytics?days=${days}`;
+    }, 300);  // wait 300ms to avoid spamming
+  });
+
 </script>
 
 {% endblock %}

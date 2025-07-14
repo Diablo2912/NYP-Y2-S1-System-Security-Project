@@ -887,34 +887,35 @@ def logging_analytics():
     if current_user['status'] != 'admin':
         return render_template('404.html')
 
-    # Fetch logs from the last 10 days
+    # Get number of days from query string, default to 10
+    num_days = int(request.args.get('days', 10))
+
+    # Fetch logs from the last `num_days` days
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute("""
         SELECT DATE(date) AS date, category, COUNT(*) AS count
         FROM logs
-        WHERE DATE(date) >= CURDATE() - INTERVAL 9 DAY
+        WHERE DATE(date) >= CURDATE() - INTERVAL %s DAY
         GROUP BY DATE(date), category
         ORDER BY date
-    """)
+    """, (num_days - 1,))  # -1 to include today
     log_data = cursor.fetchall()
     cursor.close()
 
-    # Prepare the past 10 days' dates
+    # Prepare date ranges
     today = datetime.today().date()
-    dates_iso = [(today - timedelta(days=i)).isoformat() for i in range(9, -1, -1)]
-    dates_display = [(today - timedelta(days=i)).strftime('%d - %m - %Y') for i in range(9, -1, -1)]
+    dates_iso = [(today - timedelta(days=i)).isoformat() for i in range(num_days - 1, -1, -1)]
+    dates_display = [(today - timedelta(days=i)).strftime('%d - %m - %Y') for i in range(num_days - 1, -1, -1)]
     categories = ['Info', 'Warning', 'Error', 'Critical']
 
-    # Initialize chart structure
+    # Initialize chart structures
     chart_data = {date: {cat: 0 for cat in categories} for date in dates_iso}
     category_summary = {cat: 0 for cat in categories}
 
-    # Populate chart data from DB results
     for row in log_data:
-        db_date = str(row['date'])  # 'YYYY-MM-DD'
+        db_date = str(row['date'])
         category = row['category']
         count = row['count']
-
         if db_date in chart_data and category in chart_data[db_date]:
             chart_data[db_date][category] = count
             category_summary[category] += count
@@ -928,7 +929,8 @@ def logging_analytics():
         dates_display=dates_display,
         categories=categories,
         current_time=current_time,
-        category_summary=category_summary
+        category_summary=category_summary,
+        num_days=num_days
     )
 
 ALGORITHM = "pbkdf2_sha256"
@@ -954,17 +956,14 @@ def verify_password(password, password_hash):
     return secrets.compare_digest(password_hash, compare_hash)
 
 def admin_log_activity(mysql, activity, category="Info"):
-    # Default value for logs is Info
     """
     Logs an activity to the logs table.
+    If the category is 'Critical', it will send email alerts to all admin users.
 
     Args:
         mysql: The MySQL connection object.
         activity (str): Description of the activity to log.
-        category (str): Log category (default: 'Info').
-
-    Returns:
-        None
+        category (str): Log category (e.g., 'Info', 'Warning', 'Error', 'Critical')
     """
     if not mysql:
         raise ValueError("MySQL connection object is required.")
@@ -974,6 +973,7 @@ def admin_log_activity(mysql, activity, category="Info"):
     date = datetime.now().strftime('%Y-%m-%d')
     time = datetime.now().strftime('%I:%M %p')
 
+    # Insert log into DB
     cursor = mysql.connection.cursor()
     try:
         cursor.execute('''
@@ -983,6 +983,38 @@ def admin_log_activity(mysql, activity, category="Info"):
         mysql.connection.commit()
     finally:
         cursor.close()
+
+    # If critical, notify all admins
+    if category.lower() == "critical":
+        notify_all_admins(mysql, activity)
+
+def notify_all_admins(mysql, message):
+    """
+    Sends an email notification to all admin users about a critical log event.
+    """
+    try:
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute("SELECT email, first_name FROM accounts WHERE status = 'admin'")
+        admins = cursor.fetchall()
+        cursor.close()
+
+        subject = "[Cropzy Alert] ⚠️ Critical System Event"
+        for admin in admins:
+            alert_message = f"""
+            Dear {admin['first_name']},
+
+            A critical event has occurred:
+
+            {message}
+
+            Please investigate this issue as soon as possible.
+
+            Regards,
+            Cropzy Security System
+            """
+            send_email(admin['email'], subject, alert_message)
+    except Exception as e:
+        print(f"Failed to send admin alerts: {e}")
 
 @app.route('/signUp', methods=['GET', 'POST'])
 def sign_up():
@@ -1043,7 +1075,7 @@ def sign_up():
         ))
 
         # Log registration
-        admin_log_activity(mysql, "User logged in successfully")
+        admin_log_activity(mysql, "User signed up successfully", category="Critical")
 
         mysql.connection.commit()
         cursor.close()
@@ -1422,17 +1454,17 @@ def face_id(id):
         # Retrieve the stored face blob from the database
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cursor.execute("SELECT face FROM accounts WHERE id = %s", (id,))
-        user = cursor.fetchone()
+        user_face_data = cursor.fetchone()
         cursor.close()
 
-        if not user or not user['face']:
+        if not user_face_data or not user_face_data['face']:
             flash("No registered face found. Please set up Face ID first.", "danger")
             return redirect(url_for('setup_face_id', id=id))
 
-        # Save blob image from DB into a temp file
+        # Save the registered face blob as an image
         registered_path = os.path.join(app.config['UPLOAD_FOLDER'], f"user_{id}_face.png")
         with open(registered_path, 'wb') as f:
-            f.write(user['face'])
+            f.write(user_face_data['face'])
 
         try:
             result = DeepFace.verify(
@@ -1443,9 +1475,37 @@ def face_id(id):
             )
 
             if result["verified"]:
+                # Fetch full user info
+                cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+                cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
+                user = cursor.fetchone()
+                cursor.close()
+
+                if not user:
+                    flash("User not found. Please try again.", "danger")
+                    return redirect(url_for('login'))
+
+                payload = {
+                    'user_id': user['id'],
+                    'first_name': user['first_name'],
+                    'last_name': user['last_name'],
+                    'email': user['email'],
+                    'gender': user['gender'],
+                    'phone': user['phone_number'],
+                    'status': user['status'],
+                    'exp': datetime.utcnow() + timedelta(hours=1)
+                }
+
+                token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+                response = make_response(redirect(url_for('home')))
+                response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
+
+                # Optionally delete temp files
+                if os.path.exists(temp_path): os.remove(temp_path)
+                if os.path.exists(registered_path): os.remove(registered_path)
+
                 flash("Face matched. Logged in successfully!", "success")
-                # Optionally remove temp files here
-                return redirect(url_for('home'))
+                return response
             else:
                 flash("Face does not match. Access denied.", "danger")
 
