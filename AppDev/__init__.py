@@ -953,6 +953,36 @@ def verify_password(password, password_hash):
     compare_hash = hash_password(password, salt, iterations)
     return secrets.compare_digest(password_hash, compare_hash)
 
+def admin_log_activity(mysql, activity, category="Info"):
+    # Default value for logs is Info
+    """
+    Logs an activity to the logs table.
+
+    Args:
+        mysql: The MySQL connection object.
+        activity (str): Description of the activity to log.
+        category (str): Log category (default: 'Info').
+
+    Returns:
+        None
+    """
+    if not mysql:
+        raise ValueError("MySQL connection object is required.")
+
+    hostname = socket.gethostname()
+    ip_addr = socket.gethostbyname(hostname)
+    date = datetime.now().strftime('%Y-%m-%d')
+    time = datetime.now().strftime('%I:%M %p')
+
+    cursor = mysql.connection.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO logs (date, time, category, activity, ip_address)
+            VALUES (%s, %s, %s, %s, %s)
+        ''', (date, time, category, activity, ip_addr))
+        mysql.connection.commit()
+    finally:
+        cursor.close()
 
 @app.route('/signUp', methods=['GET', 'POST'])
 def sign_up():
@@ -1013,17 +1043,7 @@ def sign_up():
         ))
 
         # Log registration
-        hostname = socket.gethostname()
-        ip_addr = socket.gethostbyname(hostname)
-        date = datetime.now().strftime('%Y-%m-%d')
-        time = datetime.now().strftime('%I:%M %p')
-        category = "Info"
-        activity = "User registration successful"
-
-        cursor.execute('''
-            INSERT INTO logs (date, time, category, activity, ip_address) 
-            VALUES (%s, %s, %s, %s, %s)
-        ''', (date, time, category, activity, ip_addr))
+        admin_log_activity(mysql, "User logged in successfully")
 
         mysql.connection.commit()
         cursor.close()

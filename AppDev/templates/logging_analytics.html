@@ -43,7 +43,7 @@
       <div class="container mt-3">
         <h2 class="mb-3">Log Overview</h2>
         <p>Last Refresh Time: {{ current_time }}</p>
-        <h5>Total Logs: </h5>
+        <h4>Total Logs: </h4>
 
         <!-- Log Summary Cards -->
         <div class="row justify-content-center g-3">
@@ -57,6 +57,14 @@
             </div>
           </div>
           {% endfor %}
+        </div>
+
+        <div class="col-lg-10 col-md-9 col-sm-12 mt-3">
+          <h4>Logs Explanation</h4>
+          <p><strong>Info:</strong> Indicates routine operations or successful actions that require no intervention.</p>
+          <p><strong>Warning:</strong> Flags unusual or unexpected behavior that may need monitoring.</p>
+          <p><strong>Error:</strong> Represents failures that prevent a specific task from completing.</p>
+          <p><strong>Critical:</strong> Denotes severe issues that threaten system stability or security and need immediate action.</p>
         </div>
 
         <!-- Pie Chart -->
