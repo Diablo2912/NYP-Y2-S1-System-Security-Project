@@ -134,12 +134,27 @@ def jwt_required(f):
             flash("Invalid or expired token. Please log in again.", "danger")
             return redirect(url_for('login'))
 
-        # Store user info in g for access within the request
-        from flask import g
+        session_id = session.get('current_session_id')
+        if session_id:
+            cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+            cursor.execute("""
+                SELECT logout_time FROM user_session_activity
+                WHERE id = %s AND user_id = %s
+            """, (session_id, user_data['user_id']))
+            result = cursor.fetchone()
+            cursor.close()
+
+            if result and result['logout_time']:
+                flash("Your session has been revoked. Please log in again.", "danger")
+                response = make_response(redirect(url_for('login')))
+                response.delete_cookie('jwt_token')
+                return response
+
         g.user = user_data
         return f(*args, **kwargs)
 
     return decorated_function
+
 
 @app.route('/add_sample_products/')
 def add_sample_products():
@@ -1033,6 +1048,7 @@ def login():
                     session['pending_2fa_user_id'] = user['id']
                     return redirect(url_for('verify_otp', id=user['id']))
                 else:
+                    session_id = log_session_activity(user['id'], 'login')
                     payload = {
                         'user_id': user['id'],
                         'first_name': user['first_name'],
@@ -1041,6 +1057,7 @@ def login():
                         'gender': user['gender'],
                         'phone': user['phone_number'],
                         'status': user['status'],
+                        'session_id': session_id,
                         'exp': datetime.utcnow() + timedelta(hours=1)
                     }
                     token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
@@ -1064,9 +1081,11 @@ def login():
 
 
 def log_session_activity(user_id, action):
-    print(f"[DEBUG] Logging {action} for user_id={user_id}")
+    print(f"[DEBUG] Creating session log for user {user_id} at {datetime.now()}")
     try:
         cursor = mysql.connection.cursor()
+
+        session_id = None  # default
 
         if action == 'login':
             cursor.execute('''
@@ -1079,8 +1098,8 @@ def log_session_activity(user_id, action):
             ))
 
             session_id = cursor.lastrowid
-            session['current_session_id'] = session_id  # ✅ Save for future action logging
-            session['user_id'] = user_id  # Optional: reinforce user_id in session
+            session['current_session_id'] = session_id
+            session['user_id'] = user_id
 
         elif action == 'logout':
             cursor.execute('''
@@ -1091,7 +1110,7 @@ def log_session_activity(user_id, action):
                 LIMIT 1
             ''', (user_id,))
 
-        # ✅ Diagnostic check BEFORE closing cursor
+        # Diagnostic
         cursor.execute('SELECT DATABASE()')
         current_db = cursor.fetchone()
         print("[DEBUG] Connected to DB:", current_db)
@@ -1100,12 +1119,15 @@ def log_session_activity(user_id, action):
         cursor.close()
         print("[DEBUG] Log saved to DB")
 
+        return session_id  # ✅ return this always (None for logout)
+
     except Exception as e:
         print("[ERROR] Session log failed:", e)
+        return None
 
 
-def log_user_action(user_id, action):
-    session_id = session.get('current_session_id')
+
+def log_user_action(user_id, session_id, action):
     if not user_id or not session_id:
         print("[WARN] Missing user_id or session_id, skipping action log")
         return
@@ -1121,6 +1143,7 @@ def log_user_action(user_id, action):
         print(f"[DEBUG] Action logged: {action}")
     except Exception as e:
         print("[ERROR] Action log failed:", e)
+
 
 
 
@@ -1159,6 +1182,7 @@ def activity_history():
 
     return render_template('/accountPage/activity.html', sessions=sessions)
 
+
 @app.route('/revoke_session/<session_id>', methods=['POST'])
 @jwt_required
 def revoke_session(session_id):
@@ -1176,9 +1200,39 @@ def revoke_session(session_id):
     mysql.connection.commit()
     cursor.close()
 
-    log_user_action(user_id, f"Manually revoked session {session_id}")
+    # ✅ Log under the correct session
+    log_user_action(user_id, g.user['session_id'], f"Manually revoked session {session_id}")
+
     flash("Session revoked successfully.", "success")
     return redirect(url_for('activity_history'))
+
+
+@app.route('/check_session_validity')
+def check_session_validity():
+    token = request.cookies.get('jwt_token')
+    if not token:
+        return jsonify({"valid": False})
+
+    user_data = verify_jwt_token(token)
+    if not user_data:
+        return jsonify({"valid": False})
+
+    session_id = user_data.get('session_id')
+    user_id = user_data.get('user_id')
+
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("""
+        SELECT logout_time FROM user_session_activity
+        WHERE id = %s AND user_id = %s
+    """, (session_id, user_id))
+    result = cursor.fetchone()
+    cursor.close()
+
+    if result and result['logout_time']:
+        return jsonify({"valid": False})
+
+    return jsonify({"valid": True})
+
 
 
 
@@ -1231,6 +1285,7 @@ def send_otp_email(email, user_id, first_name, last_name):
 
 @app.route('/verify-otp/<int:id>', methods=['GET', 'POST'])
 def verify_otp(id):
+    print(f"[DEBUG] OTP form submitted for user_id={id} at {datetime.now()}")
     if 'pending_2fa_user_id' not in session or session['pending_2fa_user_id'] != id:
         flash("Unauthorized access.", "error")
         return redirect(url_for('login'))
@@ -1263,6 +1318,9 @@ def verify_otp(id):
             otp_store.pop(id, None)
             session.pop('pending_2fa_user_id', None)
 
+            # ✅ Only ONE call here
+            session_id = log_session_activity(user['id'], 'login')
+
             payload = {
                 'user_id': user['id'],
                 'first_name': user['first_name'],
@@ -1271,14 +1329,13 @@ def verify_otp(id):
                 'gender': user['gender'],
                 'phone': user['phone_number'],
                 'status': user['status'],
+                'session_id': session_id,
                 'exp': datetime.utcnow() + timedelta(hours=1)
             }
+
             token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
             response = make_response(redirect(url_for('home')))
             response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
-
-            # ✅ Log session activity here
-            log_session_activity(user['id'], 'login')
 
             flash("Login successful!", "success")
             return response
@@ -1317,12 +1374,16 @@ def recovery_auth(id):
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
         result = cursor.fetchone()
+        cursor.close()
 
         if result:
             stored_code = result['recovery_code']
 
             if input_code == stored_code:
                 generate_recovery_code(id)
+
+                # ✅ Only one log here
+                session_id = log_session_activity(result['id'], 'login')
 
                 payload = {
                     'user_id': result['id'],
@@ -1332,22 +1393,22 @@ def recovery_auth(id):
                     'gender': result['gender'],
                     'phone': result['phone_number'],
                     'status': result['status'],
+                    'session_id': session_id,
                     'exp': datetime.utcnow() + timedelta(hours=1)
                 }
+
                 token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
                 response = make_response(redirect(url_for('home')))
                 response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
 
-                # ✅ Corrected this line: passed actual user ID instead of ['id']
-                log_session_activity(result['id'], 'login')
-
-                # ✅ Optional: Also log that they used recovery code
-                log_session_activity(result['id'], "Logged in via recovery code")
+                # ✅ Use user action log instead of logging a new session
+                log_user_action(result['id'], session_id, "Logged in via recovery code")
 
                 flash('Recovery successful. You are now logged in.', 'success')
                 return response
 
     return render_template('/accountPage/recovery_code.html', id=id)
+
 @app.route('/setup_face_id/<int:id>', methods=['GET', 'POST'])
 def setup_face_id(id):
 
@@ -1418,22 +1479,32 @@ def disable_two_factor(id):
 @app.route('/logout')
 def logout():
     token = request.cookies.get('jwt_token')
+    session_id = None
     user_id = None
 
     if token:
         try:
             data = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+            session_id = data.get('session_id')
             user_id = data.get('user_id')
         except:
-            pass  # token might be invalid or expired
+            pass
 
-    if user_id:
-        log_session_activity(user_id, 'logout')  # Log it BEFORE removing the token
+    if session_id and user_id:
+        cursor = mysql.connection.cursor()
+        cursor.execute('''
+            UPDATE user_session_activity
+            SET logout_time = NOW()
+            WHERE id = %s AND user_id = %s
+        ''', (session_id, user_id))
+        mysql.connection.commit()
+        cursor.close()
 
     response = make_response(redirect(url_for('login')))
-    response.delete_cookie('jwt_token')  # Then delete the token
+    response.delete_cookie('jwt_token')
     flash('You have been logged out.', 'success')
     return response
+
 
 @app.route('/complete_signUp')
 def complete_signUp():
@@ -1481,7 +1552,8 @@ def change_dets(id):
             mysql.connection.commit()
 
             if 'user_id' in session:
-                log_user_action(session['user_id'], "Changed account details")
+                log_user_action(session['user_id'], session.get('current_session_id'), "Changed account details")
+
 
             cursor.close()
 
@@ -1545,7 +1617,7 @@ def change_pswd(id):
         cursor.close()
 
         # ✅ Log user action
-        log_user_action(user_id, "Changed password")
+        log_user_action(user_id, session.get('current_session_id'), "Changed password")
 
         flash("Password changed successfully!", "success")
         return redirect(url_for('accountInfo'))
@@ -1735,7 +1807,7 @@ def confirm_update(token):
                 updates.append(update_data)
                 db['updates'] = updates
 
-            log_user_action(user['id'], f"Confirmed and created seasonal update: {update_data['title']}")
+            log_user_action(user['id'], session.get('current_session_id'), f"Confirmed and created seasonal update: {update_data['title']}")
             flash("Seasonal update created successfully!", "success")
         else:
             flash("User not found. Cannot restore session.", "danger")
@@ -1755,7 +1827,8 @@ def reject_update(token):
         update_data = decoded['update_data']
         user_id = decoded['user_id']
 
-        log_user_action(user_id, f"Rejected seasonal update: {update_data['title']}")
+        log_user_action(user_id, session.get('current_session_id'), f"Rejected seasonal update: {update_data['title']}")
+
         flash("Update rejected and not saved.", "info")
     except Exception as e:
         flash(f"Error processing rejection: {e}", "danger")
@@ -1770,7 +1843,8 @@ def delete_update(index):
                 removed_update = updates.pop(index)
                 db['updates'] = updates  # Save the updated list
                 if 'user_id' in session:
-                    log_user_action(session['user_id'], f'Deleted seasonal update: {removed_update["title"]}')
+                    log_user_action(session['user_id'], session.get('current_session_id'), f'Deleted seasonal update: {removed_update["title"]}')
+
 
                 flash(f'Update "{removed_update["title"]}" deleted successfully!', 'success')
             else:
@@ -1803,7 +1877,8 @@ def edit_update(index):
             db['updates'] = updates  # Save the updated list back to the database
 
             if 'user_id' in session:
-                log_user_action(session['user_id'], f'Edited seasonal update: {form.update.data}')
+                log_user_action(session['user_id'], session.get('current_session_id'), f'Edited seasonal update: {form.update.data}')
+
 
         flash(f'Update "{form.update.data}" updated successfully!', 'success')
         return redirect(url_for('home'))
