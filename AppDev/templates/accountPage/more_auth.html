@@ -25,10 +25,20 @@
 
     <!-- Clickable rectangle options -->
     <div class="mt-4 d-grid gap-2">
-      <div class="rectangle-option"><a href="{{ url_for('sms_verify_otp', id=id) }}" id="smsBtn" class="text-dark text-decoration-none">Text Phone Number</a></div>
-      <div class="rectangle-option"><a href="{{ url_for('face_id', id=id) }}" id="idBtn" class="text-dark text-decoration-none">Facial Recognition</a></div>
-      <div class="rectangle-option"><a href="{{ url_for('recovery_auth', id=id) }}" id="recoveryBtn" class="text-dark text-decoration-none">Use Recovery Code</a></div>
+    <div class="rectangle-option">
+      <a href="{{ url_for('sms_verify_otp', id=id) }}" id="smsBtn" class="text-dark text-decoration-none">Text Phone Number</a>
     </div>
+
+    {% if user.face is not none %}
+    <div class="rectangle-option">
+      <a href="{{ url_for('face_id', id=id) }}" id="idBtn" class="text-dark text-decoration-none">Facial Recognition</a>
+    </div>
+    {% endif %}
+
+    <div class="rectangle-option">
+      <a href="{{ url_for('recovery_auth', id=id) }}" id="recoveryBtn" class="text-dark text-decoration-none">Use Recovery Code</a>
+    </div>
+  </div>
 
   </form>
 </div>

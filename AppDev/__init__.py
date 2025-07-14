@@ -1,4 +1,4 @@
-from flask import Flask,g, Response, render_template, request, redirect, url_for, session, jsonify, flash, make_response
+from flask import Flask,g, send_file, Response, render_template, request, redirect, url_for, session, jsonify, flash, make_response
 from functools import wraps
 from Forms import SignUpForm,CreateAdminForm, CreateProductForm, LoginForm, ChangeDetForm, ChangePswdForm
 import shelve, User
@@ -35,6 +35,8 @@ import jwt
 import socket
 import requests
 from twilio.rest import Client
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 import json
 import numpy as np
 from deepface import DeepFace
@@ -879,7 +881,6 @@ def logging():
     )
 
 
-
 @app.route('/logging_analytics', methods=['GET'])
 @jwt_required
 def logging_analytics():
@@ -887,38 +888,59 @@ def logging_analytics():
     if current_user['status'] != 'admin':
         return render_template('404.html')
 
-    # Get number of days from query string, default to 10
-    num_days = int(request.args.get('days', 10))
+    today_str = datetime.today().strftime("%Y-%m-%d")
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    num_days = request.args.get('days')
 
-    # Fetch logs from the last `num_days` days
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cursor.execute("""
-        SELECT DATE(date) AS date, category, COUNT(*) AS count
-        FROM logs
-        WHERE DATE(date) >= CURDATE() - INTERVAL %s DAY
-        GROUP BY DATE(date), category
-        ORDER BY date
-    """, (num_days - 1,))  # -1 to include today
+
+    if start_date and end_date:
+        # Custom date range logic
+        cursor.execute("""
+            SELECT DATE(date) AS date, category, COUNT(*) AS count
+            FROM logs
+            WHERE DATE(date) BETWEEN %s AND %s
+            GROUP BY DATE(date), category
+            ORDER BY date
+        """, (start_date, end_date))
+
+        date_range = pd.date_range(start=start_date, end=end_date)
+        dates_iso = [d.date().isoformat() for d in date_range]
+        dates_display = [d.strftime('%d - %m - %Y') for d in date_range]
+        display_start_date = start_date  # For display in template
+        num_days = len(date_range)
+
+    else:
+        # Default to last N days
+        num_days = int(num_days or 10)
+        cursor.execute("""
+            SELECT DATE(date) AS date, category, COUNT(*) AS count
+            FROM logs
+            WHERE DATE(date) >= CURDATE() - INTERVAL %s DAY
+            GROUP BY DATE(date), category
+            ORDER BY date
+        """, (num_days - 1,))
+
+        today = datetime.today().date()
+        dates_iso = [(today - timedelta(days=i)).isoformat() for i in range(num_days - 1, -1, -1)]
+        dates_display = [(today - timedelta(days=i)).strftime('%d - %m - %Y') for i in range(num_days - 1, -1, -1)]
+        display_start_date = (datetime.now() - timedelta(days=num_days)).strftime("%d/%m/%Y")
+
     log_data = cursor.fetchall()
     cursor.close()
 
-    # Prepare date ranges
-    today = datetime.today().date()
-    dates_iso = [(today - timedelta(days=i)).isoformat() for i in range(num_days - 1, -1, -1)]
-    dates_display = [(today - timedelta(days=i)).strftime('%d - %m - %Y') for i in range(num_days - 1, -1, -1)]
     categories = ['Info', 'Warning', 'Error', 'Critical']
-
-    # Initialize chart structures
     chart_data = {date: {cat: 0 for cat in categories} for date in dates_iso}
     category_summary = {cat: 0 for cat in categories}
 
     for row in log_data:
         db_date = str(row['date'])
-        category = row['category']
+        cat = row['category']
         count = row['count']
-        if db_date in chart_data and category in chart_data[db_date]:
-            chart_data[db_date][category] = count
-            category_summary[category] += count
+        if db_date in chart_data and cat in chart_data[db_date]:
+            chart_data[db_date][cat] = count
+            category_summary[cat] += count
 
     current_time = datetime.now().strftime("%d-%m-%Y , %I:%M %p")
 
@@ -929,9 +951,117 @@ def logging_analytics():
         dates_display=dates_display,
         categories=categories,
         current_time=current_time,
+        today_str=today_str,
+        start_date=display_start_date,
         category_summary=category_summary,
         num_days=num_days
     )
+
+def generate_report(chart_data, category_summary, num_days):
+    filename = "Logs_Report.pdf"
+    c = canvas.Canvas(filename, pagesize=letter)
+    width, height = letter
+
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(200, height - 40, "System Log Report")
+    c.setFont("Helvetica", 10)
+    c.drawString(40, height - 60, f"Generated on: {datetime.now().strftime('%d-%m-%Y %I:%M %p')}")
+    c.drawString(40, height - 75, f"Data from past {num_days} day(s)")
+
+    y = height - 100
+
+    # Log summary section
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(40, y, "Log Summary:")
+    y -= 20
+    c.setFont("Helvetica", 10)
+    for category, count in category_summary.items():
+        c.drawString(60, y, f"{category}: {count}")
+        y -= 15
+
+    y -= 10
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(40, y, "Daily Breakdown:")
+    y -= 20
+
+    headers = ["Date", "Info", "Warning", "Error", "Critical"]
+    col_positions = [40, 150, 230, 310, 390]
+
+    c.setFont("Helvetica-Bold", 10)
+    for i, header in enumerate(headers):
+        c.drawString(col_positions[i], y, header)
+    y -= 15
+    c.line(30, y, 570, y)
+    y -= 15
+
+    c.setFont("Helvetica", 10)
+    for date in sorted(chart_data):
+        if y < 60:
+            c.showPage()
+            c.setFont("Helvetica", 10)
+            y = height - 60
+
+        row = chart_data[date]
+        values = [
+            date,
+            str(row.get("Info", 0)),
+            str(row.get("Warning", 0)),
+            str(row.get("Error", 0)),
+            str(row.get("Critical", 0))
+        ]
+        for i, val in enumerate(values):
+            c.drawString(col_positions[i], y, val)
+        y -= 15
+
+    c.save()
+
+    full_path = os.path.abspath(filename)
+    print(f"Report saved to {full_path}")
+
+    return full_path
+
+
+@app.route('/generate_log_report')
+@jwt_required
+def download_log_report():
+    current_user = g.user
+    if current_user['status'] != 'admin':
+        return render_template('404.html')
+
+    # Reuse data logic from `logging_analytics`
+    num_days = 10
+    today = datetime.today().date()
+    dates_iso = [(today - timedelta(days=i)).isoformat() for i in range(num_days - 1, -1, -1)]
+    categories = ['Info', 'Warning', 'Error', 'Critical']
+
+    # Initialize chart data and summary
+    chart_data = {date: {cat: 0 for cat in categories} for date in dates_iso}
+    category_summary = {cat: 0 for cat in categories}
+
+    # DB query
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("""
+        SELECT DATE(date) AS date, category, COUNT(*) AS count
+        FROM logs
+        WHERE DATE(date) >= CURDATE() - INTERVAL %s DAY
+        GROUP BY DATE(date), category
+        ORDER BY date
+    """, (num_days - 1,))
+    log_data = cursor.fetchall()
+    cursor.close()
+
+    # Populate data
+    for row in log_data:
+        db_date = str(row['date'])
+        cat = row['category']
+        count = row['count']
+        if db_date in chart_data and cat in chart_data[db_date]:
+            chart_data[db_date][cat] = count
+            category_summary[cat] += count
+
+    # Generate and send file
+    pdf_path = generate_report(chart_data, category_summary, num_days)
+    return send_file(pdf_path, as_attachment=True)
 
 ALGORITHM = "pbkdf2_sha256"
 
@@ -959,11 +1089,6 @@ def admin_log_activity(mysql, activity, category="Info"):
     """
     Logs an activity to the logs table.
     If the category is 'Critical', it will send email alerts to all admin users.
-
-    Args:
-        mysql: The MySQL connection object.
-        activity (str): Description of the activity to log.
-        category (str): Log category (e.g., 'Info', 'Warning', 'Error', 'Critical')
     """
     if not mysql:
         raise ValueError("MySQL connection object is required.")
@@ -986,11 +1111,11 @@ def admin_log_activity(mysql, activity, category="Info"):
 
     # If critical, notify all admins
     if category.lower() == "critical":
-        notify_all_admins(mysql, activity)
+        notify_all_admins(mysql, activity, date, time, ip_addr)
 
-def notify_all_admins(mysql, message):
+def notify_all_admins(mysql, message, date, time, ip_address):
     """
-    Sends an email notification to all admin users about a critical log event.
+    Sends a plain-text email notification to all admin users about a critical log event.
     """
     try:
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -999,22 +1124,27 @@ def notify_all_admins(mysql, message):
         cursor.close()
 
         subject = "[Cropzy Alert] ⚠️ Critical System Event"
+
         for admin in admins:
             alert_message = f"""
-            Dear {admin['first_name']},
+Dear {admin['first_name']},
 
-            A critical event has occurred:
+A critical system event has been logged:
 
-            {message}
+Incident   : {message}
+Date       : {date}
+Time       : {time}
+IP Address : {ip_address}
 
-            Please investigate this issue as soon as possible.
+Please investigate this issue as soon as possible.
 
-            Regards,
-            Cropzy Security System
-            """
+Regards,  
+Cropzy Security System
+"""
             send_email(admin['email'], subject, alert_message)
     except Exception as e:
         print(f"Failed to send admin alerts: {e}")
+
 
 @app.route('/signUp', methods=['GET', 'POST'])
 def sign_up():
@@ -1050,7 +1180,9 @@ def sign_up():
         hashed_password = hash_password(sign_up_form.pswd.data)
 
         # Hardcoded IP (Singapore - SG) for testing purposes
-        ip_address = '183.90.84.148'
+        # ip_address = '183.90.84.148'
+
+        ip_address = get_public_ip()
 
         # Get user IP address (with proxy support)
         # ip_address = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
@@ -1075,13 +1207,14 @@ def sign_up():
         ))
 
         # Log registration
-        admin_log_activity(mysql, "User signed up successfully", category="Critical")
+        admin_log_activity(mysql, "User signed up successfully", category="Info")
 
         mysql.connection.commit()
         cursor.close()
 
         flash('Sign up successful! Please log in.', 'info')
         return redirect(url_for('complete_signUp'))
+    return render_template('/accountPage/signUp.html', form=sign_up_form)
 
 
 SECRET_KEY = 'asdsa8f7as8d67a8du289p1eu89hsad7y2189eha8'  # You can change this to a more secure value
@@ -1103,6 +1236,13 @@ def get_user_country(ip_address):
         print("GeoIP Error:", e)
         return "Unknown"
 
+def get_public_ip():
+    try:
+        return requests.get("https://api.ipify.org").text
+    except Exception as e:
+        print("IP fetch error:", e)
+        return "127.0.0.1"
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     login_form = LoginForm(request.form)
@@ -1118,12 +1258,15 @@ def login():
 
         if user:
             # Hardcoded IP (Singapore - SG) for testing purposes
-            ip_address = '183.90.84.148'
+            # ip_address = '183.90.84.148'
             # Hardcoded IP (Malaysia - MYS) for testing purposes
+            # ip_address = '175.136.0.0'
             # Hardcoded IP (Japan - JPN) for testing purposes
+            # ip_address = '126.0.0.0'
             # #Uncomment if not run on code editor, but on Proxy or Load Balancer
             # Eg: Nginx, Heroku, Apache, Cloudflare
             # ip_address = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+            ip_address = get_public_ip()
             current_country = get_user_country(ip_address)
             print(f"User IP: {ip_address}, Country: {current_country}")
 
@@ -1360,7 +1503,7 @@ def sms_verify_otp(id):
 
 
 def generate_recovery_code(id):
-    code = f"{random.randint(0, 999999):012d}"  # Generate 12-digit code
+    code = f"{random.randint(10**11, 10**12 - 1)}"  # Generates a 12-digit number (no leading zeros)
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
@@ -1515,14 +1658,19 @@ def face_id(id):
     return render_template("accountPage/face_id.html", id=id)
 
 
-@app.route('/more_auth/<int:id>', methods=['GET'])
+@app.route('/more_auth/<int:id>')
 def more_auth(id):
-    # Ensure session still holds the pending 2FA user
-    if 'pending_2fa_user_id' not in session or session['pending_2fa_user_id'] != id:
-        flash("Unauthorized access.", "danger")
-        return redirect(url_for('login'))
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
+    user = cursor.fetchone()
+    cursor.close()
 
-    return render_template('/accountPage/more_auth.html', id=id)
+    if not user:
+        return render_template('404.html')
+
+    return render_template('accountPage/more_auth.html', id=id, user=user)
+
+
 
 @app.route('/2FA/<int:id>', methods=['POST'])
 def enable_two_factor(id):
@@ -1567,6 +1715,28 @@ def disable_two_factor(id):
         cursor.execute("UPDATE accounts SET two_factor_status = %s, recovery_code = NULL WHERE id = %s", ('disabled', id))
         mysql.connection.commit()
         flash("2FA has been disabled for this account.", "success")
+
+    cursor.close()
+    return redirect(url_for('accountInfo'))
+
+
+@app.route('/deleteFace/<int:id>/', methods=['POST'])
+def disable_faceID(id):
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
+    user = cursor.fetchone()
+
+    if not user:
+        flash("User not found", "danger")
+        return redirect(url_for('accountInfo'))
+
+    if user['face'] is None:
+        flash("Face ID is already disabled for this account.", "info")
+    else:
+        cursor.execute("UPDATE accounts SET face = NULL WHERE id = %s", (id,))
+        mysql.connection.commit()
+        flash("Face ID has been disabled for this account.", "success")
 
     cursor.close()
     return redirect(url_for('accountInfo'))
