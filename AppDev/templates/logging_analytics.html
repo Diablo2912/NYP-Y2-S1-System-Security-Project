@@ -56,20 +56,19 @@
               </div>
             </div>
           </div>
-        {% endfor %}
+          {% endfor %}
+        </div>
+
+        <!-- Pie Chart -->
+        <div style="max-width: 400px; margin: 0 auto;">
+          <canvas id="pieChart" width="400" height="300"></canvas>
         </div>
 
         <!-- Line Chart -->
         <div class="mt-5">
-          <h4 class="mb-3">Log Category Distribution</h4>
-        </div>
-
-        <!-- Pie Chart -->
-        <div class="mt-5">
           <h4 class="mb-3">Log Category Trend</h4>
-          <canvas id="logChart" height="120"></canvas>
+          <canvas id="lineChart" height="120"></canvas>
         </div>
-
       </div>
     </div>
   </div>
@@ -82,6 +81,7 @@
   const datesDisplay = {{ dates_display | tojson }};
   const categories = {{ categories | tojson }};
   const chartData = {{ chart_data | tojson }};
+  const categorySummary = {{ category_summary | tojson }};
 
   function getColor(category) {
     const colors = {
@@ -93,7 +93,8 @@
     return colors[category] || '#000';
   }
 
-  const datasets = categories.map(cat => ({
+  // Line Chart
+  const lineDatasets = categories.map(cat => ({
     label: cat,
     data: datesISO.map(date => chartData[date][cat]),
     borderColor: getColor(cat),
@@ -102,12 +103,12 @@
     tension: 0.3
   }));
 
-  const ctx = document.getElementById('logChart').getContext('2d');
-  new Chart(ctx, {
+  const lineCtx = document.getElementById('lineChart').getContext('2d');
+  new Chart(lineCtx, {
     type: 'line',
     data: {
-      labels: datesDisplay,  //
-      datasets: datasets
+      labels: datesDisplay,
+      datasets: lineDatasets
     },
     options: {
       responsive: true,
@@ -126,6 +127,31 @@
           ticks: {
             precision: 0
           }
+        }
+      }
+    }
+  });
+
+  // Pie Chart
+  const pieCtx = document.getElementById('pieChart').getContext('2d');
+  new Chart(pieCtx, {
+    type: 'pie',
+    data: {
+      labels: categories,
+      datasets: [{
+        data: categories.map(cat => categorySummary[cat]),
+        backgroundColor: categories.map(cat => getColor(cat))
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'top',
+        },
+        title: {
+          display: true,
+          text: 'Log Category Distribution'
         }
       }
     }
