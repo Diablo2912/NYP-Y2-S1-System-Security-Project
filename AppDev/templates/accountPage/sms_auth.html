@@ -20,11 +20,11 @@
     {% endwith %}
 
     <!-- OTP Form -->
-    <form id="form" class="bg-white rounded shadow p-4" method="POST" action="{{ url_for('verify_otp', id=id) }}">
-      <h1 class="text-center mb-4 fs-4 text-uppercase">Two-Factor Authentication</h1>
+    <form id="form" class="bg-white rounded shadow p-4" method="POST" action="{{ url_for('sms_verify_otp', id=id) }}">
+      <h1 class="text-center mb-4 fs-4 text-uppercase">SMS Authentication</h1>
 
       <div class="mb-3 text-center">
-        <label class="form-label mb-2">Enter the 6-digit code sent to your email</label>
+        <label class="form-label mb-2">Enter the 6-digit code sent to your phone number</label>
         <div class="d-flex justify-content-between">
           {% for i in range(6) %}
             <input type="tel" class="form-control text-center mx-1 pincode-input" maxlength="1" pattern="\d*" autocomplete="off">
@@ -40,8 +40,6 @@
       </div>
 
       <div class="text-center mt-2">
-        <a href="{{ url_for('verify_otp', id=id) }}" id="resendBtn" class="text-primary text-decoration-none">Resend verification code</a>
-        <br>
         <a href="{{ url_for('more_auth', id=id) }}" id="moreBtn" class="text-primary text-decoration-none">Sign in another way</a>
       </div>
     </form>

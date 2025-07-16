@@ -34,8 +34,7 @@
             <li class="list-group-item">
               <a href="{{ url_for('accountInfo') }}" class="link-underline link-underline-opacity-0">
                 <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
-                <span class="badge bg-success p-2 fs-5 align-middle shadow">Your Info</span>
-              </a>
+                <span class="badge bg-success p-2 fs-5 align-middle shadow">Your Info</span></a>
             </li>
             <li class="list-group-item">
               <a href="{{ url_for('accountSecurity') }}" class="link-underline link-underline-opacity-0">
@@ -156,9 +155,97 @@
                       <h5 class="modal-title">Recovery Code</h5>
                       <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
+                  </div>
+                </div>
+              </form>
+
+              <!-- 2FA Section -->
+              {% if user.two_factor_status == 'enabled' %}
+              <!-- Disable 2FA Button -->
+              <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#disable2FAModal_{{ user.id }}">
+                Disable 2FA
+              </button>
+
+              <!-- View Recovery Code Button -->
+              <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#viewCodeModal_{{ user.id }}">
+                View Recovery Code
+              </button>
+
+              {% if user.face is none %}
+                <!-- Setup Face ID Button -->
+                <a href="{{ url_for('setup_face_id', id=user.id) }}" class="btn btn-warning mt-2">
+                  Setup Face ID
+                </a>
+              {% else %}
+                <!-- Disable Face ID Button with Modal Trigger -->
+                <button class="btn btn-danger mt-2" data-bs-toggle="modal" data-bs-target="#deleteFaceID_{{ user.id }}">
+                  Disable Face ID
+                </button>
+              {% endif %}
+
+              <!-- Disable Face ID Modal -->
+              <div class="modal fade" id="deleteFaceID_{{ user.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                  <div class="modal-content">
+                    <form action="{{ url_for('disable_faceID', id=user.id) }}" method="POST">
+                      <div class="modal-header">
+                        <h5 class="modal-title">Disable Face ID</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                      </div>
+                      <div class="modal-body text-start">
+                        <strong>Disabling Face ID will remove it as a method of authentication.</strong><br>
+                        You can set it up again later on this page<br><br>
+                        Are you sure you want to <strong>disable Face ID</strong> for {{ user.email }}?
+                      </div>
+                      <div class="modal-footer">
+                        <button type="submit" class="btn btn-danger">Disable</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Disable 2FA Modal -->
+              <div class="modal fade" id="disable2FAModal_{{ user.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                  <div class="modal-content">
+                    <form action="{{ url_for('disable_two_factor', id=user.id) }}" method="POST">
+                      <div class="modal-header">
+                        <h5 class="modal-title">Disable 2FA</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                      </div>
+                      <div class="modal-body text-start">
+                        <strong>Disabling 2FA will reduce this account’s security.</strong><br><br>
+                        You can re-enable it at any time from your account settings.<br>
+                        Are you sure you want to <strong>disable</strong> 2FA for {{ user.email }} ?
+                      </div>
+                      <div class="modal-footer">
+                        <button type="submit" class="btn btn-danger">Disable</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+
+              <!-- View Recovery Code Modal -->
+              <div class="modal fade" id="viewCodeModal_{{ user.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                  <div class="modal-content">
+                    <div class="modal-header">
+                      <h5 class="modal-title">Recovery Code</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
                     <div class="modal-body text-start">
-                      Use this recovery code to log in if you lose access to your email or cannot receive OTP.<br><br>
-                      <strong>Recovery Code:</strong><br>{{ user.recovery_code }}
+                      <h4>You are all verified! </h4>
+                      <br>
+                      Use this recovery code to log in if you lose your phone or access to your email, this code is your failsafe to access your account.
+                      <br><br>
+                      <strong>Recovery Code:</strong>
+                      <br>{{ user.recovery_code }}
+                      <br><br>
+                      <h5><strong>Save this code somewhere safe and accesible </strong></h5>
                     </div>
                     <div class="modal-footer">
                       <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -167,6 +254,7 @@
                 </div>
               </div>
             {% else %}
+              <!-- Enable 2FA Button -->
               <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#enable2FAModal_{{ user.id }}">
                 Enable 2FA
               </button>
@@ -181,6 +269,7 @@
                       </div>
                       <div class="modal-body text-start">
                         <strong>Enabling 2FA adds extra protection to your account.</strong><br><br>
+                        Make sure to setup face-id for an additional method of verification<br><br>
                         Are you sure you want to <strong>enable</strong> 2FA for email: <strong>{{ current_user.email }}</strong>?
                       </div>
                       <div class="modal-footer">
@@ -191,9 +280,9 @@
                   </div>
                 </div>
               </form>
-            {% endif %}
+              {% endif %}
+            </div>
           </div>
-
         </div>
       </div>
     </div>
