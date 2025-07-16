@@ -44,44 +44,14 @@
         <h2 class="mb-3">Log Overview</h2>
         <p>Last Refresh Time: {{ current_time }}</p>
 
-        <a href="{{ url_for('logging_analytics') }}?start_date={{ today_str }}&end_date={{ today_str }}" class="btn btn-primary mb-3">
-            Show logs from today
-        </a>
-
         <!-- Slider Control -->
         <div class="mb-4">
           <label for="logRange" class="form-label"><h5>Logs From Past Days</h5></label>
-          <div class="position-relative" style="max-width: 250px;">
-            <div id="rangeBubble" class="range-bubble">10</div>
-            <input type="range" class="form-range mt-2" min="1" max="20" step="1" id="logRange"
-                    value="{{ num_days or 10 }}">
-          </div>
-          <p>Showing last <output id="rangeOutput">{{ num_days or 10 }}</output> day(s)</p>
-          {% if request.args.get('start_date') and request.args.get('end_date') %}
-            <p>Showing logs from <u>{{ request.args.get('start_date') }}</u> to <u>{{ request.args.get('end_date') }}</u></p>
-          {% else %}
-            <p>Showing logs from <u>{{ start_date }}</u> until today.</p>
-          {% endif %}
+        <div style="max-width: 250px;">
+          <input type="range" class="form-range" min="1" max="20" step="1" id="logRange"
+                 value="{{ num_days or 10 }}" oninput="rangeOutput.value = logRange.value">
         </div>
-
-        <div class="mb-4">
-        <h5>Log Activity Between Dates</h5>
-          <p>Only a maximum range of 20 days can be selected</p>
-          <p>Showing logs from <u>{{ request.args.get('start_date') }}</u> to <u>{{ request.args.get('end_date') }}</u></p>
-        <div class="d-flex flex-column flex-sm-row gap-2 align-items-end">
-          <div>
-            <label for="X-DATE" class="form-label">Start Date</label>
-            <input type="date" id="X-DATE" class="form-control">
-          </div>
-          <div>
-            <label for="Y-DATE" class="form-label">End Date</label>
-            <input type="date" id="Y-DATE" class="form-control">
-          </div>
-          <div>
-            <label class="form-label d-none d-sm-block invisible">Submit</label>
-            <button id="dateSearchBtn" class="btn btn-secondary w-100">Filter Logs</button>
-          </div>
-        </div>
+        <p>Showing last <output id="rangeOutput">{{ num_days or 10 }}</output> day(s) </p>
       </div>
 
         <h4>Total Logs: </h4>
@@ -100,13 +70,12 @@
           {% endfor %}
         </div>
 
-        <!-- Logs Explanation -->
         <div class="col-lg-10 col-md-9 col-sm-12 mt-3">
-          <h4>Log Category Explanation</h4>
+          <h4>Logs Explanation</h4>
           <p><strong>Info:</strong> Indicates routine operations or successful actions that require no intervention.</p>
           <p><strong>Warning:</strong> Flags unusual or unexpected behavior that may need monitoring.</p>
           <p><strong>Error:</strong> Represents failures that prevent a specific task from completing.</p>
-          <p><strong>Critical:</strong> Denotes severe issues that threaten system stability or security. Admins are immediately notified via email.</p>
+          <p><strong>Critical:</strong> Denotes severe issues that threaten system stability or security and need immediate action.</p>
         </div>
 
         <!-- Pie Chart -->
@@ -119,36 +88,14 @@
           <h4 class="mb-3">Log Category Trend</h4>
           <canvas id="lineChart" height="120"></canvas>
         </div>
-
-        <!-- Logs Summary -->
-        <div class="col-lg-10 col-md-9 col-sm-12 mt-3">
-          <h4>Logs Summary</h4>
-          <p><strong>Info:</strong> Indicates routine operations or successful actions that require no intervention.</p>
-        </div>
-
-        <div class="text-center mb-4">
-          <a href="{{ url_for('download_log_report') }}" class="btn btn-primary mt-4">
-            Download Log Report (PDF)
-          </a>
-        </div>
       </div>
     </div>
   </div>
 </div>
 
-
-
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-
-  // Prevent selecting future dates -  Date range
-  window.addEventListener("DOMContentLoaded", () => {
-    const today = new Date().toISOString().split("T")[0];
-    document.getElementById("X-DATE").setAttribute("max", today);
-    document.getElementById("Y-DATE").setAttribute("max", today);
-  });
-
   const datesISO = {{ dates_iso | tojson }};
   const datesDisplay = {{ dates_display | tojson }};
   const categories = {{ categories | tojson }};
@@ -241,66 +188,6 @@
     }, 300);  // wait 300ms to avoid spamming
   });
 
-  //bubble on slider
-  const rangeOutput = document.getElementById('rangeOutput');
-  const rangeBubble = document.getElementById('rangeBubble');
-
-  function updateBubble() {
-    const val = slider.value;
-    const min = slider.min;
-    const max = slider.max;
-    const percent = (val - min) / (max - min);
-
-    // Position bubble
-    const sliderWidth = slider.offsetWidth;
-    const bubbleOffset = slider.offsetLeft + percent * sliderWidth;
-
-    rangeBubble.textContent = val;
-    rangeBubble.style.left = `${bubbleOffset}px`;
-    rangeOutput.textContent = val;
-  }
-
-  slider.addEventListener("input", updateBubble);
-  window.addEventListener("load", updateBubble);
-
-  document.getElementById("dateSearchBtn").addEventListener("click", function () {
-  const startDate = document.getElementById("X-DATE").value;
-  const endDate = document.getElementById("Y-DATE").value;
-
-  if (!startDate || !endDate) {
-    alert("Please select both start and end dates.");
-    return;
-  }
-
-  // Check range does not exceed 20 days
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const diffTime = Math.abs(end - start);
-  const diffDays = diffTime / (1000 * 60 * 60 * 24);
-
-  if (diffDays > 20) {
-    alert("The date range cannot exceed 20 days.");
-    return;
-  }
-
-  window.location.href = `/logging_analytics?start_date=${startDate}&end_date=${endDate}`;
-});
-
 </script>
-
-<style>
-.range-bubble {
-  position: absolute;
-  top: -15px;
-  background: #0d6efd;
-  color: white;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-  transform: translateX(-50%);
-  pointer-events: none;
-  white-space: nowrap;
-}
-</style>
 
 {% endblock %}
