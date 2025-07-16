@@ -1,4 +1,3 @@
-#test
 from flask import Flask,g, Response, render_template, request, redirect, url_for, session, jsonify, flash, make_response
 from functools import wraps
 from Forms import SignUpForm,CreateAdminForm, CreateProductForm, LoginForm, ChangeDetForm, ChangePswdForm
@@ -22,9 +21,12 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import os
 from werkzeug.utils import secure_filename
-import bleach
+from dotenv import load_dotenv
+import requests
 from flask_mysqldb import MySQL
+import bleach
 import MySQLdb.cursors
+from MySQLdb.cursors import DictCursor
 import base64
 import hashlib
 import secrets
@@ -48,6 +50,10 @@ app.config['SECRET_KEY'] = '5791262abcdefg'
 UPLOAD_FOLDER = 'static/uploads/'  # Define where images are stored
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 stripe.api_key = "sk_test_51Qrle9CddzoT6fzjpqNPd1g3UV8ScbnxiiPK5uYT0clGPV82Gn7QPwcakuijNv4diGpcbDadJjzunwRcWo0eOXvb00uDZ2Gnw6"
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=90)
+
+load_dotenv()
+print("Loaded ENV value for TEST_VAR =", os.getenv("TEST_VAR"))
 
 images = UploadSet('images', IMAGES)
 
@@ -59,6 +65,13 @@ app.config['MAIL_PASSWORD'] = 'isgw cesr jdbs oytx'
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
 mail = Mail(app)
+
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+app.config['MYSQL_DB'] = 'sspCropzy'
+
+mysql = MySQL(app)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///products.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -99,6 +112,9 @@ mysql = MySQL(app)
 with app.app_context():
     db.create_all()
 
+ALGORITHM = 'pbkdf2_sha256'
+
+#CFT on SQL#
 #SQL LOGGING
 # Info
 # Warning
@@ -138,8 +154,22 @@ def jwt_required(f):
             flash("Invalid or expired token. Please log in again.", "danger")
             return redirect(url_for('login'))
 
-        # Store user info in `g` for access within the request
-        from flask import g
+        session_id = session.get('current_session_id')
+        if session_id:
+            cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+            cursor.execute("""
+                SELECT logout_time FROM user_session_activity
+                WHERE id = %s AND user_id = %s
+            """, (session_id, user_data['user_id']))
+            result = cursor.fetchone()
+            cursor.close()
+
+            if result and result['logout_time']:
+                flash("Your session has been revoked. Please log in again.", "danger")
+                response = make_response(redirect(url_for('login')))
+                response.delete_cookie('jwt_token')
+                return response
+              
         g.user = user_data
         return f(*args, **kwargs)
 
@@ -657,9 +687,8 @@ def accountHist():
 @jwt_required
 def dashboard():
     jwt_user = g.user
-
     if jwt_user['status'] not in ['admin']:
-        return render_template('404.html')
+        return render_template('404glen.html')
 
     user_id = jwt_user['user_id']
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -1020,7 +1049,6 @@ def notify_all_admins(mysql, message):
 @app.route('/signUp', methods=['GET', 'POST'])
 def sign_up():
     sign_up_form = SignUpForm(request.form)
-
     if request.method == 'POST' and sign_up_form.validate():
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
@@ -1067,6 +1095,229 @@ def sign_up():
             first_name,
             last_name,
             gender,
+            phone_number,
+            email,
+            hashed_password,
+            status,
+            'disabled'
+        ))
+
+        mysql.connection.commit()
+        cursor.close()
+
+        flash('Admin account created successfully.', 'success')
+        return redirect(url_for('createAdmin'))
+
+    return render_template('createAdmin.html', form=create_admin_form)
+
+@app.route('/roleManagement', methods=['GET', 'POST'])
+@jwt_required
+def roleManagement():
+    new_status = request.form.get('status')
+    current_user = g.user
+
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("SELECT id, first_name, last_name, email, status FROM accounts")
+    users = cursor.fetchall()
+    user_info = cursor.fetchone()
+
+    if current_user['status'] not in ['admin', 'staff']:
+        return render_template('404.html')
+
+
+    # Get search and role filters
+    search_query = request.args.get("search", "").strip().lower()
+    selected_roles = request.args.getlist("roles")  # multi-select
+
+    # Build dynamic query
+    query = "SELECT id, first_name, last_name, email, status FROM accounts WHERE 1=1"
+    params = []
+
+    if search_query:
+        query += " AND (LOWER(first_name) LIKE %s OR LOWER(last_name) LIKE %s OR LOWER(email) LIKE %s)"
+        like_value = f"%{search_query}%"
+        params += [like_value, like_value, like_value]
+
+    if selected_roles:
+        role_placeholders = ','.join(['%s'] * len(selected_roles))
+        query += f" AND status IN ({role_placeholders})"
+        params += selected_roles
+
+    cursor.execute(query, params)
+    users = cursor.fetchall()
+    cursor.close()
+
+    return render_template(
+        'roleManagement.html',
+        user=user_info,
+        users=users,
+        search_query=search_query,
+        selected_roles=selected_roles
+    )
+
+
+@app.route('/logging', methods=['GET'])
+@jwt_required
+def logging():
+    current_user = g.user
+    if current_user['status'] != 'admin' or 'staff':
+        return render_template('404glen.html')
+
+    search_query = request.args.get("search", "").strip().lower()
+    selected_roles = request.args.getlist("roles")  # Get all selected categories (checkbox)
+
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    # Get admin info (optional if not used in template)
+    cursor.execute("SELECT * FROM accounts WHERE id = %s", (current_user['user_id'],))
+    user_info = cursor.fetchone()
+
+    # Build base query
+    query = "SELECT id, date, time, category, activity, ip_address FROM logs WHERE 1=1"
+    params = []
+
+    # Apply category filter (checkboxes)
+    if selected_roles:
+        placeholders = ','.join(['%s'] * len(selected_roles))
+        query += f" AND category IN ({placeholders})"
+        params.extend(selected_roles)
+
+    # Apply search filter (search box, if needed)
+    if search_query:
+        query += " AND (LOWER(category) LIKE %s OR LOWER(activity) LIKE %s OR ip_address LIKE %s)"
+        like_term = f"%{search_query}%"
+        params.extend([like_term, like_term, like_term])
+
+    # Execute and return logs
+    cursor.execute(query, params)
+    logs = cursor.fetchall()
+    cursor.close()
+
+    return render_template(
+        'logging.html',
+        user=user_info,
+        users=logs,
+        selected_roles=selected_roles,
+        search_query=search_query
+    )
+
+
+
+@app.route('/logging_analytics', methods=['GET'])
+@jwt_required
+def logging_analytics():
+    current_user = g.user
+    if current_user['status'] != 'admin':
+        return render_template('404.html')
+
+    # Fetch logs from the last 10 days
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("""
+        SELECT DATE(date) AS date, category, COUNT(*) AS count
+        FROM logs
+        WHERE DATE(date) >= CURDATE() - INTERVAL 9 DAY
+        GROUP BY DATE(date), category
+        ORDER BY date
+    """)
+    log_data = cursor.fetchall()
+    cursor.close()
+
+    # Prepare the past 10 days' dates
+    today = datetime.today().date()
+    dates_iso = [(today - timedelta(days=i)).isoformat() for i in range(9, -1, -1)]
+    dates_display = [(today - timedelta(days=i)).strftime('%d - %m - %Y') for i in range(9, -1, -1)]
+    categories = ['Info', 'Warning', 'Error', 'Critical']
+
+    # Initialize chart structure
+    chart_data = {date: {cat: 0 for cat in categories} for date in dates_iso}
+    category_summary = {cat: 0 for cat in categories}
+
+    # Populate chart data from DB results
+    for row in log_data:
+        db_date = str(row['date'])  # 'YYYY-MM-DD'
+        category = row['category']
+        count = row['count']
+
+        if db_date in chart_data and category in chart_data[db_date]:
+            chart_data[db_date][category] = count
+            category_summary[category] += count
+
+    current_time = datetime.now().strftime("%d-%m-%Y , %I:%M %p")
+
+    return render_template(
+        'logging_analytics.html',
+        chart_data=chart_data,
+        dates_iso=dates_iso,
+        dates_display=dates_display,
+        categories=categories,
+        current_time=current_time,
+        category_summary=category_summary
+    )
+
+ALGORITHM = "pbkdf2_sha256"
+
+def hash_password(password, salt=None, iterations=260000):
+    if salt is None:
+        salt = secrets.token_hex(16)
+    assert salt and isinstance(salt, str) and "$" not in salt
+    assert isinstance(password, str)
+    pw_hash = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations
+    )
+    b64_hash = base64.b64encode(pw_hash).decode("ascii").strip()
+    return "{}${}${}${}".format(ALGORITHM, iterations, salt, b64_hash)
+
+def verify_password(password, password_hash):
+    if (password_hash or "").count("$") != 3:
+        return False
+    algorithm, iterations, salt, b64_hash = password_hash.split("$", 3)
+    iterations = int(iterations)
+    assert algorithm == ALGORITHM
+    compare_hash = hash_password(password, salt, iterations)
+    return secrets.compare_digest(password_hash, compare_hash)
+
+
+@app.route('/signUp', methods=['GET', 'POST'])
+def sign_up():
+    sign_up_form = SignUpForm(request.form)
+
+    if request.method == 'POST' and sign_up_form.validate():
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+        # Check if email or phone number already exists
+        cursor.execute("SELECT * FROM accounts WHERE email = %s OR phone_number = %s",
+                       (sign_up_form.email.data, sign_up_form.number.data))
+        existing_user = cursor.fetchone()
+
+        first_name = sanitize_input(sign_up_form.first_name.data)
+        last_name = sanitize_input(sign_up_form.last_name.data)
+        gender = sanitize_input(sign_up_form.gender.data)
+        phone_number = sanitize_input(sign_up_form.number.data)
+        email = sanitize_input(sign_up_form.email.data.lower())
+
+        if existing_user:
+            if existing_user['email'] == sign_up_form.email.data:
+                flash('Email is already registered. Please use a different email.', 'danger')
+            elif existing_user['phone_number'] == sign_up_form.number.data:
+                flash('Phone number is already registered. Please use a different number.', 'danger')
+            cursor.close()
+            return redirect(url_for('sign_up'))
+
+        # Determine status based on email domain
+        email = sign_up_form.email.data
+        status = 'admin' if email.endswith('@cropzy.com') else 'user'
+
+        # Hash the password before storing
+        hashed_password = hash_password(sign_up_form.pswd.data)
+
+        # Insert new user with hashed password
+        cursor.execute('''
+            INSERT INTO accounts (first_name, last_name, gender, phone_number, email, password, status, two_factor_status) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (
+            first_name,
+            last_name,
+            gender
             '+65' + str(phone_number),
             email,
             hashed_password,
@@ -1083,7 +1334,7 @@ def sign_up():
 
         flash('Sign up successful! Please log in.', 'info')
         return redirect(url_for('complete_signUp'))
-
+    return render_template('/accountPage/signUp.html', form=sign_up_form)
 
 SECRET_KEY = 'asdsa8f7as8d67a8du289p1eu89hsad7y2189eha8'  # You can change this to a more secure value
 
@@ -1103,6 +1354,16 @@ def get_user_country(ip_address):
     except Exception as e:
         print("GeoIP Error:", e)
         return "Unknown"
+
+
+SECRET_KEY = 'asdsa8f7as8d67a8du289p1eu89hsad7y2189eha8'  # You can change this to a more secure value
+
+@app.context_processor
+def inject_user():
+    token = request.cookies.get('jwt_token')
+    user = verify_jwt_token(token) if token else None
+    return dict(current_user=user)
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -1144,6 +1405,7 @@ def login():
                     session['pending_2fa_user_id'] = user['id']
                     return redirect(url_for('verify_otp', id=user['id']))
                 else:
+                    session_id = log_session_activity(user['id'], 'login')
                     payload = {
                         'user_id': user['id'],
                         'first_name': user['first_name'],
@@ -1152,8 +1414,15 @@ def login():
                         'gender': user['gender'],
                         'phone': user['phone_number'],
                         'status': user['status'],
+                        'session_id': session_id,
                         'exp': datetime.utcnow() + timedelta(hours=1)
                     }
+          
+                    # ✅ Log login session
+                    log_session_activity(user['id'], 'login')
+
+                    flash('Login successful!', 'success')
+                    return response
                     token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
                     response = make_response(redirect(url_for('home')))
                     response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
@@ -1264,7 +1533,6 @@ def verify_otp(id):
             if not user:
                 flash("User not found. Please login again.", "error")
                 return redirect(url_for('login'))
-
             otp_store.pop(id, None)
             session.pop('pending_2fa_user_id', None)
 
@@ -1276,6 +1544,7 @@ def verify_otp(id):
                 'gender': user['gender'],
                 'phone': user['phone_number'],
                 'status': user['status'],
+                'session_id': session_id,
                 'exp': datetime.utcnow() + timedelta(hours=1)
             }
             token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
@@ -1346,6 +1615,7 @@ def sms_verify_otp(id):
                 'gender': user['gender'],
                 'phone': user['phone_number'],
                 'status': user['status'],
+                'session_id': session_id,
                 'exp': datetime.utcnow() + timedelta(hours=1)
             }
             token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
@@ -1404,6 +1674,7 @@ def recovery_auth(id):
                     'gender': result['gender'],
                     'phone': result['phone_number'],
                     'status': result['status'],
+                    'session_id': session_id,
                     'exp': datetime.utcnow() + timedelta(hours=1)
                 }
                 token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
@@ -1494,6 +1765,7 @@ def face_id(id):
                     'gender': user['gender'],
                     'phone': user['phone_number'],
                     'status': user['status'],
+                    'session_id': session_id,
                     'exp': datetime.utcnow() + timedelta(hours=1)
                 }
 
@@ -1572,12 +1844,433 @@ def disable_two_factor(id):
     cursor.close()
     return redirect(url_for('accountInfo'))
 
+
+
+def log_session_activity(user_id, action):
+    print(f"[DEBUG] Creating session log for user {user_id} at {datetime.now()}")
+    try:
+        cursor = mysql.connection.cursor()
+
+        session_id = None  # default
+
+        if action == 'login':
+            cursor.execute('''
+                INSERT INTO user_session_activity (user_id, login_time, ip_address, user_agent)
+                VALUES (%s, NOW(), %s, %s)
+            ''', (
+                user_id,
+                request.remote_addr,
+                request.headers.get('User-Agent')
+            ))
+
+            session_id = cursor.lastrowid
+            session['current_session_id'] = session_id
+            session['user_id'] = user_id
+
+        elif action == 'logout':
+            cursor.execute('''
+                UPDATE user_session_activity
+                SET logout_time = NOW()
+                WHERE user_id = %s AND logout_time IS NULL
+                ORDER BY login_time DESC
+                LIMIT 1
+            ''', (user_id,))
+
+        # Diagnostic
+        cursor.execute('SELECT DATABASE()')
+        current_db = cursor.fetchone()
+        print("[DEBUG] Connected to DB:", current_db)
+
+        mysql.connection.commit()
+        cursor.close()
+        print("[DEBUG] Log saved to DB")
+
+        return session_id  # ✅ return this always (None for logout)
+
+    except Exception as e:
+        print("[ERROR] Session log failed:", e)
+        return None
+
+
+
+def log_user_action(user_id, session_id, action):
+    if not user_id or not session_id:
+        print("[WARN] Missing user_id or session_id, skipping action log")
+        return
+
+    try:
+        cursor = mysql.connection.cursor()
+        cursor.execute('''
+            INSERT INTO user_actions_log (user_id, session_id, action)
+            VALUES (%s, %s, %s)
+        ''', (user_id, session_id, action))
+        mysql.connection.commit()
+        cursor.close()
+        print(f"[DEBUG] Action logged: {action}")
+    except Exception as e:
+        print("[ERROR] Action log failed:", e)
+
+
+
+
+@app.route('/test-log')
+def test_log():
+    log_session_activity(3, 'login')
+    return 'Test log done'
+
+@app.route('/activity_history')
+@jwt_required
+def activity_history():
+    user_id = g.user['user_id']
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    # Fetch session activity logs
+    cursor.execute("""
+        SELECT id, login_time, logout_time, ip_address, user_agent
+        FROM user_session_activity
+        WHERE user_id = %s
+        ORDER BY login_time DESC
+        LIMIT 50
+    """, (user_id,))
+    sessions = cursor.fetchall()
+
+    # For each session, fetch related actions
+    for s in sessions:
+        cursor.execute("""
+            SELECT action, timestamp
+            FROM user_actions_log
+            WHERE session_id = %s
+            ORDER BY timestamp ASC
+        """, (s['id'],))
+        s['actions'] = cursor.fetchall()
+
+    cursor.close()
+
+    return render_template('/accountPage/activity.html', sessions=sessions)
+
+
+@app.route('/revoke_session/<session_id>', methods=['POST'])
+@jwt_required
+def revoke_session(session_id):
+    user_id = g.user['user_id']
+    if not user_id:
+        flash("Unauthorized action.", "danger")
+        return redirect(url_for('login'))
+
+    cursor = mysql.connection.cursor()
+    cursor.execute("""
+        UPDATE user_session_activity
+        SET logout_time = %s
+        WHERE id = %s AND user_id = %s AND logout_time IS NULL
+    """, (datetime.utcnow(), session_id, user_id))
+    mysql.connection.commit()
+    cursor.close()
+
+    # ✅ Log under the correct session
+    log_user_action(user_id, g.user['session_id'], f"Manually revoked session {session_id}")
+
+    flash("Session revoked successfully.", "success")
+    return redirect(url_for('activity_history'))
+
+
+@app.route('/check_session_validity')
+def check_session_validity():
+    token = request.cookies.get('jwt_token')
+    if not token:
+        return jsonify({"valid": False})
+
+    user_data = verify_jwt_token(token)
+    if not user_data:
+        return jsonify({"valid": False})
+
+    session_id = user_data.get('session_id')
+    user_id = user_data.get('user_id')
+
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("""
+        SELECT logout_time FROM user_session_activity
+        WHERE id = %s AND user_id = %s
+    """, (session_id, user_id))
+    result = cursor.fetchone()
+    cursor.close()
+
+    if result and result['logout_time']:
+        return jsonify({"valid": False})
+
+    return jsonify({"valid": True})
+
+
+
+
+
+
+# A helper function to verify JWT token
+def verify_jwt_token(token):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+        return payload
+    except jwt.ExpiredSignatureError:
+        return None  # Token expired
+    except jwt.InvalidTokenError:
+        return None  # Invalid token
+
+
+
+otp_store = {}
+
+def send_otp_email(email, user_id, first_name, last_name):
+    """
+    Generate a 6-digit OTP, store it with an expiration time,
+    and send it to the specified email address.
+
+    Args:
+        email (str): Recipient email address.
+        user_id (int): ID of the user to associate with the OTP.
+
+    Returns:
+        None
+    """
+    otp = f"{random.randint(0, 999999):06d}"
+    expires = time.time() + 60  # OTP valid for 60 seconds
+
+    # Store OTP and expiry time
+    otp_store[user_id] = {"otp": otp, "expires": expires}
+
+    # Prepare email content
+    subject = "[Cropzy] Cropzy Login 2FA OTP Code"
+    message = (f"Hello {first_name} {last_name},\n\nPlease enter the generated code below to authenticate yourself \n\n"
+               f"Your OTP code is: {otp} It expires in 1 minute. "
+               f"If you did not attempt to sign in to your account, your password may be compromised.\n\nVisit http://127.0.0.1:5000/accountSecurity to create a new, strong password for your Cropzy account.\n\n"
+               f"Thanks,\nCropzy Support Team")
+
+
+    # Call your existing email sending function
+    send_email(email, subject, message)
+
+# def send_otp_sms():
+
+@app.route('/verify-otp/<int:id>', methods=['GET', 'POST'])
+def verify_otp(id):
+    print(f"[DEBUG] OTP form submitted for user_id={id} at {datetime.now()}")
+    if 'pending_2fa_user_id' not in session or session['pending_2fa_user_id'] != id:
+        flash("Unauthorized access.", "error")
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        entered_otp = request.form.get('otp')
+        record = otp_store.get(id)
+
+        if not record:
+            flash("No OTP found. Please login again.", "error")
+            return redirect(url_for('login'))
+
+        if time.time() > record['expires']:
+            flash("OTP expired. Please login again.", "error")
+            otp_store.pop(id, None)
+            session.pop('pending_2fa_user_id', None)
+            return redirect(url_for('login'))
+
+        if entered_otp == record['otp']:
+            # Fetch the user BEFORE using it
+            cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+            cursor.execute('SELECT * FROM accounts WHERE id = %s', (id,))
+            user = cursor.fetchone()
+            cursor.close()
+
+            if not user:
+                flash("User not found. Please login again.", "error")
+                return redirect(url_for('login'))
+
+            otp_store.pop(id, None)
+            session.pop('pending_2fa_user_id', None)
+
+            # ✅ Only ONE call here
+            session_id = log_session_activity(user['id'], 'login')
+
+            payload = {
+                'user_id': user['id'],
+                'first_name': user['first_name'],
+                'last_name': user['last_name'],
+                'email': user['email'],
+                'gender': user['gender'],
+                'phone': user['phone_number'],
+                'status': user['status'],
+                'session_id': session_id,
+                'exp': datetime.utcnow() + timedelta(hours=1)
+            }
+
+            token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+            response = make_response(redirect(url_for('home')))
+            response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
+
+            flash("Login successful!", "success")
+            return response
+        else:
+            flash("Invalid OTP. Please try again.", "error")
+
+    return render_template('/accountPage/two_factor.html', id=id)
+
+
+
+def generate_recovery_code(id):
+    code = f"{random.randint(0, 999999):06d}"  # Generate 6-digit code
+
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    # Check if user exists
+    cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
+    user = cursor.fetchone()
+
+    if not user:
+        cursor.close()
+        return False  # User not found
+
+    # Update recovery code
+    cursor.execute("UPDATE accounts SET recovery_code = %s WHERE id = %s", (code, id))
+    mysql.connection.commit()
+    cursor.close()
+
+    return code
+
+@app.route('/recovery_auth/<int:id>', methods=['GET', 'POST'])
+def recovery_auth(id):
+    if request.method == 'POST':
+        input_code = request.form.get('recovery_code')
+
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
+        result = cursor.fetchone()
+        cursor.close()
+
+        if result:
+            stored_code = result['recovery_code']
+
+            if input_code == stored_code:
+                generate_recovery_code(id)
+
+                # ✅ Only one log here
+                session_id = log_session_activity(result['id'], 'login')
+
+                payload = {
+                    'user_id': result['id'],
+                    'first_name': result['first_name'],
+                    'last_name': result['last_name'],
+                    'email': result['email'],
+                    'gender': result['gender'],
+                    'phone': result['phone_number'],
+                    'status': result['status'],
+                    'session_id': session_id,
+                    'exp': datetime.utcnow() + timedelta(hours=1)
+                }
+
+                token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+                response = make_response(redirect(url_for('home')))
+                response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
+
+                # ✅ Use user action log instead of logging a new session
+                log_user_action(result['id'], session_id, "Logged in via recovery code")
+
+                flash('Recovery successful. You are now logged in.', 'success')
+                return response
+
+    return render_template('/accountPage/recovery_code.html', id=id)
+
+@app.route('/setup_face_id/<int:id>', methods=['GET', 'POST'])
+def setup_face_id(id):
+
+    return render_template("/accountPage/setup_face_id.html", id=id)
+
+@app.route('/face_id/<int:id>', methods=['GET', 'POST'])
+def face_id(id):
+
+    return render_template('/accountPage/face_id.html', id=id)
+
+@app.route('/more_auth/<int:id>', methods=['GET'])
+def more_auth(id):
+    # Ensure session still holds the pending 2FA user
+    if 'pending_2fa_user_id' not in session or session['pending_2fa_user_id'] != id:
+        flash("Unauthorized access.", "danger")
+        return redirect(url_for('login'))
+
+    return render_template('/accountPage/more_auth.html', id=id)
+
+@app.route('/2FA/<int:id>', methods=['POST'])
+def enable_two_factor(id):
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    # Check if the user exists
+    cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
+    user = cursor.fetchone()
+
+    if not user:
+        flash("User not found", "danger")
+        return redirect(url_for('accountInfo'))
+
+    # If already enabled, don't update again
+    if user['two_factor_status'] == 'enabled':
+        flash("2FA is already enabled for this account.", "info")
+    else:
+        # Enable 2FA
+        cursor.execute("UPDATE accounts SET two_factor_status = %s WHERE id = %s", ('enabled', id))
+        mysql.connection.commit()
+        flash('You have successfully enabled 2FA for this account', 'success')
+
+    generate_recovery_code(id)
+
+    cursor.close()
+    return redirect(url_for('accountInfo'))
+
+@app.route('/disable2FA/<int:id>/', methods=['POST'])
+def disable_two_factor(id):
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
+    user = cursor.fetchone()
+
+    if not user:
+        flash("User not found", "danger")
+        return redirect(url_for('accountInfo'))
+
+    if user['two_factor_status'] == 'disabled':
+        flash("2FA is already disabled for this account.", "info")
+    else:
+        cursor.execute("UPDATE accounts SET two_factor_status = %s WHERE id = %s", ('disabled', id))
+        mysql.connection.commit()
+        flash("2FA has been disabled for this account.", "success")
+
+    cursor.close()
+    return redirect(url_for('accountInfo'))
+
+
 @app.route('/logout')
 def logout():
+    token = request.cookies.get('jwt_token')
+    session_id = None
+    user_id = None
+
+    if token:
+        try:
+            data = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+            session_id = data.get('session_id')
+            user_id = data.get('user_id')
+        except:
+            pass
+
+    if session_id and user_id:
+        cursor = mysql.connection.cursor()
+        cursor.execute('''
+            UPDATE user_session_activity
+            SET logout_time = NOW()
+            WHERE id = %s AND user_id = %s
+        ''', (session_id, user_id))
+        mysql.connection.commit()
+        cursor.close()
+
     response = make_response(redirect(url_for('login')))
-    response.delete_cookie('jwt_token')  # Delete the JWT token from cookies
+    response.delete_cookie('jwt_token')
     flash('You have been logged out.', 'success')
     return response
+
 
 @app.route('/complete_signUp')
 def complete_signUp():
@@ -1623,6 +2316,10 @@ def change_dets(id):
             ))
 
             mysql.connection.commit()
+
+            if 'user_id' in session:
+                log_user_action(session['user_id'], session.get('current_session_id'), "Changed account details")
+
             cursor.close()
 
             # Update session
@@ -1646,9 +2343,10 @@ def change_dets(id):
     return render_template('/accountPage/changeDets.html', form=change_dets_form)
 
 @app.route('/changePswd/<int:id>/', methods=['GET', 'POST'])
-@login_required
+@jwt_required
 def change_pswd(id):
     change_pswd_form = ChangePswdForm(request.form)
+    user_id = g.user['user_id']  # ✅ Get from JWT
 
     user_id = session.get('user_id')
     if not user_id or user_id != id:
@@ -1681,9 +2379,14 @@ def change_pswd(id):
             return redirect(url_for('change_pswd', id=id))
 
         # Update new password in the DB (still plaintext)
-        cursor.execute("UPDATE accounts SET password = %s WHERE id = %s", (confirm_pswd, id))
+        
+        
+        
         mysql.connection.commit()
         cursor.close()
+        
+        # ✅ Log user action
+        log_user_action(user_id, session.get('current_session_id'), "Changed password")
 
         # Update session value too
         session['password'] = confirm_pswd
@@ -1692,6 +2395,7 @@ def change_pswd(id):
         return redirect(url_for('accountInfo'))
 
     return render_template('/accountPage/changePswd.html', form=change_pswd_form)
+
 
 @app.route('/deleteUser/<int:id>', methods=['POST'])
 @jwt_required
@@ -1731,7 +2435,41 @@ def delete_user(id):
 @app.route("/create_update", methods=['GET', 'POST'])
 def create_update():
     form = SeasonalUpdateForm()
+    site_key = os.getenv("RECAPTCHA_SITE_KEY")
+
     if form.validate_on_submit():
+        # reCAPTCHA validation
+        recaptcha_response = request.form.get('g-recaptcha-response')
+        secret_key = os.getenv("RECAPTCHA_SECRET_KEY")
+        verify_url = "https://www.google.com/recaptcha/api/siteverify"
+        payload = {'secret': secret_key, 'response': recaptcha_response}
+        r = requests.post(verify_url, data=payload)
+        result = r.json()
+
+        if not result.get('success'):
+            flash("reCAPTCHA verification failed. Please try again.", 'danger')
+            return render_template('/home/update.html', title='Update', form=form, site_key=site_key)
+
+        # ✅ Decode JWT token from cookie
+        token = request.cookies.get('jwt_token')
+        if not token:
+            flash("User not authenticated. No token found.", "danger")
+            return redirect(url_for('login'))
+
+        try:
+            decoded = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+            user_email = decoded['email']
+            user_id = decoded['user_id']
+            print("[DEBUG] Decoded user:", decoded)
+        except jwt.ExpiredSignatureError:
+            flash("Session expired. Please log in again.", "danger")
+            return redirect(url_for('login'))
+        except Exception as e:
+            flash("Invalid session token. Please log in again.", "danger")
+            print(f"[ERROR] JWT decoding failed: {e}")
+            return redirect(url_for('login'))
+
+        # Prepare update data
         update_data = {
             'title': form.update.data,
             'content': form.content.data,
@@ -1739,18 +2477,134 @@ def create_update():
             'season': form.season.data,
         }
 
-        # Save the update_data to the shelve database
-        with shelve.open('seasonal_updates.db') as db:
-            if 'updates' not in db:
-                db['updates'] = []  # Initialize a list if it doesn't exist
-            updates = db['updates']  # Get the existing list
-            updates.append(update_data)  # Append the new update
-            db['updates'] = updates  # Save the updated list back to the database
-
-
-        flash(f'Update "{form.update.data}" created successfully!', 'success')
+        # ✅ Send confirmation email
+        send_update_confirmation_email(
+            email=user_email,
+            user_id=user_id,
+            update_data=update_data
+        )
+        flash("A confirmation email has been sent. Please verify to complete the update.", "info")
         return redirect(url_for('home'))
-    return render_template('/home/update.html', title='Update', form=form)
+
+    return render_template('/home/update.html', title='Update', form=form, site_key=site_key)
+
+
+
+def send_update_confirmation_email(email, user_id, update_data):
+    token_data = {
+        'user_id': user_id,
+        'update_id': str(uuid.uuid4()),
+        'update_data': update_data,
+        'exp': datetime.utcnow() + timedelta(minutes=15)
+    }
+    token = jwt.encode(token_data, SECRET_KEY, algorithm='HS256')
+
+    confirm_url = url_for('confirm_update', token=token, _external=True)
+    reject_url = url_for('reject_update', token=token, _external=True)
+
+    html = f"""
+    <html>
+    <body>
+    <p>Hello,</p>
+    <p>You attempted to create the following seasonal update:</p>
+    <ul>
+        <li><strong>Title:</strong> {update_data['title']}</li>
+        <li><strong>Content:</strong> {update_data['content']}</li>
+        <li><strong>Date:</strong> {update_data['date']}</li>
+        <li><strong>Season:</strong> {update_data['season']}</li>
+    </ul>
+    <p>Please confirm your identity:</p>
+    <p>
+        <a href="{confirm_url}" style="padding:10px 15px;background-color:green;color:white;text-decoration:none;">Yes, this is me</a>
+        &nbsp;
+        <a href="{reject_url}" style="padding:10px 15px;background-color:red;color:white;text-decoration:none;">This is not me</a>
+    </p>
+    </body>
+    </html>
+    """
+
+    sender_email = "sadevdulneth6@gmail.com"
+    receiver_email = email
+    sender_password = "isgw cesr jdbs oytx"
+
+    message = MIMEMultipart("alternative")
+    message["Subject"] = "Confirm Your Seasonal Update"
+    message["From"] = sender_email
+    message["To"] = receiver_email
+
+    # ✅ Attach HTML with proper UTF-8 encoding
+    message.attach(MIMEText(html, "html", _charset="utf-8"))
+
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, receiver_email, message.as_string())
+        server.quit()
+        print("[DEBUG] Email confirmation sent.")
+    except Exception as e:
+        print(f"[ERROR] Failed to send email: {e}")
+
+
+
+
+
+@app.route('/confirm_update/<token>')
+def confirm_update(token):
+    try:
+        # Decode the token
+        decoded = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+        update_data = decoded['update_data']
+        user_id = decoded['user_id']
+
+        # ✅ Fetch user from DB to restore session
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('SELECT * FROM accounts WHERE id = %s', (user_id,))
+        user = cursor.fetchone()
+        cursor.close()
+
+        if user:
+            # ✅ Restore session
+            session['user_id'] = user['id']
+            session['email'] = user['email']
+            session['first_name'] = user['first_name']
+            session['last_name'] = user['last_name']
+            session['gender'] = user['gender']
+            session['phone'] = user['phone_number']
+            session['status'] = user['status']
+
+            # ✅ Save the update
+            with shelve.open('seasonal_updates.db') as db:
+                updates = db.get('updates', [])
+                updates.append(update_data)
+                db['updates'] = updates
+
+            log_user_action(user['id'], session.get('current_session_id'), f"Confirmed and created seasonal update: {update_data['title']}")
+            flash("Seasonal update created successfully!", "success")
+        else:
+            flash("User not found. Cannot restore session.", "danger")
+
+    except jwt.ExpiredSignatureError:
+        flash("Confirmation link expired.", "danger")
+    except Exception as e:
+        flash(f"Failed to confirm update: {e}", "danger")
+
+    return redirect(url_for('home'))
+
+
+@app.route('/reject_update/<token>')
+def reject_update(token):
+    try:
+        decoded = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+        update_data = decoded['update_data']
+        user_id = decoded['user_id']
+
+        log_user_action(user_id, session.get('current_session_id'), f"Rejected seasonal update: {update_data['title']}")
+
+        flash("Update rejected and not saved.", "info")
+    except Exception as e:
+        flash(f"Error processing rejection: {e}", "danger")
+    return redirect(url_for('home'))
 
 @app.route('/delete_update/<int:index>', methods=['POST'])
 def delete_update(index):
@@ -1760,6 +2614,10 @@ def delete_update(index):
             if 0 <= index < len(updates):
                 removed_update = updates.pop(index)
                 db['updates'] = updates  # Save the updated list
+                if 'user_id' in session:
+                    log_user_action(session['user_id'], session.get('current_session_id'), f'Deleted seasonal update: {removed_update["title"]}')
+
+
                 flash(f'Update "{removed_update["title"]}" deleted successfully!', 'success')
             else:
                 flash('Invalid update index.', 'danger')
@@ -1789,6 +2647,10 @@ def edit_update(index):
         }
         with shelve.open('seasonal_updates.db') as db:
             db['updates'] = updates  # Save the updated list back to the database
+
+            if 'user_id' in session:
+                log_user_action(session['user_id'], session.get('current_session_id'), f'Edited seasonal update: {form.update.data}')
+
 
         flash(f'Update "{form.update.data}" updated successfully!', 'success')
         return redirect(url_for('home'))
