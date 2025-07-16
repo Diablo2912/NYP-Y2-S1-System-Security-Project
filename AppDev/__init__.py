@@ -1,3 +1,4 @@
+#test
 from flask import Flask,g, Response, render_template, request, redirect, url_for, session, jsonify, flash, make_response
 from functools import wraps
 from Forms import SignUpForm,CreateAdminForm, CreateProductForm, LoginForm, ChangeDetForm, ChangePswdForm
