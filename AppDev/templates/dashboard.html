@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="container">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<div class="container">
+  <div class="row">
+    {% if current_user %}
+
+    <!-- Left Panel -->
+    <div class="col-lg-4 p-3">
+      <div class="card mb-3 m-3">
+        <div class="card-body pb-0">
+          <div class="d-flex mb-3">
+            <div class="flex-grow-1 ms-3">
+              <h2 class="card-title mb-1">Admin Dashboard</h2>
+              <h6 class="card-subtitle text-body-secondary">{{ current_user.email }}</h6>
+            </div>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="/roleManagement" class="link-underline link-underline-opacity-0">
+                <img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" class="me-2">
+                <span class="badge bg-success p-2 fs-5 align-middle shadow">Role Management</span>
+              </a>
+            </li>
+            <li class="list-group-item">
+              <a href="/createAdmin" class="link-underline link-underline-opacity-0">
+                <img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" class="me-2">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Create Admin</span>
+              </a>
+            </li>
+            <li class="list-group-item">
+              <a href="/logging" class="link-underline link-underline-opacity-0">
+                <img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" class="me-2">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Logs</span>
+              </a>
+            </li>
+            <li class="list-group-item">
+              <a href="/logging_analytics" class="link-underline link-underline-opacity-0">
+                <img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" class="me-2">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Logging Analytics</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="col-lg-8 p-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h2 class="text-center mb-4">All Registered Users</h2>
+          <p><strong>Admin:</strong> Full access — can manage products, users, and view the dashboard.</p>
+          <p><strong>Manager:</strong> Can manage products only; no access to users or dashboard.</p>
+          <p><strong>User:</strong> Registered account holder with standard access.</p>
+
+          <!-- Search Bar -->
+          <form class="mb-3" method="GET" action="{{ url_for('dashboard') }}">
+            <div class="input-group">
+              <input type="text" name="search" class="form-control" placeholder="Search by ID or Name" value="{{ search_query }}">
+              <button type="submit" class="btn btn-primary">Search</button>
+            </div>
+          </form>
+
+          <!-- Filter Toggle Button -->
+          <button class="btn btn-outline-secondary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#filter-section" aria-expanded="false" aria-controls="filter-section">
+            Filter by Role
+          </button>
+
+          <div id="filter-section" class="collapse">
+            <div class="card p-3">
+              <form method="GET" action="{{ url_for('roleManagement') }}">
+                <div class="mb-3">
+                  <h5>User Roles</h5>
+                  {% set selected_roles = selected_roles or [] %}
+                  {% for role in ['admin', 'manager', 'user'] %}
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="roles" value="{{ role }}" id="role_{{ role }}"
+                      {% if role in selected_roles %}checked{% endif %}>
+                    <label class="form-check-label" for="role_{{ role }}">{{ role|capitalize }}</label>
+                  </div>
+                  {% endfor %}
+                </div>
+                {% if search_query %}
+                  <input type="hidden" name="search" value="{{ search_query }}">
+                {% endif %}
+                <button type="submit" class="btn btn-primary w-100">Apply Filter</button>
+              </form>
+            </div>
+          </div>
+
+          <!-- User Table -->
+          <div class="table-responsive ">
+            <table class="table table-bordered table-hover text-center align-middle">
+              <thead class="table-success">
+                <tr>
+                  <th>ID</th>
+                  <th>First Name</th>
+                  <th>Last Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for user in users %}
+                <tr>
+                  <td>{{ user.id }}</td>
+                  <td>{{ user.first_name }}</td>
+                  <td>{{ user.last_name }}</td>
+                  <td>{{ user.email }}</td>
+                  <td>{{ user.status }}</td>
+                  <td>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editStatusModal_{{ user.id }}">Edit</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteUserModal_{{ user.id }}">Delete</button>
+                  </td>
+                </tr>
+
+                <!-- Edit Modal -->
+                <div class="modal fade" id="editStatusModal_{{ user.id }}" tabindex="-1" aria-hidden="true">
+                  <div class="modal-dialog">
+                    <div class="modal-content">
+                      <form action="{{ url_for('update_user_status', id=user.id) }}" method="POST">
+                        <div class="modal-header">
+                          <h5 class="modal-title">Edit User Status</h5>
+                          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body text-start">
+                          <label for="statusSelect_{{ user.id }}" class="form-label">Select New Status</label>
+                          <select class="form-select" id="statusSelect_{{ user.id }}" name="status" required>
+                            <option value="user" {% if user.status == 'user' %}selected{% endif %}>User</option>
+                            <option value="manager" {% if user.status == 'manager' %}selected{% endif %}>Manager</option>
+                            <option value="admin" {% if user.status == 'admin' %}selected{% endif %}>Admin</option>
+                          </select>
+                        </div>
+                        <div class="modal-footer">
+                          <button type="submit" class="btn btn-primary">Update</button>
+                          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Delete Modal -->
+                <div class="modal fade" id="deleteUserModal_{{ user.id }}" tabindex="-1" aria-hidden="true">
+                  <div class="modal-dialog">
+                    <div class="modal-content">
+                      <form action="{{ url_for('delete_user', id=user.id) }}" method="POST">
+                        <div class="modal-header">
+                          <h5 class="modal-title">Confirm Deletion</h5>
+                          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body text-start">
+                          Are you sure you want to delete <strong>{{ user.first_name }} {{ user.last_name }}</strong>?
+                        </div>
+                        <div class="modal-footer">
+                          <button type="submit" class="btn btn-danger">Delete</button>
+                          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+                {% endfor %}
+              </tbody>
+            </table>
+
+            {% if users|length == 0 %}
+              <p class="text-center mt-3">No users found.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

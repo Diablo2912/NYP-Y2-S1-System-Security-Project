@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container">
+  <div class="row">
+    <!-- Left Container (Admin Dashboard Links) -->
+    <div class="col-lg-4 p-3">
+      <div class="card d-flex mb-3 m-3">
+        <div class="card-body pb-0">
+          <div class="d-flex mb-3">
+            <div class="flex-grow-1 ms-3">
+              <h2 class="card-title mb-1">Admin Dashboard</h2>
+              <h6 class="card-subtitle text-body-secondary">{{ current_user.email }}</h6>
+            </div>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="/roleManagement" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Role Management</span></a>
+            </li>
+            <li class="list-group-item">
+              <a href="/createAdmin" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Create Admin</span></a>
+            </li>
+            <li class="list-group-item">
+              <a href="/logging" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
+                <span class="badge bg-success p-2 fs-5 align-middle shadow">Logs</span></a>
+            </li>
+            <li class="list-group-item">
+              <a href="/logging_analytics" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Logging Analytics</span></a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Container (Log Table) -->
+    <div class="col-lg-8 p-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h2 class="text-center mb-4">Log Records</h2>
+
+          <!-- Filter Toggle Button -->
+          <button class="btn btn-outline-secondary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#filter-section" aria-expanded="false" aria-controls="filter-section">
+            Filter by Category
+          </button>
+
+          <div id="filter-section" class="collapse">
+            <div class="card p-3">
+              <form method="GET" action="{{ url_for('logging') }}">
+                <div class="mb-3">
+                  <h5>Log Category</h5>
+                  {% set selected_roles = selected_roles or [] %}
+                  {% for role in ['Info', 'Warning', 'Critical', 'Error'] %}
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="roles" value="{{ role }}" id="role_{{ role }}"
+                      {% if role in selected_roles %}checked{% endif %}>
+                    <label class="form-check-label" for="role_{{ role }}">{{ role|capitalize }}</label>
+                  </div>
+                  {% endfor %}
+                </div>
+                {% if search_query %}
+                  <input type="hidden" name="search" value="{{ search_query }}">
+                {% endif %}
+                <button type="submit" class="btn btn-primary w-100">Apply Filter</button>
+              </form>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-bordered table-hover text-center align-middle">
+              <thead class="table-success">
+                <tr>
+                  <th>ID</th>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Category</th>
+                  <th>Activity</th>
+                  <th>IP Address</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for log in users %}
+                <tr>
+                  <td>{{ log.id }}</td>
+                  <td>{{ log.date }}</td>
+                  <td>{{ log.time }}</td>
+                  <td>{{ log.category }}</td>
+                  <td>{{ log.activity }}</td>
+                  <td>{{ log.ip_address }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% if users|length == 0 %}
+              <p class="text-center mt-3">No logs found.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+{% endblock %}
+
