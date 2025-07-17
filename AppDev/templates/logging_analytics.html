@@ -48,13 +48,14 @@
             Show logs from today
         </a>
 
+        <div class="row mb-4">
         <!-- Slider Control -->
-        <div class="mb-4">
+        <div class="col-lg-6 mb-4">
           <label for="logRange" class="form-label"><h5>Logs From Past Days</h5></label>
           <div class="position-relative" style="max-width: 250px;">
             <div id="rangeBubble" class="range-bubble">10</div>
             <input type="range" class="form-range mt-2" min="1" max="20" step="1" id="logRange"
-                    value="{{ num_days or 10 }}">
+                   value="{{ num_days or 10 }}">
           </div>
           <p>Showing last <output id="rangeOutput">{{ num_days or 10 }}</output> day(s)</p>
           {% if request.args.get('start_date') and request.args.get('end_date') %}
@@ -64,22 +65,24 @@
           {% endif %}
         </div>
 
-        <div class="mb-4">
-        <h5>Log Activity Between Dates</h5>
+        <!-- Date Filter -->
+        <div class="col-lg-6 mb-4">
+          <h5>Log Activity Between Dates</h5>
           <p>Only a maximum range of 20 days can be selected</p>
           <p>Showing logs from <u>{{ request.args.get('start_date') }}</u> to <u>{{ request.args.get('end_date') }}</u></p>
-        <div class="d-flex flex-column flex-sm-row gap-2 align-items-end">
-          <div>
-            <label for="X-DATE" class="form-label">Start Date</label>
-            <input type="date" id="X-DATE" class="form-control">
-          </div>
-          <div>
-            <label for="Y-DATE" class="form-label">End Date</label>
-            <input type="date" id="Y-DATE" class="form-control">
-          </div>
-          <div>
-            <label class="form-label d-none d-sm-block invisible">Submit</label>
-            <button id="dateSearchBtn" class="btn btn-secondary w-100">Filter Logs</button>
+          <div class="d-flex flex-column flex-sm-row gap-2 align-items-end">
+            <div>
+              <label for="X-DATE" class="form-label">Start Date</label>
+              <input type="date" id="X-DATE" class="form-control">
+            </div>
+            <div>
+              <label for="Y-DATE" class="form-label">End Date</label>
+              <input type="date" id="Y-DATE" class="form-control">
+            </div>
+            <div>
+              <label class="form-label d-none d-sm-block invisible">Submit</label>
+              <button id="dateSearchBtn" class="btn btn-secondary w-100">Filter Logs</button>
+            </div>
           </div>
         </div>
       </div>
