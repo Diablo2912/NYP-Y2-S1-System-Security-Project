@@ -1,51 +1,79 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="container">
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="container mt-3">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-ywzG+YB8q1YQk... (shortened)" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+<div class="container-fluid pt-4">
   <div class="row">
-    <!-- Left Container (Admin Dashboard Links) -->
-    <div class="col-lg-4 p-3">
-      <div class="card d-flex mb-3 m-3">
+    <!-- Left Panel -->
+    <div class="col-lg-2 col-md-3 col-sm-12 px-1 p-3 ">
+      <div class="card mb-3 ms-0">
         <div class="card-body pb-0">
           <div class="d-flex mb-3">
-            <div class="flex-grow-1 ms-3">
-              <h2 class="card-title mb-1">Admin Dashboard</h2>
-              <h6 class="card-subtitle text-body-secondary">{{ current_user.email }}</h6>
+            <div class="flex-grow-1 ms-2">
+              <h5 class="card-title mb-1">Admin</h5>
+              <h6 class="card-subtitle text-body-secondary small">{{ current_user.email }}</h6>
             </div>
           </div>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <a href="/roleManagement" class="link-underline link-underline-opacity-0">
-                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
-                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Role Management</span></a>
-            </li>
-            <li class="list-group-item">
-              <a href="/createAdmin" class="link-underline link-underline-opacity-0">
-                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
-                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Create Admin</span></a>
-            </li>
-            <li class="list-group-item">
-              <a href="/logging" class="link-underline link-underline-opacity-0">
-                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
-                <span class="badge bg-success p-2 fs-5 align-middle shadow">Logs</span></a>
-            </li>
-            <li class="list-group-item">
-              <a href="/logging_analytics" class="link-underline link-underline-opacity-0">
-                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
-                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Logging Analytics</span></a>
-            </li>
+          <ul class="list-group list-group-flush small">
+            <li class="list-group-item px-2 py-1"><a href="/roleManagement" class="d-flex align-items-center text-decoration-none text-dark"><img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Role Management</a></li>
+            <li class="list-group-item px-2 py-1"><a href="/createAdmin" class="d-flex align-items-center text-decoration-none text-dark"><img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Create Staff</a></li>
+            <li class="list-group-item px-2 py-1"><a href="/logging" class="d-flex align-items-center text-decoration-none text-dark"><img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Logs</a></li>
+            <li class="list-group-item px-2 py-1"><a href="/logging_analytics" class="d-flex align-items-center text-decoration-none text-dark"><img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Logging Analytics</a></li>
           </ul>
         </div>
       </div>
     </div>
 
     <!-- Right Container (Log Table) -->
-    <div class="col-lg-8 p-3">
+    <div class="col-lg-10 p-3">
       <div class="card shadow-sm">
         <div class="card-body">
           <h2 class="text-center mb-4">Log Records</h2>
 
-          <!-- Filter Toggle Button -->
+
+          <!-- Select Date Toggle Button -->
+          <button class="btn btn-outline-secondary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#selectDate-section" aria-expanded="false" aria-controls="selectDate-section">
+            Select Date
+          </button>
+
+          <div id="selectDate-section" class="collapse">
+            <div class="card p-3">
+              <form method="GET" action="{{ url_for('logging') }}">
+                <div class="row mb-3">
+                  <div class="col-md-6">
+                    <label for="start_date" class="form-label">Select a date</label>
+                    <input type="date" id="start_date" name="start_date" class="form-control" max="{{ current_date }}">
+                  </div>
+                </div>
+                {% for role in selected_roles %}
+                  <input type="hidden" name="roles" value="{{ role }}">
+                {% endfor %}
+                {% for status in selected_statuses %}
+                  <input type="hidden" name="statuses" value="{{ status }}">
+                {% endfor %}
+                {% if search_query %}
+                  <input type="hidden" name="search" value="{{ search_query }}">
+                {% endif %}
+                <button type="submit" class="btn btn-primary w-100">Apply Date Filter</button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Filter Catgory Toggle Button -->
           <button class="btn btn-outline-secondary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#filter-section" aria-expanded="false" aria-controls="filter-section">
             Filter by Category
           </button>
@@ -72,6 +100,36 @@
             </div>
           </div>
 
+          <!-- Filter Severity Toggle Button -->
+          <button class="btn btn-outline-secondary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#filterSeverity-section" aria-expanded="false" aria-controls="filter-section">
+            Filter by Severity
+          </button>
+
+          <div id="filterSeverity-section" class="collapse">
+            <div class="card p-3">
+              <form method="GET" action="{{ url_for('logging') }}">
+                <div class="mb-3">
+                  <h5>Log Severity</h5>
+                  {% set selected_statuses = selected_statuses or [] %}
+                  {% for status in ['Open', 'Closed', 'Accepted', 'Triage'] %}
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="statuses" value="{{ status }}" id="status_{{ status }}"
+                      {% if status in selected_statuses %}checked{% endif %}>
+                    <label class="form-check-label" for="status_{{ status }}">{{ status }}</label>
+                  </div>
+                  {% endfor %}
+                </div>
+                {% if search_query %}
+                  <input type="hidden" name="search" value="{{ search_query }}">
+                {% endif %}
+                {% for role in selected_roles %}
+                  <input type="hidden" name="roles" value="{{ role }}">
+                {% endfor %}
+                <button type="submit" class="btn btn-primary w-100">Apply Filter</button>
+              </form>
+            </div>
+          </div>
+
           <div class="table-responsive">
             <table class="table table-bordered table-hover text-center align-middle">
               <thead class="table-success">
@@ -79,9 +137,29 @@
                   <th>ID</th>
                   <th>Date</th>
                   <th>Time</th>
-                  <th>Category</th>
+                  <th>
+                    Severity <i class="fa-solid fa-circle-info" title="
+                    Info: Indicates routine operations or successful actions that require no intervention.
+
+Warning: Flags unusual or unexpected behavior that may need monitoring.
+
+Error: Represents failures that prevent a specific task from completing.
+
+Critical: Denotes severe issues that threaten system stability or security and need immediate action."></i>
+                  </th>
                   <th>Activity</th>
+                  <th>
+                    Status <i class="fa-solid fa-circle-info" title="
+                    Open: The issue or log entry has been created but not yet addressed.
+
+Closed: The issue has been resolved or no further action is required.
+
+Accepted: The issue has been acknowledged and will be worked on.
+
+Triage: The issue is being reviewed and prioritized based on severity and impact."></i>
+                  </th>
                   <th>IP Address</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -92,7 +170,47 @@
                   <td>{{ log.time }}</td>
                   <td>{{ log.category }}</td>
                   <td>{{ log.activity }}</td>
+                  <td>{{ log.status }}</td>
                   <td>{{ log.ip_address }}</td>
+                  <td>
+                     <!-- Edit Button -->
+                      <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editStatusModal_{{ log.id }}">
+                        Edit
+                      </button>
+
+                      <!-- Edit Log Status Modal -->
+                      <div class="modal fade" id="editStatusModal_{{ log.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                          <div class="modal-content">
+                            <form action="{{ url_for('update_log_status', id=log.id) }}" method="POST">
+                              <div class="modal-header">
+                                <h5 class="modal-title">Edit Log Status</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                              </div>
+                              <div class="modal-body text-start">
+                                <div class="container mb-5 pb-5">
+                                  <label for="statusSelect_{{ log.id }}" class="form-label">Select New Status</label>
+                                  <select class="form-select" id="statusSelect_{{ log.id }}" name="status" required>
+                                    {% for s in ['Open', 'Accepted', 'Triage', 'Closed'] %}
+                                      <option value="{{ s }}" {% if log.status == s %}selected{% endif %}>{{ s }}</option>
+                                    {% endfor %}
+                                  </select>
+                                </div>
+                              </div>
+                              <div class="modal-footer">
+                                <button type="submit" class="btn btn-primary">Update</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                              </div>
+                            </form>
+                          </div>
+                        </div>
+                      </div>
+
+                    <!-- Delete Button (Triggers Modal) -->
+                    <form action="{{ url_for('delete_log', id=log.id) }}" method="POST" style="display: inline-block;">
+                      <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                  </td>
                 </tr>
                 {% endfor %}
               </tbody>
