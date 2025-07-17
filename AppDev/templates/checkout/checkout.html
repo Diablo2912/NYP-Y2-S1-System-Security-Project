@@ -26,6 +26,7 @@
     <div class="card p-4 mt-4">
         <h3 class="text-success">Customer Information</h3>
         <form method="POST" action="{{ url_for('create_checkout_session') }}">
+            {{ form.hidden_tag() }}
             <div class="mb-3">
                 <label for="name" class="form-label">Full Name</label>
                 <input type="text" class="form-control" id="name" name="name" required>
@@ -54,5 +55,33 @@
     {% else %}
     <p class="text-center text-danger">Your cart is empty!</p>
     {% endif %}
+    <div id="timer" class="text-danger fw-bold mb-3"></div>
 </div>
+
+<script>
+  let timeLeft = 5 * 60; // 5 minutes in seconds
+
+  const timerDisplay = document.getElementById("timer");
+
+  function updateTimer() {
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    timerDisplay.textContent = `⏳ Time left: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+    if (timeLeft <= 0) {
+      clearInterval(timer);
+      timerDisplay.textContent = "⛔ Time's up! Please refresh the page.";
+      const form = document.querySelector("form");
+      if (form) {
+        Array.from(form.elements).forEach(el => el.disabled = true); // Disable form fields
+      }
+    } else {
+      timeLeft--;
+    }
+  }
+
+  const timer = setInterval(updateTimer, 1000);
+  updateTimer(); // Initialize on load
+</script>
+    
 {% endblock %}

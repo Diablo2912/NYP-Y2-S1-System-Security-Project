@@ -3,7 +3,7 @@ import re
 from wtforms import FileField
 from flask_wtf.file import FileAllowed
 from flask_wtf import FlaskForm
-class SignUpForm(Form):
+class SignUpForm(FlaskForm):
     def no_numbers(form, field):
         if re.search(r'\d', field.data):
             raise validators.ValidationError('Name cannot contain numbers')
@@ -55,12 +55,12 @@ class ChangeDetForm(Form):
     email = EmailField('Email*', [validators.Email(), validators.DataRequired()])
     pswd = PasswordField('Enter Password to Confirm:', [validators.Length(min=8, message='Password must be at least 8 characters.'),validators.DataRequired()])
 
-class ChangePswdForm(Form):
+class ChangePswdForm(FlaskForm):
     current_pswd = PasswordField('Current Password:',[validators.Length(min=8, message='Password must be at least 8 characters.'),validators.DataRequired()])
     new_pswd = PasswordField('New Password:',[validators.Length(min=8, message='Password must be at least 8 characters.'),validators.DataRequired()])
     confirm_pswd = PasswordField('Confirm New Password:',[validators.Length(min=8, message='Password must be at least 8 characters.'),validators.DataRequired()])
 
-class LoginForm(Form):
+class LoginForm(FlaskForm):
     email = EmailField('Email*',[validators.Email(), validators.DataRequired()])
     pswd = PasswordField('Password*', [validators.Length(min=8, message='Password must be at least 8 characters.'), validators.DataRequired()])
 

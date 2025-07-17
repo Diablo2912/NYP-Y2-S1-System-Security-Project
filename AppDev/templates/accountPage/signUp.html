@@ -23,6 +23,7 @@
       <h1 class="text-center mb-4">Sign Up</h1>
 
       <form method="POST" action="" class="row g-3">
+          {{ form.hidden_tag() }}
         <div class="form-group col-md-6">
           {{ render_field(form.first_name, class="form-control") }}
         </div>
@@ -64,11 +65,26 @@
         <input type="submit" value="Submit" class="btn btn-success mt-4"/>
       </form>
 
+      <p class="text-danger mt-2">This form will expire in <span id="timer">120</span> seconds.</p>
+
     </div>
   </div>
 </div>
 
 <script>
+  let seconds = 120;
+  let countdown = document.getElementById("timer");
+
+  const interval = setInterval(() => {
+    seconds--;
+    countdown.textContent = seconds;
+    if (seconds <= 0) {
+      clearInterval(interval);
+      document.querySelectorAll("form input, form select, form button").forEach(el => el.disabled = true);
+      alert("Form expired. Please refresh to continue.");
+    }
+  }, 1000);
+
   function togglePassword(passwordFieldId, eyeIconId) {
     var passwordField = document.getElementById(passwordFieldId);
     var eyeIcon = document.getElementById(eyeIconId);

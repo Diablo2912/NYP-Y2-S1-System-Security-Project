@@ -20,6 +20,12 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import os
 from werkzeug.utils import secure_filename
+import pathlib
+from cryptography import x509
+from cryptography.x509.oid import NameOID
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from flask_wtf import CSRFProtect #This protects all form-based and POST, PUT, DELETE routes, even ones not using FlaskForm
 from dotenv import load_dotenv
 import requests
 import bleach
@@ -55,6 +61,9 @@ load_dotenv()
 print("Loaded ENV value for TEST_VAR =", os.getenv("TEST_VAR"))
 
 images = UploadSet('images', IMAGES)
+#csrf (activate global CSRF protection)
+csrf = CSRFProtect()
+csrf.init_app(app)
 
 app.register_blueprint(main_blueprint)
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -779,6 +788,7 @@ def createAdmin():
     if request.method == 'POST' and create_admin_form.validate():
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
+
         # Step 1: Check for duplicate email or phone number (unsanitized for accurate lookup)
         cursor.execute("SELECT * FROM accounts WHERE email = %s OR phone_number = %s",
                        (create_admin_form.email.data.lower(), create_admin_form.number.data))
@@ -789,6 +799,7 @@ def createAdmin():
                 flash('Email is already registered. Please use a different email.', 'danger')
             elif existing_user['phone_number'] == create_admin_form.number.data:
                 flash('Phone number is already registered. Please use a different number.', 'danger')
+                
             cursor.close()
             return redirect(url_for('createAdmin'))
 
@@ -1116,8 +1127,6 @@ def roleManagement():
         search_query=search_query,
         selected_roles=selected_roles
     )
-
-
 ALGORITHM = "pbkdf2_sha256"
 
 def hash_password(password, salt=None, iterations=260000):
@@ -1139,6 +1148,7 @@ def verify_password(password, password_hash):
     assert algorithm == ALGORITHM
     compare_hash = hash_password(password, salt, iterations)
     return secrets.compare_digest(password_hash, compare_hash)
+
 
 
 @app.route('/signUp', methods=['GET', 'POST'])
@@ -1248,9 +1258,17 @@ def inject_user():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    login_form = LoginForm(request.form)
+    login_form = LoginForm()
+
+    if request.method == 'GET':
+        session['form_start_time'] = datetime.utcnow().timestamp()
 
     if request.method == 'POST' and login_form.validate():
+        # Expiry check
+        start_time = session.get('form_start_time')
+        if start_time and (datetime.utcnow().timestamp() - start_time > 120):
+            flash("Form expired. Please log in again.", "warning")
+            return redirect(url_for('login'))
         email = sanitize_input(login_form.email.data.lower())
         password = login_form.pswd.data
 
@@ -2464,6 +2482,12 @@ def create_checkout_session():
 @app.route('/checkout', methods=['GET'])
 @login_required
 def checkout():
+    if 'form_start_time' not in session:
+        session['form_start_time'] = datetime.utcnow().timestamp()
+    elif datetime.utcnow().timestamp() - session['form_start_time'] > 300:  # 5 minutes
+        flash("Your session expired. Please restart checkout.", "danger")
+        return redirect(url_for('buy_product'))
+
     cart = session.get("cart", {})  # Get cart from session
     total_price = sum(item["price"] * item["quantity"] for item in cart.values())  # Calculate total price
 
@@ -2577,6 +2601,73 @@ def chat():
     bot_response = generate_response(user_message)
     return jsonify({'response': bot_response})
 
+#Secure header
+
+def generate_self_signed_cert(cert_file='cert.pem', key_file='key.pem'):
+    cert_path = pathlib.Path(cert_file)
+    key_path = pathlib.Path(key_file)
+
+    if cert_path.exists() and key_path.exists():
+        print("✅ SSL certs already exist. Skipping generation.")
+        return
+
+    print("🔐 Generating self-signed SSL certificate...")
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = x509.Name([
+        x509.NameAttribute(NameOID.COUNTRY_NAME, u"SG"),
+        x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, u"Singapore"),
+        x509.NameAttribute(NameOID.LOCALITY_NAME, u"Singapore"),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"SustainableAgri"),
+        x509.NameAttribute(NameOID.COMMON_NAME, u"localhost"),
+    ])
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.datetime.utcnow())
+        .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=365))
+        .sign(key, hashes.SHA256())
+    )
+
+    with open(key_file, "wb") as f:
+        f.write(key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.TraditionalOpenSSL,
+            serialization.NoEncryption()
+        ))
+
+    with open(cert_file, "wb") as f:
+        f.write(cert.public_bytes(serialization.Encoding.PEM))
+
+    print(f"✅ Certificate saved to {cert_file}")
+    print(f"✅ Private key saved to {key_file}")
+
+@app.before_request
+def enforce_https():
+    if not request.is_secure and not app.debug:
+        url = request.url.replace("http://", "https://", 1)
+        return redirect(url, code=301)
+
+
+@app.after_request
+def set_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' https://cdn.jsdelivr.net; "
+        "style-src 'self' https://cdn.jsdelivr.net; "
+        "img-src 'self' data:; "
+        "connect-src 'self';"
+    )
+    return response
+
+# Final Secure Flask App Entry Point
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    generate_self_signed_cert()  # Auto-generate certs if not exist
+    app.run(ssl_context=('cert.pem', 'key.pem'), host='127.0.0.1', port=443)
