@@ -47,53 +47,67 @@
         <a href="{{ url_for('logging_analytics') }}?start_date={{ today_str }}&end_date={{ today_str }}" class="btn btn-primary mb-3">
             Show logs from today
         </a>
-
-        <div class="row mb-4">
-        <!-- Slider Control -->
-        <div class="col-lg-6 mb-4">
-          <label for="logRange" class="form-label"><h5>Logs From Past Days</h5></label>
-          <div class="position-relative" style="max-width: 250px;">
-            <div id="rangeBubble" class="range-bubble">10</div>
-            <input type="range" class="form-range mt-2" min="1" max="20" step="1" id="logRange"
-                   value="{{ num_days or 10 }}">
+        <div class="row mb-4 g-3">
+          <!-- Slider Control -->
+          <div class="col-lg-6 mb-4">
+            <div class="border border-dark rounded p-3 h-100">
+              <label for="logRange" class="form-label"><h5>Logs From Past Days</h5></label>
+              <div class="position-relative" style="max-width: 250px;">
+                <div id="rangeBubble" class="range-bubble">10</div>
+                <input type="range" class="form-range mt-2" min="1" max="20" step="1" id="logRange"
+                       value="{{ num_days or 10 }}">
+              </div>
+              <p>Showing last <output id="rangeOutput">{{ num_days or 10 }}</output> day(s) including today</p>
+              {% if request.args.get('start_date') and request.args.get('end_date') %}
+                <p>Showing logs from <u>{{ request.args.get('start_date') }}</u> to <u>{{ request.args.get('end_date') }}</u></p>
+              {% else %}
+                <p>Showing logs from <u>{{ start_date }}</u> until today,<u>{{ current_day }}</u>.</p>
+              {% endif %}
+            </div>
           </div>
-          <p>Showing last <output id="rangeOutput">{{ num_days or 10 }}</output> day(s)</p>
-          {% if request.args.get('start_date') and request.args.get('end_date') %}
-            <p>Showing logs from <u>{{ request.args.get('start_date') }}</u> to <u>{{ request.args.get('end_date') }}</u></p>
-          {% else %}
-            <p>Showing logs from <u>{{ start_date }}</u> until today.</p>
-          {% endif %}
-        </div>
 
-        <!-- Date Filter -->
-        <div class="col-lg-6 mb-4">
-          <h5>Log Activity Between Dates</h5>
-          <p>Only a maximum range of 20 days can be selected</p>
-          <p>Showing logs from <u>{{ request.args.get('start_date') }}</u> to <u>{{ request.args.get('end_date') }}</u></p>
-          <div class="d-flex flex-column flex-sm-row gap-2 align-items-end">
-            <div>
-              <label for="X-DATE" class="form-label">Start Date</label>
-              <input type="date" id="X-DATE" class="form-control">
-            </div>
-            <div>
-              <label for="Y-DATE" class="form-label">End Date</label>
-              <input type="date" id="Y-DATE" class="form-control">
-            </div>
-            <div>
-              <label class="form-label d-none d-sm-block invisible">Submit</label>
-              <button id="dateSearchBtn" class="btn btn-secondary w-100">Filter Logs</button>
+          <!-- Date Filter -->
+          <div class="col-lg-6 mb-4">
+            <div class="border border-dark rounded p-3 h-100">
+              <h5>Log Activity Between Dates</h5>
+              <p><i>Only a maximum range of 20 days can be selected</i></p>
+              <p>Showing logs from <u>{{ request.args.get('start_date') }}</u> to <u>{{ request.args.get('end_date') }}</u></p>
+              <div class="d-flex flex-column flex-sm-row gap-2 align-items-end">
+                <div>
+                  <label for="X-DATE" class="form-label">Start Date</label>
+                  <input type="date" id="X-DATE" class="form-control">
+                </div>
+                <div>
+                  <label for="Y-DATE" class="form-label">End Date</label>
+                  <input type="date" id="Y-DATE" class="form-control">
+                </div>
+                <div>
+                  <label class="form-label d-none d-sm-block invisible">Submit</label>
+                  <button id="dateSearchBtn" class="btn btn-secondary w-100">Filter Logs</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-        <h4>Total Logs: </h4>
+        <h4>Application Incident Management: </h4>
 
         <!-- Log Summary Cards -->
-        <div class="row justify-content-center g-3">
+        <!-- Log Summary Cards (5 in a row) -->
+        <div class="five-card-row mt-3">
           {% for category in ['Info', 'Warning', 'Error', 'Critical'] %}
-          <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
-            <div class="card text-white bg-{{ 'info' if category == 'Info' else 'warning' if category == 'Warning' else 'danger' if category == 'Error' else 'dark' }}">
+          <div class="card-wrapper">
+            <div class="card text-white
+              {% if category == 'Info' %}
+                bg-success
+              {% elif category == 'Warning' %}
+                bg-warning text-dark
+              {% elif category == 'Error' %}
+                bg-orange
+              {% elif category == 'Critical' %}
+                bg-danger
+              {% endif %}">
               <div class="card-body py-2 px-2 text-center">
                 <h6 class="card-title mb-1">{{ category }}</h6>
                 <p class="card-text fs-6 mb-0">{{ category_summary[category] }}</p>
@@ -101,6 +115,16 @@
             </div>
           </div>
           {% endfor %}
+
+          <!-- 5th Card: Total Logs -->
+          <div class="card-wrapper">
+            <div class="card bg-primary text-white">
+              <div class="card-body py-2 px-2 text-center">
+                <h6 class="card-title mb-1">Resolved</h6>
+                <p class="card-text fs-6 mb-0">{{ total_logs }}</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Logs Explanation -->
@@ -120,6 +144,12 @@
         <!-- Line Chart -->
         <div class="mt-5">
           <h4 class="mb-3">Log Category Trend</h4>
+          <p>Showing last <output id="range2Output">{{ num_days or 10 }}</output> day(s) including today </p>
+              {% if request.args.get('start_date') and request.args.get('end_date') %}
+                <p>Showing logs from <u>{{ request.args.get('start_date') }}</u> to <u>{{ request.args.get('end_date') }}</u></p>
+              {% else %}
+                <p>Showing logs from <u>{{ start_date }}</u> until today,<u>{{ current_day }}</u>.</p>
+              {% endif %}
           <canvas id="lineChart" height="120"></canvas>
         </div>
 
@@ -134,7 +164,22 @@
 </div>
 
 
-
+<style>
+  .bg-orange {
+  background-color: #fd7e14 !important; /* Bootstrap's orange-500 */
+  }
+    .five-card-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+  }
+  .five-card-row .card-wrapper {
+    flex: 1 1 18%; /* ~5 in a row */
+    min-width: 180px;
+    max-width: 240px;
+  }
+</style>
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
@@ -154,10 +199,10 @@
 
   function getColor(category) {
     const colors = {
-      Info: '#36A2EB',
-      Warning: '#FFCE56',
-      Error: '#FF6384',
-      Critical: '#8B0000'
+      Info: '#198754',
+      Warning: '#ffc107',
+      Error: '#fd7e14',
+      Critical: '#dc3545'
     };
     return colors[category] || '#000';
   }
