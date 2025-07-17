@@ -1007,7 +1007,6 @@ def logging_analytics():
         display_start_date = start_date_obj.strftime("%d/%m/%Y")
 
     log_data = cursor.fetchall()
-    cursor.close()
 
     categories = ['Info', 'Warning', 'Error', 'Critical']
     chart_data = {date: {cat: 0 for cat in categories} for date in dates_iso}
@@ -1024,6 +1023,13 @@ def logging_analytics():
     current_time = datetime.now().strftime("%d-%m-%Y , %I:%M %p")
     current_day = datetime.now().strftime("%d-%m-%Y")
 
+    cursor.execute("SELECT COUNT(*) AS closed_count FROM logs WHERE status = 'Closed'")
+    closed_result = cursor.fetchone()
+    closed_count = closed_result['closed_count']
+
+
+    cursor.close()
+
     return render_template(
         'logging_analytics.html',
         chart_data=chart_data,
@@ -1035,6 +1041,7 @@ def logging_analytics():
         today_str=today_str,
         start_date=display_start_date,
         category_summary=category_summary,
+        closed_count=closed_count,
         num_days=num_days
     )
 
