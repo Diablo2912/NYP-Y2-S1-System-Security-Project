@@ -896,7 +896,10 @@ def logging():
 
     search_query = request.args.get("search", "").strip().lower()
     selected_roles = request.args.getlist("roles")
-    selected_statuses = request.args.getlist("statuses")  # ✅ added
+    selected_statuses = request.args.getlist("statuses")
+    sort_by = request.args.get("sort_by", "date")
+    sort_order = request.args.get("sort_order", "desc")
+    start_date = request.args.get("start_date")
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute("SELECT * FROM accounts WHERE id = %s", (current_user['user_id'],))
@@ -920,6 +923,23 @@ def logging():
         like_term = f"%{search_query}%"
         params.extend([like_term, like_term, like_term])
 
+    if start_date:
+        try:
+            datetime.strptime(start_date, "%Y-%m-%d")  # validate format
+            query += " AND date >= %s"
+            params.append(start_date)
+        except ValueError:
+            flash("Invalid date format provided.", "warning")
+
+    sortable_columns = {
+        "date": "date",
+        "category": "FIELD(category, 'Critical', 'Error', 'Warning', 'Info')"
+    }
+
+    if sort_by in sortable_columns:
+        order_clause = sortable_columns[sort_by]
+        query += f" ORDER BY {order_clause} {'ASC' if sort_order == 'asc' else 'DESC'}"
+
     cursor.execute(query, params)
     logs = cursor.fetchall()
     cursor.close()
@@ -933,9 +953,11 @@ def logging():
         selected_roles=selected_roles,
         selected_statuses=selected_statuses,
         current_date=current_date,
-        search_query=search_query
+        search_query=search_query,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        start_date=start_date,
     )
-
 
 @app.route('/logging_analytics', methods=['GET'])
 @jwt_required
