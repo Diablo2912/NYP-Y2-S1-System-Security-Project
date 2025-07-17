@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container text-center">
+  <h3 class="mt-3">Scan Your Face for Registration</h3>
+
+  <video id="video" width="320" height="240" autoplay class="mb-3 border border-dark rounded"></video>
+  <canvas id="canvas" width="320" height="240" class="d-none"></canvas>
+
+  <button id="capture" class="btn btn-primary mb-2">Capture Face</button>
+
+  <form method="POST" id="faceForm">
+    <input type="hidden" name="face_image" id="face_image">
+    <button type="submit" class="btn btn-success">Register Face</button>
+  </form>
+</div>
+
+<script>
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const captureButton = document.getElementById('capture');
+  const faceInput = document.getElementById('face_image');
+
+  navigator.mediaDevices.getUserMedia({ video: true })
+    .then(stream => {
+      video.srcObject = stream;
+    });
+
+  captureButton.addEventListener('click', function () {
+    const context = canvas.getContext('2d');
+    canvas.classList.remove('d-none');
+    context.drawImage(video, 0, 0, 320, 240);
+    const dataURL = canvas.toDataURL('image/png');
+    faceInput.value = dataURL;
+  });
+</script>
+{% endblock %}

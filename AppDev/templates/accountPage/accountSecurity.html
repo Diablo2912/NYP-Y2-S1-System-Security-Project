@@ -2,18 +2,31 @@
 
 {% block content %}
 
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="container mt-3">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
 <div class="container">
   <div class="row">
+    {% if current_user %}
     <!-- Left Container -->
-    {% if 'user_id' in session %}
     <div class="col-lg-4 p-3">
       <div class="card d-flex mb-3 m-3">
         <div class="card-body pb-0">
           <div class="d-flex mb-3">
             <img class="flex" src="{{ url_for('static', filename='assets/person.svg') }}" width="60" height="60">
             <div class="flex-grow-1 ms-3">
-              <h2 class="card-title mb-1">{{ session['first_name'] }}</h2>
-                <h6 class="card-subtitle text-body-secondary">{{ session['email'] }}</h6>
+              <h2 class="card-title mb-1">{{ current_user.first_name }}</h2>
+              <h6 class="card-subtitle text-body-secondary">{{ current_user.email }}</h6>
             </div>
           </div>
 
@@ -36,7 +49,6 @@
                 <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Purchase History</span></a>
             </li>
           </ul>
-
         </div>
       </div>
     </div>
@@ -50,26 +62,61 @@
             <ul class="list-group list-group-flush">
               <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
                 <div class="d-flex fs-5 m-1 p-0">
-                <label class="col-md-3 m-1 fs-6">Password</label>
-                  <input type="password" id="password" class="form-control w-auto" value="{{ session['pswd'] }}" disabled>
+                  <label class="col-md-3 m-1 fs-6">Password</label>
+                  <!-- Placeholder password field for UX purposes only -->
+                  <input type="password" id="password" class="form-control w-auto" value="********" disabled>
                   <button type="button" class="btn btn-outline-success btn-sm ms-2" onclick="togglePassword()">
                     <i id="eye-icon" class="fa fa-eye"></i>
                   </button>
                 </div>
               </li>
-                <a href="/changePswd/{{ session['user_id'] }}" class="btn btn-success">Change Password</a>
+              <a href="/changePswd/{{ current_user.user_id }}" class="btn btn-success ms-2">Change Password</a>
             </ul>
+
+
+          <div class="pt-3 ms-2">  <!-- Adds top padding and slight right shift -->
+            <h4>Permitted Login Countries </h4>
+            <p>Refers to the list of countries from which you're allowed to access your account.</p>
+            <p>The country you signed up for the account has been automatically checked</p>
+
+            <button class="btn btn-success mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#filter-section" aria-expanded="false" aria-controls="filter-section">
+              Countries
+            </button>
           </div>
-          {% else %}
-          <div class="alert alert-warning mt-5" role="alert">
-            No account information available. Please sign up or log in to access your account.
+
+          <div id="filter-section" class="collapse ms-2">
+          <div class="card p-3">
+            <form method="POST" action="{{ url_for('accountSecurity') }}">
+              <div class="mb-3">
+                <h5>Countries</h5>
+                {% set selected_countries = (user.countries or '').split(',') %}
+                {% set country_names = {'SG': 'Singapore', 'MYS': 'Malaysia', 'JP': 'Japan', 'NL': 'Netherlands', 'US': 'United States'} %}
+                {% for code, name in country_names.items() %}
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="allowed_countries" value="{{ code }}" id="country_{{ code }}"
+                      {% if code in selected_countries %}checked{% endif %}>
+                    <label class="form-check-label" for="country_{{ code }}">{{ name }}</label>
+                  </div>
+                {% endfor %}
+              </div>
+              <button type="submit" class="btn btn-primary w-100">Confirm</button>
+            </form>
           </div>
+
+        </div>
         </div>
       </div>
+    </div>
+
+    {% else %}
+    <!-- If not authenticated -->
+    <div class="alert alert-warning mt-5" role="alert">
+      No account information available. Please sign up or log in to access your account.
     </div>
     {% endif %}
   </div>
 </div>
+
 <script>
   function togglePassword() {
     var passwordField = document.getElementById("password");
@@ -85,9 +132,10 @@
       eyeIcon.classList.add("fa-eye");
     }
   }
+
 </script>
 
-<!-- Add FontAwesome for the eye icon -->
+<!-- Add FontAwesome for eye icon -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
 {% endblock %}

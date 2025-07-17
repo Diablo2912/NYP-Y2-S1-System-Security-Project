@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="container">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<div class="container mt-4">
+  <h2 class="mb-4">Session Activity Monitor</h2>
+
+  <table class="table table-bordered table-hover">
+    <thead class="table-success">
+      <tr>
+        <th>Session ID</th>
+        <th>IP Address</th>
+        <th>User Agent</th>
+        <th>Login Time</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sessions %}
+      <tr>
+        <td>{{ s.id }}</td>
+        <td>{{ s.ip }}</td>
+        <td style="word-break: break-all;">{{ s.agent }}</td>
+        <td>{{ s.time }}</td>
+        <td>
+          {% if s.id == current_id %}
+            <span class="badge bg-success">Current</span>
+          {% elif s.active %}
+            <span class="badge bg-warning text-dark">Active</span>
+          {% else %}
+            <span class="badge bg-secondary">Ended</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

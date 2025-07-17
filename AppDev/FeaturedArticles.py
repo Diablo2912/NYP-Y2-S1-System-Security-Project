@@ -6,7 +6,13 @@ def get_featured_articles():
     newsapi = NewsApiClient(api_key=api_key)
 
     try:
-        response = newsapi.get_top_headlines( language='en', page_size=5)
+        # Fetching agriculture-related news
+        response = newsapi.get_everything(
+            q="agriculture OR farming OR agritech OR sustainable farming",
+            language="en",
+            sort_by="publishedAt",
+            page_size=5  # Get the latest 5 articles
+        )
 
         if response['status'] == 'ok' and response['articles']:
             return response['articles']
