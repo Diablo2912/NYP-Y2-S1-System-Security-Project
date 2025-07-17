@@ -1,11 +1,11 @@
-from flask import Flask,g, Response, render_template, request, redirect, url_for, session, jsonify, flash, make_response
+from flask import Flask, g, Response, render_template, request, redirect, url_for, session, jsonify, flash, \
+    make_response
 from functools import wraps
-from Forms import SignUpForm,CreateAdminForm, CreateProductForm, LoginForm, ChangeDetForm, ChangePswdForm
+from Forms import SignUpForm, CreateAdminForm, CreateProductForm, LoginForm, ChangeDetForm, ChangePswdForm
 import shelve, User
 from FeaturedArticles import get_featured_articles
 from Filter import main_blueprint
 from seasonalUpdateForm import SeasonalUpdateForm
-from datetime import datetime, timedelta
 from flask_mail import Mail, Message
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -23,17 +23,17 @@ import os
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 import requests
-from flask_mysqldb import MySQL
 import bleach
 import MySQLdb.cursors
 from MySQLdb.cursors import DictCursor
+from flask_mysqldb import MySQL
 import base64
 import hashlib
 import secrets
 import pyotp
 import random
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import jwt
 import socket
 import requests
@@ -66,13 +66,6 @@ app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
 mail = Mail(app)
 
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-app.config['MYSQL_DB'] = 'sspCropzy'
-
-mysql = MySQL(app)
-
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///products.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -92,20 +85,40 @@ SMTP_PORT = 587
 EMAIL_SENDER = "sadevdulneth6@gmail.com"
 EMAIL_PASSWORD = "isgw cesr jdbs oytx"
 
+# SETUP UR DB CONFIG ACCORDINGLY
+# DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
-#SQL DB
-# Change this to your secret key (can be anything, it's for extra protection)
+# GLEN SQL DB CONFIG
 app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# Enter your database connection details below
 app.config['MYSQL_HOST'] = '127.0.0.1'
 app.config['MYSQL_USER'] = 'glen'
-# Password below must be changed to match root password specified at server installation
-# Lab computers use the root password `mysql`
 app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
 app.config['MYSQL_DB'] = 'ssp_db'
-#DO NOTE THAT THE MYSQL SERVER INSTANCE IN THE LAB IS RUNNING ON PORT 3306.
-#Please make necessary change to the above MYSQL_PORT config
 app.config['MYSQL_PORT'] = 3306
+
+# BRANDON SQL DB CONFIG
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'glen'
+# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
+#
+# #SACHIN SQL DB CONFIG
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'glen'
+# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
+#
+# #SADEV SQL DB CONFIG
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'glen'
+# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 
 mysql = MySQL(app)
 
@@ -114,8 +127,9 @@ with app.app_context():
 
 ALGORITHM = 'pbkdf2_sha256'
 
-#CFT on SQL#
-#SQL LOGGING
+
+# CFT on SQL#
+# SQL LOGGING
 # Info
 # Warning
 # Error
@@ -129,8 +143,6 @@ def sanitize_input(user_input):
     return bleach.clean(user_input, tags=allowed_tags, attributes=allowed_attributes)
 
 
-#CFT on SQL#
-
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -138,7 +150,9 @@ def login_required(f):
             flash("You must be logged in to access this page.", "warning")
             return redirect(url_for("login"))
         return f(*args, **kwargs)
+
     return decorated_function
+
 
 def jwt_required(f):
     @wraps(f)
@@ -169,11 +183,12 @@ def jwt_required(f):
                 response = make_response(redirect(url_for('login')))
                 response.delete_cookie('jwt_token')
                 return response
-              
+
         g.user = user_data
         return f(*args, **kwargs)
 
     return decorated_function
+
 
 @app.route('/add_sample_products/')
 def add_sample_products():
@@ -194,7 +209,8 @@ def add_sample_products():
 
         # Eco-Friendly Farming Tools
         Product(name="Bamboo Hand Trowel", quantity=30, category="Eco-Friendly Farming Tools", price=8.99, co2=1.0),
-        Product(name="Solar-Powered Irrigation Timer", quantity=20, category="Eco-Friendly Farming Tools", price=34.99, co2=2.2),
+        Product(name="Solar-Powered Irrigation Timer", quantity=20, category="Eco-Friendly Farming Tools", price=34.99,
+                co2=2.2),
 
         # Regenerative Agriculture Products
         Product(name="Cover Crop Mix", quantity=25, category="Regenerative Agriculture", price=14.99, co2=2.8),
@@ -205,9 +221,11 @@ def add_sample_products():
     db.session.commit()
     return "Sample sustainable agricultural products added!"
 
+
 @app.route('/404_NOT_FOUND')
 def notfound():
     return render_template('404.html')
+
 
 @app.route('/')
 def home():
@@ -323,6 +341,7 @@ def buy_product():
                            selected_categories=selected_categories,
                            total_price=total_price)
 
+
 @app.route('/createProduct', methods=['GET', 'POST'])
 @jwt_required
 def create_product():
@@ -337,7 +356,6 @@ def create_product():
     # fetch categories from database
     categories = db.session.query(Product.category).distinct().all()
     category_choices = [(category[0], category[0]) for category in categories]
-
 
     form.category.choices = [('', 'Select Category')] + category_choices
 
@@ -367,6 +385,7 @@ def create_product():
 
     return render_template('/productPage/createProduct.html', form=form)
 
+
 @app.route('/manageProduct')
 @jwt_required
 def manageProduct():
@@ -389,7 +408,8 @@ def manageProduct():
         def generate():
             data = ["Product Name,Quantity,Category,Price,CO2,Description,Image Filename\n"]
             for product in products:
-                data.append(f"{product.name},{product.quantity},{product.category},{product.price},{product.co2},{product.description},{product.image_filename}\n")
+                data.append(
+                    f"{product.name},{product.quantity},{product.category},{product.price},{product.co2},{product.description},{product.image_filename}\n")
             return "".join(data)
 
         response = Response(generate(), mimetype='text/csv')
@@ -398,6 +418,7 @@ def manageProduct():
 
     print(f"✅ Loaded {len(products)} products for management.")  # Debugging message
     return render_template('/productPage/manageProduct.html', products=products)
+
 
 @app.route('/updateProduct/<int:id>/', methods=['GET', 'POST'])
 def update_product(id):
@@ -434,6 +455,7 @@ def update_product(id):
 
     return render_template('/productPage/updateProduct.html', form=form, product=product)
 
+
 @app.route('/deleteProduct/<int:id>', methods=['POST'])
 def delete_product(id):
     product = Product.query.get_or_404(id)
@@ -448,13 +470,13 @@ def delete_product(id):
     db.session.commit()
     return redirect(url_for('manageProduct'))
 
+
 @app.route('/view_products')
 def view_products():
     products = Product.query.all()  # Fetch all products from the database
 
     if not products:
         return "<p style='color: red; font-size: 20px; text-align: center;'>No products found in the database!</p>"
-
 
     product_list = """
     <div style="text-align: center; font-family: Arial;">
@@ -488,6 +510,7 @@ def view_products():
 
     return product_list
 
+
 @app.route('/clearProducts', methods=['POST', 'GET'])
 def clear_products():
     try:
@@ -499,6 +522,7 @@ def clear_products():
         return f"Error: {str(e)}"
 
     return product_list
+
 
 @app.route('/carbonFootprintTracker', methods=['GET', 'POST'])
 def carbonFootprintTracker():
@@ -567,6 +591,7 @@ def carbonFootprintTracker():
                            suggested_alternatives=suggested_alternatives,
                            goal_status=goal_status)
 
+
 @app.route('/deleteSelectedProduct/<int:product_id>', methods=['POST'])
 def deleteSelectedProduct(product_id):
     if 'selected_products' in session:
@@ -575,21 +600,26 @@ def deleteSelectedProduct(product_id):
 
     return redirect(url_for('carbonFootprintTracker'))  # Redirect back
 
+
 @app.route('/educationalGuide')
 def educationalGuide():
-   return render_template('/resourcesPage/educational_guide.html')
+    return render_template('/resourcesPage/educational_guide.html')
+
 
 @app.route('/farmTools')
 def farmTools():
-   return render_template('/resourcesPage/farmTools.html')
+    return render_template('/resourcesPage/farmTools.html')
+
 
 @app.route('/initiatives')
 def initiatives():
-   return render_template('/resourcesPage/initiatives.html')
+    return render_template('/resourcesPage/initiatives.html')
+
 
 @app.route('/aboutUs')
 def aboutUs():
-   return render_template('aboutUs.html')
+    return render_template('aboutUs.html')
+
 
 @app.route('/contactUs', methods=['GET', 'POST'])
 def contactUs():
@@ -616,6 +646,7 @@ def accountInfo():
     user = cursor.fetchone()
     cursor.close()
     return render_template('/accountPage/accountInfo.html', user=user)
+
 
 @app.route('/accountSecurity', methods=['GET', 'POST'])
 @jwt_required
@@ -660,7 +691,7 @@ def accountSecurity():
 @app.route('/accountHist')
 @jwt_required
 def accountHist():
-    user_id = g.user['email']   # Get logged-in user ID
+    user_id = g.user['email']  # Get logged-in user ID
 
     # Get all transactions from session (if not found, return empty list)
     all_transactions = session.get("transactions", [])
@@ -682,6 +713,7 @@ def accountHist():
                              search_query in t["id"].lower() or search_query in t["name"].lower()]
 
     return render_template('/accountPage/accountHist.html', transactions=user_transactions, search_query=search_query)
+
 
 @app.route('/dashboard')
 @jwt_required
@@ -730,6 +762,7 @@ def dashboard():
         search_query=search_query,
         selected_roles=selected_roles
     )
+
 
 @app.route('/updateUserStatus/<int:id>', methods=['POST'])
 @jwt_required
@@ -791,7 +824,6 @@ def createAdmin():
         phone_number = sanitize_input(create_admin_form.number.data)
         email = sanitize_input(create_admin_form.email.data.lower())
 
-
         # Step 4: Hash password and insert user
         hashed_password = hash_password(create_admin_form.pswd.data)
 
@@ -817,50 +849,42 @@ def createAdmin():
 
     return render_template('createAdmin.html', form=create_admin_form)
 
-@app.route('/roleManagement', methods=['GET', 'POST'])
+
+@app.route('/updateLogStatus/<int:id>', methods=['POST'])
 @jwt_required
-def roleManagement():
+def update_log_status(id):
     new_status = request.form.get('status')
     current_user = g.user
 
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cursor.execute("SELECT id, first_name, last_name, email, status FROM accounts")
-    users = cursor.fetchall()
-    user_info = cursor.fetchone()
+    if current_user['status'] != 'admin':
+        flash("Only admins can change log statuses.", "danger")
+        return redirect(url_for('logging'))
 
-    if current_user['status'] not in ['admin']:
-        return render_template('404.html')
-
-
-    # Get search and role filters
-    search_query = request.args.get("search", "").strip().lower()
-    selected_roles = request.args.getlist("roles")  # multi-select
-
-    # Build dynamic query
-    query = "SELECT id, first_name, last_name, email, status FROM accounts WHERE 1=1"
-    params = []
-
-    if search_query:
-        query += " AND (LOWER(first_name) LIKE %s OR LOWER(last_name) LIKE %s OR LOWER(email) LIKE %s)"
-        like_value = f"%{search_query}%"
-        params += [like_value, like_value, like_value]
-
-    if selected_roles:
-        role_placeholders = ','.join(['%s'] * len(selected_roles))
-        query += f" AND status IN ({role_placeholders})"
-        params += selected_roles
-
-    cursor.execute(query, params)
-    users = cursor.fetchall()
+    cursor = mysql.connection.cursor()
+    cursor.execute("UPDATE logs SET status = %s WHERE id = %s", (new_status, id))
+    mysql.connection.commit()
     cursor.close()
 
-    return render_template(
-        'roleManagement.html',
-        user=user_info,
-        users=users,
-        search_query=search_query,
-        selected_roles=selected_roles
-    )
+    flash("Log status updated successfully.", "success")
+    return redirect(url_for('logging'))
+
+
+@app.route('/delete_log/<int:id>', methods=['POST'])
+@jwt_required
+def delete_log(id):
+    current_user = g.user
+
+    if current_user['status'] != 'admin':
+        flash("Only admins can delete logs.", "danger")
+        return redirect(url_for('logging'))
+
+    cursor = mysql.connection.cursor()
+    cursor.execute("DELETE FROM logs WHERE id = %s", (id,))
+    mysql.connection.commit()
+    cursor.close()
+
+    flash("Log deleted successfully.", "success")
+    return redirect(url_for('logging'))
 
 
 @app.route('/logging', methods=['GET'])
@@ -871,43 +895,46 @@ def logging():
         return render_template('404.html')
 
     search_query = request.args.get("search", "").strip().lower()
-    selected_roles = request.args.getlist("roles")  # Get all selected categories (checkbox)
+    selected_roles = request.args.getlist("roles")
+    selected_statuses = request.args.getlist("statuses")  # ✅ added
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-
-    # Get admin info (optional if not used in template)
     cursor.execute("SELECT * FROM accounts WHERE id = %s", (current_user['user_id'],))
     user_info = cursor.fetchone()
 
-    # Build base query
-    query = "SELECT id, date, time, category, activity, ip_address FROM logs WHERE 1=1"
+    query = "SELECT id, date, time, category, activity, status, ip_address FROM logs WHERE 1=1"
     params = []
 
-    # Apply category filter (checkboxes)
     if selected_roles:
         placeholders = ','.join(['%s'] * len(selected_roles))
         query += f" AND category IN ({placeholders})"
         params.extend(selected_roles)
 
-    # Apply search filter (search box, if needed)
+    if selected_statuses:
+        placeholders = ','.join(['%s'] * len(selected_statuses))
+        query += f" AND status IN ({placeholders})"
+        params.extend(selected_statuses)
+
     if search_query:
         query += " AND (LOWER(category) LIKE %s OR LOWER(activity) LIKE %s OR ip_address LIKE %s)"
         like_term = f"%{search_query}%"
         params.extend([like_term, like_term, like_term])
 
-    # Execute and return logs
     cursor.execute(query, params)
     logs = cursor.fetchall()
     cursor.close()
+
+    current_date = date.today().isoformat()
 
     return render_template(
         'logging.html',
         user=user_info,
         users=logs,
         selected_roles=selected_roles,
+        selected_statuses=selected_statuses,
+        current_date=current_date,
         search_query=search_query
     )
-
 
 
 @app.route('/logging_analytics', methods=['GET'])
@@ -917,38 +944,59 @@ def logging_analytics():
     if current_user['status'] != 'admin':
         return render_template('404.html')
 
-    # Get number of days from query string, default to 10
-    num_days = int(request.args.get('days', 10))
+    today_str = datetime.today().strftime("%Y-%m-%d")
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    num_days = request.args.get('days')
 
-    # Fetch logs from the last `num_days` days
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cursor.execute("""
-        SELECT DATE(date) AS date, category, COUNT(*) AS count
-        FROM logs
-        WHERE DATE(date) >= CURDATE() - INTERVAL %s DAY
-        GROUP BY DATE(date), category
-        ORDER BY date
-    """, (num_days - 1,))  # -1 to include today
+
+    if start_date and end_date:
+        # Custom date range logic
+        cursor.execute("""
+            SELECT DATE(date) AS date, category, COUNT(*) AS count
+            FROM logs
+            WHERE DATE(date) BETWEEN %s AND %s
+            GROUP BY DATE(date), category
+            ORDER BY date
+        """, (start_date, end_date))
+
+        date_range = pd.date_range(start=start_date, end=end_date)
+        dates_iso = [d.date().isoformat() for d in date_range]
+        dates_display = [d.strftime('%d - %m - %Y') for d in date_range]
+        display_start_date = start_date  # For display in template
+        num_days = len(date_range)
+
+    else:
+        # Default to last N days
+        num_days = int(num_days or 10)
+        cursor.execute("""
+            SELECT DATE(date) AS date, category, COUNT(*) AS count
+            FROM logs
+            WHERE DATE(date) >= CURDATE() - INTERVAL %s DAY
+            GROUP BY DATE(date), category
+            ORDER BY date
+        """, (num_days - 1,))
+
+        today = datetime.today().date()
+        dates_iso = [(today - timedelta(days=i)).isoformat() for i in range(num_days - 1, -1, -1)]
+        dates_display = [(today - timedelta(days=i)).strftime('%d - %m - %Y') for i in range(num_days - 1, -1, -1)]
+        display_start_date = (datetime.now() - timedelta(days=num_days)).strftime("%d/%m/%Y")
+
     log_data = cursor.fetchall()
     cursor.close()
 
-    # Prepare date ranges
-    today = datetime.today().date()
-    dates_iso = [(today - timedelta(days=i)).isoformat() for i in range(num_days - 1, -1, -1)]
-    dates_display = [(today - timedelta(days=i)).strftime('%d - %m - %Y') for i in range(num_days - 1, -1, -1)]
     categories = ['Info', 'Warning', 'Error', 'Critical']
-
-    # Initialize chart structures
     chart_data = {date: {cat: 0 for cat in categories} for date in dates_iso}
     category_summary = {cat: 0 for cat in categories}
 
     for row in log_data:
         db_date = str(row['date'])
-        category = row['category']
+        cat = row['category']
         count = row['count']
-        if db_date in chart_data and category in chart_data[db_date]:
-            chart_data[db_date][category] = count
-            category_summary[category] += count
+        if db_date in chart_data and cat in chart_data[db_date]:
+            chart_data[db_date][cat] = count
+            category_summary[cat] += count
 
     current_time = datetime.now().strftime("%d-%m-%Y , %I:%M %p")
 
@@ -959,11 +1007,15 @@ def logging_analytics():
         dates_display=dates_display,
         categories=categories,
         current_time=current_time,
+        today_str=today_str,
+        start_date=display_start_date,
         category_summary=category_summary,
         num_days=num_days
     )
 
+
 ALGORITHM = "pbkdf2_sha256"
+
 
 def hash_password(password, salt=None, iterations=260000):
     if salt is None:
@@ -976,6 +1028,7 @@ def hash_password(password, salt=None, iterations=260000):
     b64_hash = base64.b64encode(pw_hash).decode("ascii").strip()
     return "{}${}${}${}".format(ALGORITHM, iterations, salt, b64_hash)
 
+
 def verify_password(password, password_hash):
     if (password_hash or "").count("$") != 3:
         return False
@@ -984,6 +1037,7 @@ def verify_password(password, password_hash):
     assert algorithm == ALGORITHM
     compare_hash = hash_password(password, salt, iterations)
     return secrets.compare_digest(password_hash, compare_hash)
+
 
 def admin_log_activity(mysql, activity, category="Info"):
     """
@@ -1018,6 +1072,7 @@ def admin_log_activity(mysql, activity, category="Info"):
     if category.lower() == "critical":
         notify_all_admins(mysql, activity)
 
+
 def notify_all_admins(mysql, message):
     """
     Sends an email notification to all admin users about a critical log event.
@@ -1046,69 +1101,6 @@ def notify_all_admins(mysql, message):
     except Exception as e:
         print(f"Failed to send admin alerts: {e}")
 
-@app.route('/signUp', methods=['GET', 'POST'])
-def sign_up():
-    sign_up_form = SignUpForm(request.form)
-    if request.method == 'POST' and sign_up_form.validate():
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-
-        # Check if email or phone number already exists
-        cursor.execute("SELECT * FROM accounts WHERE email = %s OR phone_number = %s",
-                       (sign_up_form.email.data, sign_up_form.number.data))
-        existing_user = cursor.fetchone()
-
-        first_name = sanitize_input(sign_up_form.first_name.data)
-        last_name = sanitize_input(sign_up_form.last_name.data)
-        gender = sanitize_input(sign_up_form.gender.data)
-        phone_number = sanitize_input(sign_up_form.number.data)
-        email = sanitize_input(sign_up_form.email.data.lower())
-
-        if existing_user:
-            if existing_user['email'] == sign_up_form.email.data:
-                flash('Email is already registered. Please use a different email.', 'danger')
-            elif existing_user['phone_number'] == sign_up_form.number.data:
-                flash('Phone number is already registered. Please use a different number.', 'danger')
-            cursor.close()
-            return redirect(url_for('sign_up'))
-
-        # Determine status based on email domain
-        email = sign_up_form.email.data
-        status = 'admin' if email.endswith('@cropzy.com') else 'user'
-
-        # Hash the password
-        hashed_password = hash_password(sign_up_form.pswd.data)
-
-        # Hardcoded IP (Singapore - SG) for testing purposes
-        ip_address = '183.90.84.148'
-
-        # Get user IP address (with proxy support)
-        # ip_address = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
-
-        # Get country code using IP
-        user_country = get_user_country(ip_address)
-
-        #  Insert user with country into DB
-        cursor.execute('''
-            INSERT INTO accounts (first_name, last_name, gender, phone_number, email, password, status, two_factor_status, countries) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ''', (
-            first_name,
-            last_name,
-            gender,
-            phone_number,
-            email,
-            hashed_password,
-            status,
-            'disabled'
-        ))
-
-        mysql.connection.commit()
-        cursor.close()
-
-        flash('Admin account created successfully.', 'success')
-        return redirect(url_for('createAdmin'))
-
-    return render_template('createAdmin.html', form=create_admin_form)
 
 @app.route('/roleManagement', methods=['GET', 'POST'])
 @jwt_required
@@ -1123,7 +1115,6 @@ def roleManagement():
 
     if current_user['status'] not in ['admin', 'staff']:
         return render_template('404.html')
-
 
     # Get search and role filters
     search_query = request.args.get("search", "").strip().lower()
@@ -1156,105 +1147,8 @@ def roleManagement():
     )
 
 
-@app.route('/logging', methods=['GET'])
-@jwt_required
-def logging():
-    current_user = g.user
-    if current_user['status'] != 'admin' or 'staff':
-        return render_template('404glen.html')
-
-    search_query = request.args.get("search", "").strip().lower()
-    selected_roles = request.args.getlist("roles")  # Get all selected categories (checkbox)
-
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-
-    # Get admin info (optional if not used in template)
-    cursor.execute("SELECT * FROM accounts WHERE id = %s", (current_user['user_id'],))
-    user_info = cursor.fetchone()
-
-    # Build base query
-    query = "SELECT id, date, time, category, activity, ip_address FROM logs WHERE 1=1"
-    params = []
-
-    # Apply category filter (checkboxes)
-    if selected_roles:
-        placeholders = ','.join(['%s'] * len(selected_roles))
-        query += f" AND category IN ({placeholders})"
-        params.extend(selected_roles)
-
-    # Apply search filter (search box, if needed)
-    if search_query:
-        query += " AND (LOWER(category) LIKE %s OR LOWER(activity) LIKE %s OR ip_address LIKE %s)"
-        like_term = f"%{search_query}%"
-        params.extend([like_term, like_term, like_term])
-
-    # Execute and return logs
-    cursor.execute(query, params)
-    logs = cursor.fetchall()
-    cursor.close()
-
-    return render_template(
-        'logging.html',
-        user=user_info,
-        users=logs,
-        selected_roles=selected_roles,
-        search_query=search_query
-    )
-
-
-
-@app.route('/logging_analytics', methods=['GET'])
-@jwt_required
-def logging_analytics():
-    current_user = g.user
-    if current_user['status'] != 'admin':
-        return render_template('404.html')
-
-    # Fetch logs from the last 10 days
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cursor.execute("""
-        SELECT DATE(date) AS date, category, COUNT(*) AS count
-        FROM logs
-        WHERE DATE(date) >= CURDATE() - INTERVAL 9 DAY
-        GROUP BY DATE(date), category
-        ORDER BY date
-    """)
-    log_data = cursor.fetchall()
-    cursor.close()
-
-    # Prepare the past 10 days' dates
-    today = datetime.today().date()
-    dates_iso = [(today - timedelta(days=i)).isoformat() for i in range(9, -1, -1)]
-    dates_display = [(today - timedelta(days=i)).strftime('%d - %m - %Y') for i in range(9, -1, -1)]
-    categories = ['Info', 'Warning', 'Error', 'Critical']
-
-    # Initialize chart structure
-    chart_data = {date: {cat: 0 for cat in categories} for date in dates_iso}
-    category_summary = {cat: 0 for cat in categories}
-
-    # Populate chart data from DB results
-    for row in log_data:
-        db_date = str(row['date'])  # 'YYYY-MM-DD'
-        category = row['category']
-        count = row['count']
-
-        if db_date in chart_data and category in chart_data[db_date]:
-            chart_data[db_date][category] = count
-            category_summary[category] += count
-
-    current_time = datetime.now().strftime("%d-%m-%Y , %I:%M %p")
-
-    return render_template(
-        'logging_analytics.html',
-        chart_data=chart_data,
-        dates_iso=dates_iso,
-        dates_display=dates_display,
-        categories=categories,
-        current_time=current_time,
-        category_summary=category_summary
-    )
-
 ALGORITHM = "pbkdf2_sha256"
+
 
 def hash_password(password, salt=None, iterations=260000):
     if salt is None:
@@ -1266,6 +1160,7 @@ def hash_password(password, salt=None, iterations=260000):
     )
     b64_hash = base64.b64encode(pw_hash).decode("ascii").strip()
     return "{}${}${}${}".format(ALGORITHM, iterations, salt, b64_hash)
+
 
 def verify_password(password, password_hash):
     if (password_hash or "").count("$") != 3:
@@ -1310,6 +1205,14 @@ def sign_up():
         # Hash the password before storing
         hashed_password = hash_password(sign_up_form.pswd.data)
 
+        # Get user IP (use real IP for deployment)
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+        # If testing locally, uncomment this line:
+        # ip_address = requests.get("https://api.ipify.org").text
+
+        # Get country code from IP
+        user_country = get_user_country(ip_address)
+
         # Insert new user with hashed password
         cursor.execute('''
             INSERT INTO accounts (first_name, last_name, gender, phone_number, email, password, status, two_factor_status) 
@@ -1317,7 +1220,7 @@ def sign_up():
         ''', (
             first_name,
             last_name,
-            gender
+            gender,
             '+65' + str(phone_number),
             email,
             hashed_password,
@@ -1336,13 +1239,16 @@ def sign_up():
         return redirect(url_for('complete_signUp'))
     return render_template('/accountPage/signUp.html', form=sign_up_form)
 
+
 SECRET_KEY = 'asdsa8f7as8d67a8du289p1eu89hsad7y2189eha8'  # You can change this to a more secure value
+
 
 @app.context_processor
 def inject_user():
     token = request.cookies.get('jwt_token')
     user = verify_jwt_token(token) if token else None
     return dict(current_user=user)
+
 
 def get_user_country(ip_address):
     try:
@@ -1356,7 +1262,16 @@ def get_user_country(ip_address):
         return "Unknown"
 
 
+def get_public_ip():
+    try:
+        return requests.get("https://api.ipify.org").text
+    except Exception as e:
+        print("IP fetch error:", e)
+        return "127.0.0.1"
+
+
 SECRET_KEY = 'asdsa8f7as8d67a8du289p1eu89hsad7y2189eha8'  # You can change this to a more secure value
+
 
 @app.context_processor
 def inject_user():
@@ -1417,12 +1332,7 @@ def login():
                         'session_id': session_id,
                         'exp': datetime.utcnow() + timedelta(hours=1)
                     }
-          
-                    # ✅ Log login session
-                    log_session_activity(user['id'], 'login')
 
-                    flash('Login successful!', 'success')
-                    return response
                     token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
                     response = make_response(redirect(url_for('home')))
                     response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
@@ -1449,6 +1359,7 @@ def verify_jwt_token(token):
 
 otp_store = {}
 
+
 def send_otp_email(email, user_id, first_name, last_name):
     """
     Generate a 6-digit OTP, store it with an expiration time,
@@ -1474,9 +1385,9 @@ def send_otp_email(email, user_id, first_name, last_name):
                f"If you did not attempt to sign in to your account, your password may be compromised.\n\nVisit http://127.0.0.1:5000/accountSecurity to create a new, strong password for your Cropzy account.\n\n"
                f"Thanks,\nCropzy Support Team")
 
-
     # Call existing email sending function
     send_email(email, subject, message)
+
 
 # Twilio credentials (use environment variables in production!)
 account_sid = 'AC69fe3693aeb2b86b276600293ab078d5'
@@ -1486,7 +1397,8 @@ twilio_phone = '+13072882468'
 # Twilio client setup
 client = Client(account_sid, auth_token)
 
-def send_otp_sms(phone_number,user_id, first_name, last_name):
+
+def send_otp_sms(phone_number, user_id, first_name, last_name):
     otp = f"{random.randint(0, 999999):06d}"
     expires = time.time() + 60  # OTP valid for 60 seconds
 
@@ -1499,64 +1411,10 @@ def send_otp_sms(phone_number,user_id, first_name, last_name):
             body=f'\n Use verification code {otp} for Cropzy authentication.',
             to=phone_number
         )
-        print(f" SMS sent: {message.sid}") #Debugger msg
+        print(f" SMS sent: {message.sid}")  # Debugger msg
     except Exception as e:
-        print(f" Failed to send SMS: {e}") #Debugger msg
+        print(f" Failed to send SMS: {e}")  # Debugger msg
 
-@app.route('/verify-otp/<int:id>', methods=['GET', 'POST'])
-def verify_otp(id):
-    if 'pending_2fa_user_id' not in session or session['pending_2fa_user_id'] != id:
-        flash("Unauthorized access.", "error")
-        return redirect(url_for('login'))
-
-    if request.method == 'POST':
-        entered_otp = request.form.get('otp')
-        record = otp_store.get(id)
-
-        if not record:
-            flash("No OTP found. Please login again.", "error")
-            return redirect(url_for('login'))
-
-        if time.time() > record['expires']:
-            flash("OTP expired. Please login again.", "error")
-            otp_store.pop(id, None)
-            session.pop('pending_2fa_user_id', None)
-            return redirect(url_for('login'))
-
-        if entered_otp == record['otp']:
-            # Fetch the user BEFORE using it
-            cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-            cursor.execute('SELECT * FROM accounts WHERE id = %s', (id,))
-            user = cursor.fetchone()
-            cursor.close()
-
-            if not user:
-                flash("User not found. Please login again.", "error")
-                return redirect(url_for('login'))
-            otp_store.pop(id, None)
-            session.pop('pending_2fa_user_id', None)
-
-            payload = {
-                'user_id': user['id'],
-                'first_name': user['first_name'],
-                'last_name': user['last_name'],
-                'email': user['email'],
-                'gender': user['gender'],
-                'phone': user['phone_number'],
-                'status': user['status'],
-                'session_id': session_id,
-                'exp': datetime.utcnow() + timedelta(hours=1)
-            }
-            token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
-            response = make_response(redirect(url_for('home')))
-            response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
-
-            flash("Login successful!", "success")
-            return response
-        else:
-            flash("Invalid OTP. Please try again.", "error")
-
-    return render_template('/accountPage/two_factor.html', id=id)
 
 @app.route('/sms-verify-otp/<int:id>', methods=['GET', 'POST'])
 def sms_verify_otp(id):
@@ -1607,6 +1465,8 @@ def sms_verify_otp(id):
             otp_store.pop(id, None)
             session.pop('pending_2fa_user_id', None)
 
+            session_id = log_session_activity(user['id'], 'login')
+
             payload = {
                 'user_id': user['id'],
                 'first_name': user['first_name'],
@@ -1650,40 +1510,6 @@ def generate_recovery_code(id):
 
     return code
 
-@app.route('/recovery_auth/<int:id>', methods=['GET', 'POST'])
-def recovery_auth(id):
-    if request.method == 'POST':
-        input_code = request.form.get('recovery_code')
-
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # Get recovery code from database for the user
-        cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
-        result = cursor.fetchone()
-
-        if result:
-            stored_code = result['recovery_code']
-
-            if input_code == stored_code:
-                generate_recovery_code(id)
-
-                payload = {
-                    'user_id': result['id'],
-                    'first_name': result['first_name'],
-                    'last_name': result['last_name'],
-                    'email': result['email'],
-                    'gender': result['gender'],
-                    'phone': result['phone_number'],
-                    'status': result['status'],
-                    'session_id': session_id,
-                    'exp': datetime.utcnow() + timedelta(hours=1)
-                }
-                token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
-                response = make_response(redirect(url_for('home')))
-                response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
-
-                flash('Recovery successful. You are now logged in.', 'success')
-                return response
-    return render_template('/accountPage/recovery_code.html',id=id)
 
 @app.route('/setup_face_id/<int:id>', methods=['GET', 'POST'])
 def setup_face_id(id):
@@ -1707,6 +1533,7 @@ def setup_face_id(id):
         return redirect(url_for('accountInfo'))
 
     return render_template("accountPage/setup_face_id.html", id=id)
+
 
 @app.route('/face_id/<int:id>', methods=['GET', 'POST'])
 def face_id(id):
@@ -1757,6 +1584,8 @@ def face_id(id):
                     flash("User not found. Please try again.", "danger")
                     return redirect(url_for('login'))
 
+                session_id = log_session_activity(user['id'], 'login')
+
                 payload = {
                     'user_id': user['id'],
                     'first_name': user['first_name'],
@@ -1797,6 +1626,7 @@ def more_auth(id):
 
     return render_template('/accountPage/more_auth.html', id=id)
 
+
 @app.route('/2FA/<int:id>', methods=['POST'])
 def enable_two_factor(id):
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -1823,6 +1653,7 @@ def enable_two_factor(id):
     cursor.close()
     return redirect(url_for('accountInfo'))
 
+
 @app.route('/disable2FA/<int:id>/', methods=['POST'])
 def disable_two_factor(id):
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -1837,13 +1668,13 @@ def disable_two_factor(id):
     if user['two_factor_status'] == 'disabled':
         flash("2FA is already disabled for this account.", "info")
     else:
-        cursor.execute("UPDATE accounts SET two_factor_status = %s, recovery_code = NULL WHERE id = %s", ('disabled', id))
+        cursor.execute("UPDATE accounts SET two_factor_status = %s, recovery_code = NULL WHERE id = %s",
+                       ('disabled', id))
         mysql.connection.commit()
         flash("2FA has been disabled for this account.", "success")
 
     cursor.close()
     return redirect(url_for('accountInfo'))
-
 
 
 def log_session_activity(user_id, action):
@@ -1892,31 +1723,29 @@ def log_session_activity(user_id, action):
         return None
 
 
-
 def log_user_action(user_id, session_id, action):
     if not user_id or not session_id:
         print("[WARN] Missing user_id or session_id, skipping action log")
         return
-
     try:
+        timestamp = datetime.utcnow()
         cursor = mysql.connection.cursor()
         cursor.execute('''
-            INSERT INTO user_actions_log (user_id, session_id, action)
-            VALUES (%s, %s, %s)
-        ''', (user_id, session_id, action))
+            INSERT INTO user_actions_log (user_id, session_id, action, timestamp)
+            VALUES (%s, %s, %s, %s)
+        ''', (user_id, session_id, action, timestamp))
         mysql.connection.commit()
         cursor.close()
-        print(f"[DEBUG] Action logged: {action}")
+        print(f"[DEBUG] Action logged: {action} at {timestamp}")
     except Exception as e:
         print("[ERROR] Action log failed:", e)
-
-
 
 
 @app.route('/test-log')
 def test_log():
     log_session_activity(3, 'login')
     return 'Test log done'
+
 
 @app.route('/activity_history')
 @jwt_required
@@ -2000,10 +1829,6 @@ def check_session_validity():
     return jsonify({"valid": True})
 
 
-
-
-
-
 # A helper function to verify JWT token
 def verify_jwt_token(token):
     try:
@@ -2015,8 +1840,8 @@ def verify_jwt_token(token):
         return None  # Invalid token
 
 
-
 otp_store = {}
+
 
 def send_otp_email(email, user_id, first_name, last_name):
     """
@@ -2043,9 +1868,9 @@ def send_otp_email(email, user_id, first_name, last_name):
                f"If you did not attempt to sign in to your account, your password may be compromised.\n\nVisit http://127.0.0.1:5000/accountSecurity to create a new, strong password for your Cropzy account.\n\n"
                f"Thanks,\nCropzy Support Team")
 
-
     # Call your existing email sending function
     send_email(email, subject, message)
+
 
 # def send_otp_sms():
 
@@ -2111,27 +1936,6 @@ def verify_otp(id):
     return render_template('/accountPage/two_factor.html', id=id)
 
 
-
-def generate_recovery_code(id):
-    code = f"{random.randint(0, 999999):06d}"  # Generate 6-digit code
-
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-
-    # Check if user exists
-    cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
-    user = cursor.fetchone()
-
-    if not user:
-        cursor.close()
-        return False  # User not found
-
-    # Update recovery code
-    cursor.execute("UPDATE accounts SET recovery_code = %s WHERE id = %s", (code, id))
-    mysql.connection.commit()
-    cursor.close()
-
-    return code
-
 @app.route('/recovery_auth/<int:id>', methods=['GET', 'POST'])
 def recovery_auth(id):
     if request.method == 'POST':
@@ -2175,72 +1979,6 @@ def recovery_auth(id):
 
     return render_template('/accountPage/recovery_code.html', id=id)
 
-@app.route('/setup_face_id/<int:id>', methods=['GET', 'POST'])
-def setup_face_id(id):
-
-    return render_template("/accountPage/setup_face_id.html", id=id)
-
-@app.route('/face_id/<int:id>', methods=['GET', 'POST'])
-def face_id(id):
-
-    return render_template('/accountPage/face_id.html', id=id)
-
-@app.route('/more_auth/<int:id>', methods=['GET'])
-def more_auth(id):
-    # Ensure session still holds the pending 2FA user
-    if 'pending_2fa_user_id' not in session or session['pending_2fa_user_id'] != id:
-        flash("Unauthorized access.", "danger")
-        return redirect(url_for('login'))
-
-    return render_template('/accountPage/more_auth.html', id=id)
-
-@app.route('/2FA/<int:id>', methods=['POST'])
-def enable_two_factor(id):
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-
-    # Check if the user exists
-    cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
-    user = cursor.fetchone()
-
-    if not user:
-        flash("User not found", "danger")
-        return redirect(url_for('accountInfo'))
-
-    # If already enabled, don't update again
-    if user['two_factor_status'] == 'enabled':
-        flash("2FA is already enabled for this account.", "info")
-    else:
-        # Enable 2FA
-        cursor.execute("UPDATE accounts SET two_factor_status = %s WHERE id = %s", ('enabled', id))
-        mysql.connection.commit()
-        flash('You have successfully enabled 2FA for this account', 'success')
-
-    generate_recovery_code(id)
-
-    cursor.close()
-    return redirect(url_for('accountInfo'))
-
-@app.route('/disable2FA/<int:id>/', methods=['POST'])
-def disable_two_factor(id):
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-
-    cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
-    user = cursor.fetchone()
-
-    if not user:
-        flash("User not found", "danger")
-        return redirect(url_for('accountInfo'))
-
-    if user['two_factor_status'] == 'disabled':
-        flash("2FA is already disabled for this account.", "info")
-    else:
-        cursor.execute("UPDATE accounts SET two_factor_status = %s WHERE id = %s", ('disabled', id))
-        mysql.connection.commit()
-        flash("2FA has been disabled for this account.", "success")
-
-    cursor.close()
-    return redirect(url_for('accountInfo'))
-
 
 @app.route('/logout')
 def logout():
@@ -2274,7 +2012,8 @@ def logout():
 
 @app.route('/complete_signUp')
 def complete_signUp():
-   return render_template('/accountPage/complete_signUp.html')
+    return render_template('/accountPage/complete_signUp.html')
+
 
 @app.route('/changeDets/<int:id>/', methods=['GET', 'POST'])
 def change_dets(id):
@@ -2342,6 +2081,7 @@ def change_dets(id):
     cursor.close()
     return render_template('/accountPage/changeDets.html', form=change_dets_form)
 
+
 @app.route('/changePswd/<int:id>/', methods=['GET', 'POST'])
 @jwt_required
 def change_pswd(id):
@@ -2379,12 +2119,10 @@ def change_pswd(id):
             return redirect(url_for('change_pswd', id=id))
 
         # Update new password in the DB (still plaintext)
-        
-        
-        
+
         mysql.connection.commit()
         cursor.close()
-        
+
         # ✅ Log user action
         log_user_action(user_id, session.get('current_session_id'), "Changed password")
 
@@ -2431,6 +2169,7 @@ def delete_user(id):
     cursor.close()
     flash("You are not authorized to delete this account.", "danger")
     return redirect(url_for('accountInfo'))
+
 
 @app.route("/create_update", methods=['GET', 'POST'])
 def create_update():
@@ -2489,7 +2228,6 @@ def create_update():
     return render_template('/home/update.html', title='Update', form=form, site_key=site_key)
 
 
-
 def send_update_confirmation_email(email, user_id, update_data):
     token_data = {
         'user_id': user_id,
@@ -2546,9 +2284,6 @@ def send_update_confirmation_email(email, user_id, update_data):
         print(f"[ERROR] Failed to send email: {e}")
 
 
-
-
-
 @app.route('/confirm_update/<token>')
 def confirm_update(token):
     try:
@@ -2579,7 +2314,8 @@ def confirm_update(token):
                 updates.append(update_data)
                 db['updates'] = updates
 
-            log_user_action(user['id'], session.get('current_session_id'), f"Confirmed and created seasonal update: {update_data['title']}")
+            log_user_action(user['id'], session.get('current_session_id'),
+                            f"Confirmed and created seasonal update: {update_data['title']}")
             flash("Seasonal update created successfully!", "success")
         else:
             flash("User not found. Cannot restore session.", "danger")
@@ -2606,6 +2342,7 @@ def reject_update(token):
         flash(f"Error processing rejection: {e}", "danger")
     return redirect(url_for('home'))
 
+
 @app.route('/delete_update/<int:index>', methods=['POST'])
 def delete_update(index):
     try:
@@ -2615,8 +2352,8 @@ def delete_update(index):
                 removed_update = updates.pop(index)
                 db['updates'] = updates  # Save the updated list
                 if 'user_id' in session:
-                    log_user_action(session['user_id'], session.get('current_session_id'), f'Deleted seasonal update: {removed_update["title"]}')
-
+                    log_user_action(session['user_id'], session.get('current_session_id'),
+                                    f'Deleted seasonal update: {removed_update["title"]}')
 
                 flash(f'Update "{removed_update["title"]}" deleted successfully!', 'success')
             else:
@@ -2625,6 +2362,7 @@ def delete_update(index):
         flash(f"An error occurred: {e}", 'danger')
 
     return redirect(url_for('home'))
+
 
 @app.route('/edit_update/<int:index>', methods=['GET', 'POST'])
 def edit_update(index):
@@ -2649,8 +2387,8 @@ def edit_update(index):
             db['updates'] = updates  # Save the updated list back to the database
 
             if 'user_id' in session:
-                log_user_action(session['user_id'], session.get('current_session_id'), f'Edited seasonal update: {form.update.data}')
-
+                log_user_action(session['user_id'], session.get('current_session_id'),
+                                f'Edited seasonal update: {form.update.data}')
 
         flash(f'Update "{form.update.data}" updated successfully!', 'success')
         return redirect(url_for('home'))
@@ -2663,6 +2401,7 @@ def edit_update(index):
 
     return render_template('/home/update.html', title='Edit Update', form=form)
 
+
 @app.route('/request_delete/<int:index>', methods=['GET'])
 def request_delete(index):
     with shelve.open('seasonal_updates.db') as db:
@@ -2673,6 +2412,7 @@ def request_delete(index):
         else:
             flash('Invalid update index.', 'danger')
             return redirect(url_for('home'))
+
 
 @app.route('/update_cart', methods=['POST'])
 def update_cart():
@@ -2692,6 +2432,7 @@ def update_cart():
     session.modified = True  # save changes
     return redirect(url_for('buy_product'))
 
+
 @app.route('/add_to_cart/<int:product_id>', methods=['POST'])
 def add_to_cart(product_id):
     cart = session.get("cart", {})
@@ -2707,7 +2448,8 @@ def add_to_cart(product_id):
         cart[str(product_id)] = {
             "name": product.name,
             "price": float(product.price),
-            "image": url_for('static', filename='uploads/' + (product.image_filename or 'default.jpg')),  # ✅ Include Image
+            "image": url_for('static', filename='uploads/' + (product.image_filename or 'default.jpg')),
+            # ✅ Include Image
             "quantity": 1
         }
 
@@ -2718,12 +2460,14 @@ def add_to_cart(product_id):
     flash(f"✅ {product.name} added to cart!", "success")
     return redirect(url_for('buy_product'))
 
+
 @app.route('/clear_cart', methods=['POST'])
 def clear_cart():
     session["cart"] = {}
     session.modified = True
     flash("🛒 Cart cleared!", "info")
     return redirect(url_for('buy_product'))
+
 
 @app.route('/create-checkout-session', methods=['POST'])
 def create_checkout_session():
@@ -2768,6 +2512,7 @@ def create_checkout_session():
     except Exception as e:
         return f"Error: {str(e)}", 500
 
+
 @app.route('/checkout', methods=['GET'])
 @login_required
 def checkout():
@@ -2775,6 +2520,7 @@ def checkout():
     total_price = sum(item["price"] * item["quantity"] for item in cart.values())  # Calculate total price
 
     return render_template('/checkout/checkout.html', cart=cart, total_price=total_price)
+
 
 def send_email(to_email, subject, message):
     """Send an email using SMTP."""
@@ -2794,6 +2540,7 @@ def send_email(to_email, subject, message):
 
     except Exception as e:
         print(f"❌ Email failed to send: {e}")
+
 
 @app.route('/thank_you')
 def thank_you():
@@ -2856,6 +2603,7 @@ def thank_you():
     except Exception as e:
         return f"Error retrieving session: {str(e)}", 500
 
+
 @app.route('/transactions', methods=['GET'])
 def transactions():
     transactions = session.get("transactions", [])  # Get transaction history from session
@@ -2867,12 +2615,14 @@ def transactions():
 
     return render_template('checkout/transaction.html', transactions=transactions, search_query=search_query)
 
+
 @app.route('/cart', methods=['GET', 'POST'])
 def cart():
     cart = session.get("cart", {})  # Retrieve cart from session
     total_price = sum(item["price"] * item["quantity"] for item in cart.values())  # Calculate total price
 
     return render_template('/checkout/cart.html', cart=cart, total_price=total_price)
+
 
 @app.route('/chat', methods=['POST'])
 def chat():
