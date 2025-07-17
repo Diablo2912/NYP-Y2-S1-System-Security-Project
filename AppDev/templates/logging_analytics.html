@@ -91,12 +91,13 @@
         </div>
       </div>
 
-        <h4>Total Logs: </h4>
+        <h4>Application Incident Management: </h4>
 
         <!-- Log Summary Cards -->
-        <div class="row justify-content-center g-3">
+        <!-- Log Summary Cards (5 in a row) -->
+        <div class="five-card-row mt-3">
           {% for category in ['Info', 'Warning', 'Error', 'Critical'] %}
-          <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+          <div class="card-wrapper">
             <div class="card text-white
               {% if category == 'Info' %}
                 bg-success
@@ -114,6 +115,16 @@
             </div>
           </div>
           {% endfor %}
+
+          <!-- 5th Card: Total Logs -->
+          <div class="card-wrapper">
+            <div class="card bg-primary text-white">
+              <div class="card-body py-2 px-2 text-center">
+                <h6 class="card-title mb-1">Resolved</h6>
+                <p class="card-text fs-6 mb-0">{{ total_logs }}</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Logs Explanation -->
@@ -156,7 +167,18 @@
 <style>
   .bg-orange {
   background-color: #fd7e14 !important; /* Bootstrap's orange-500 */
-}
+  }
+    .five-card-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+  }
+  .five-card-row .card-wrapper {
+    flex: 1 1 18%; /* ~5 in a row */
+    min-width: 180px;
+    max-width: 240px;
+  }
 </style>
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
