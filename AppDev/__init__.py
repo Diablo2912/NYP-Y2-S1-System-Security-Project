@@ -981,7 +981,8 @@ def logging_analytics():
         today = datetime.today().date()
         dates_iso = [(today - timedelta(days=i)).isoformat() for i in range(num_days - 1, -1, -1)]
         dates_display = [(today - timedelta(days=i)).strftime('%d - %m - %Y') for i in range(num_days - 1, -1, -1)]
-        display_start_date = (datetime.now() - timedelta(days=num_days)).strftime("%d/%m/%Y")
+        start_date_obj = datetime.now().date() - timedelta(days=num_days - 1)
+        display_start_date = start_date_obj.strftime("%d/%m/%Y")
 
     log_data = cursor.fetchall()
     cursor.close()
@@ -999,6 +1000,7 @@ def logging_analytics():
             category_summary[cat] += count
 
     current_time = datetime.now().strftime("%d-%m-%Y , %I:%M %p")
+    current_day = datetime.now().strftime("%d-%m-%Y")
 
     return render_template(
         'logging_analytics.html',
@@ -1007,6 +1009,7 @@ def logging_analytics():
         dates_display=dates_display,
         categories=categories,
         current_time=current_time,
+        current_day=current_day,
         today_str=today_str,
         start_date=display_start_date,
         category_summary=category_summary,
