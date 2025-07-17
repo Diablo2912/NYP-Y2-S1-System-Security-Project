@@ -133,6 +133,7 @@
             <table class="table table-bordered table-hover text-center align-middle">
               <thead class="table-success">
                 <tr>
+                  <th>User ID</th>
                   <th>
                     <a href="{{ url_for('logging', sort_by='date', sort_order='asc' if sort_order == 'desc' and sort_by == 'date' else 'desc', search=search_query, roles=selected_roles, statuses=selected_statuses) }}" class="text-decoration-none text-dark">
                       Date
@@ -161,7 +162,7 @@ Critical: Denotes severe issues that threaten system stability or security and n
                     <i class="fa-solid {% if sort_by == 'category' %}{% if sort_order == 'asc' %}fa-angle-up{% else %}fa-angle-down{% endif %}{% else %}fa-angle-up text-muted{% endif %} ms-1"></i>
                   </a>
                   </th>
-                  <th style="width: 30%;">Activity <i class="fa-solid fa-circle-info" title="Describes the event or action recorded by the system"></i>
+                  <th style="width: 25%;">Activity <i class="fa-solid fa-circle-info" title="Describes the event or action recorded by the system"></i>
                   <th>
                     Status <i class="fa-solid fa-circle-info" title="
                     Open: The issue or log entry has been created but not yet addressed.
@@ -180,6 +181,7 @@ Triage: The issue is being reviewed and prioritized based on severity and impact
               <tbody>
                 {% for log in users %}
                 <tr>
+                  <td>{{ log.user_id }}</td>
                   <td>{{ log.date }}</td>
                   <td>{{ log.time }}</td>
                   <td>

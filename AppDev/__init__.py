@@ -905,7 +905,7 @@ def logging():
     cursor.execute("SELECT * FROM accounts WHERE id = %s", (current_user['user_id'],))
     user_info = cursor.fetchone()
 
-    query = "SELECT id, date, time, category, activity, status, ip_address FROM logs WHERE 1=1"
+    query = "SELECT id, user_id, date, time, category, activity, status, ip_address FROM logs WHERE 1=1"
     params = []
 
     if selected_roles:
@@ -1074,18 +1074,22 @@ def admin_log_activity(mysql, activity, category="Info"):
     if not mysql:
         raise ValueError("MySQL connection object is required.")
 
-    hostname = socket.gethostname()
-    ip_addr = socket.gethostbyname(hostname)
+    user_id = g.user['user_id']
+
+    user_id = user_id
     date = datetime.now().strftime('%Y-%m-%d')
     time = datetime.now().strftime('%I:%M %p')
+    status = 'Open'
+    hostname = socket.gethostname()
+    ip_addr = socket.gethostbyname(hostname)
 
     # Insert log into DB
     cursor = mysql.connection.cursor()
     try:
         cursor.execute('''
-            INSERT INTO logs (date, time, category, activity, ip_address)
+            INSERT INTO logs (user_id, date, time, category, activity, status, ip_address)
             VALUES (%s, %s, %s, %s, %s)
-        ''', (date, time, category, activity, ip_addr))
+        ''', (user_id, date, time, category, activity, status, ip_addr))
         mysql.connection.commit()
     finally:
         cursor.close()
@@ -1237,8 +1241,8 @@ def sign_up():
 
         # Insert new user with hashed password
         cursor.execute('''
-            INSERT INTO accounts (first_name, last_name, gender, phone_number, email, password, status, two_factor_status) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO accounts (first_name, last_name, gender, phone_number, email, password, status, two_factor_status, countries) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         ''', (
             first_name,
             last_name,
@@ -1248,11 +1252,11 @@ def sign_up():
             hashed_password,
             status,
             'disabled',
-            user_country  # this is the country code like 'SG', 'MY', etc.
+            user_country
         ))
 
         # Log registration
-        admin_log_activity(mysql, "User signed up successfully", category="Critical")
+        # admin_log_activity(mysql, "User signed up successfully", category="Critical")
 
         mysql.connection.commit()
         cursor.close()
