@@ -1,5 +1,5 @@
 from flask import Flask, g, Response, render_template, request, redirect, url_for, session, jsonify, flash, \
-    make_response
+    make_response, send_file
 from functools import wraps
 from Forms import SignUpForm, CreateAdminForm, CreateProductForm, LoginForm, ChangeDetForm, ChangePswdForm
 import shelve, User
@@ -44,6 +44,13 @@ from deepface import DeepFace
 from PIL import Image
 import io
 from scipy.spatial.distance import cosine
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '5791262abcdefg'
@@ -65,6 +72,7 @@ app.config['MAIL_PASSWORD'] = 'isgw cesr jdbs oytx'
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
 mail = Mail(app)
+
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///products.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -89,12 +97,12 @@ EMAIL_PASSWORD = "isgw cesr jdbs oytx"
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'glen'
-app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'glen'
+# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 
 # BRANDON SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -105,12 +113,10 @@ app.config['MYSQL_PORT'] = 3306
 # app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'glen'
-# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-# app.config['MYSQL_DB'] = 'ssp_db'
-# app.config['MYSQL_PORT'] = 3306
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+app.config['MYSQL_DB'] = 'sspCropzy'
 #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -381,6 +387,11 @@ def create_product():
 
         db.session.add(new_product)
         db.session.commit()
+        log_user_action(
+            user_id=current_user['user_id'],
+            session_id=current_user['session_id'],
+            action=f"Created new product: {name} (Category: {category})"
+        )
         return redirect(url_for('buy_product'))
 
     return render_template('/productPage/createProduct.html', form=form)
@@ -421,6 +432,7 @@ def manageProduct():
 
 
 @app.route('/updateProduct/<int:id>/', methods=['GET', 'POST'])
+@jwt_required
 def update_product(id):
     product = Product.query.get_or_404(id)
     form = CreateProductForm(obj=product)  # Prepopulate form fields
@@ -451,12 +463,19 @@ def update_product(id):
             product.image_filename = filename if filename else "default.png"
 
         db.session.commit()
+        log_user_action(
+            user_id=g.user['user_id'],
+            session_id=g.user['session_id'],
+            action=f"Updated product: {product.name} (ID: {product.id})"
+        )
+
         return redirect(url_for('manageProduct'))
 
     return render_template('/productPage/updateProduct.html', form=form, product=product)
 
 
 @app.route('/deleteProduct/<int:id>', methods=['POST'])
+@jwt_required
 def delete_product(id):
     product = Product.query.get_or_404(id)
 
@@ -468,6 +487,11 @@ def delete_product(id):
 
     db.session.delete(product)
     db.session.commit()
+    log_user_action(
+        user_id=g.user['user_id'],
+        session_id=g.user['session_id'],
+        action=f"Deleted product: {product.name} (ID: {product.id})"
+    )
     return redirect(url_for('manageProduct'))
 
 
@@ -652,6 +676,7 @@ def accountInfo():
 @jwt_required
 def accountSecurity():
     user_id = g.user['user_id']
+    session_id = g.user['session_id']
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     if request.method == 'POST':
@@ -671,6 +696,11 @@ def accountSecurity():
         try:
             cursor.execute("UPDATE accounts SET countries = %s WHERE id = %s", (country_str, user_id))
             mysql.connection.commit()
+            log_user_action(
+                user_id=user_id,
+                session_id=session_id,
+                action=f"Updated allowed countries to: {country_str}"
+            )
             flash("Allowed countries updated successfully.", "success")
         except Exception as e:
             mysql.connection.rollback()
@@ -723,6 +753,7 @@ def dashboard():
         return render_template('404glen.html')
 
     user_id = jwt_user['user_id']
+    session_id = jwt_user['session_id']
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     # Get current user info
@@ -754,6 +785,11 @@ def dashboard():
     cursor.execute(query, params)
     users = cursor.fetchall()
     cursor.close()
+    log_user_action(
+        user_id=user_id,
+        session_id=session_id,
+        action="Accessed admin dashboard"
+    )
 
     return render_template(
         'dashboard.html',
@@ -781,8 +817,17 @@ def update_user_status(id):
         return redirect(url_for('dashboard'))
 
     cursor = mysql.connection.cursor()
+    # Fetch previous status before update (for user_action_log in session activity tracking)
+    cursor.execute("SELECT status FROM accounts WHERE id = %s", (id,))
+    old_status = cursor.fetchone()[0]
+
     cursor.execute("UPDATE accounts SET status = %s WHERE id = %s", (new_status, id))
     mysql.connection.commit()
+    log_user_action(
+        user_id=current_user['user_id'],
+        session_id=current_user['session_id'],
+        action=f"Updated user ID {id}'s status from '{old_status}' to '{new_status}'"
+    )
     cursor.close()
 
     flash("User status updated successfully.", "success")
@@ -842,6 +887,11 @@ def createAdmin():
         ))
 
         mysql.connection.commit()
+        log_user_action(
+            user_id=current_user['user_id'],
+            session_id=current_user['session_id'],
+            action=f"Created admin account for {email}"
+        )
         cursor.close()
 
         flash('Admin account created successfully.', 'success')
@@ -863,6 +913,12 @@ def update_log_status(id):
     cursor = mysql.connection.cursor()
     cursor.execute("UPDATE logs SET status = %s WHERE id = %s", (new_status, id))
     mysql.connection.commit()
+    log_user_action(
+        user_id=current_user['user_id'],
+        session_id=current_user['session_id'],
+        action=f"Updated log status (Log ID: {id}) to '{new_status}'"
+    )
+
     cursor.close()
 
     flash("Log status updated successfully.", "success")
@@ -882,6 +938,12 @@ def delete_log(id):
     cursor.execute("DELETE FROM logs WHERE id = %s", (id,))
     mysql.connection.commit()
     cursor.close()
+    log_user_action(
+        user_id=current_user['user_id'],
+        session_id=current_user['session_id'],
+        action=f"Deleted log entry with ID: {id}"
+    )
+
 
     flash("Log deleted successfully.", "success")
     return redirect(url_for('logging'))
@@ -925,6 +987,13 @@ def logging():
     cursor.close()
 
     current_date = date.today().isoformat()
+
+    log_user_action(
+        user_id=current_user['user_id'],
+        session_id=current_user['session_id'],
+        action="Viewed log dashboard"
+    )
+
 
     return render_template(
         'logging.html',
@@ -1015,28 +1084,6 @@ def logging_analytics():
 
 
 ALGORITHM = "pbkdf2_sha256"
-
-
-def hash_password(password, salt=None, iterations=260000):
-    if salt is None:
-        salt = secrets.token_hex(16)
-    assert salt and isinstance(salt, str) and "$" not in salt
-    assert isinstance(password, str)
-    pw_hash = hashlib.pbkdf2_hmac(
-        "sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations
-    )
-    b64_hash = base64.b64encode(pw_hash).decode("ascii").strip()
-    return "{}${}${}${}".format(ALGORITHM, iterations, salt, b64_hash)
-
-
-def verify_password(password, password_hash):
-    if (password_hash or "").count("$") != 3:
-        return False
-    algorithm, iterations, salt, b64_hash = password_hash.split("$", 3)
-    iterations = int(iterations)
-    assert algorithm == ALGORITHM
-    compare_hash = hash_password(password, salt, iterations)
-    return secrets.compare_digest(password_hash, compare_hash)
 
 
 def admin_log_activity(mysql, activity, category="Info"):
@@ -1288,6 +1335,11 @@ def login():
         email = sanitize_input(login_form.email.data.lower())
         password = login_form.pswd.data
 
+        # for user action log purposes
+        hostname = socket.gethostname()
+        ip_addr = socket.gethostbyname(hostname)
+        user_agent = request.headers.get('User-Agent')
+
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cursor.execute('SELECT * FROM accounts WHERE email = %s', (email,))
         user = cursor.fetchone()
@@ -1310,6 +1362,11 @@ def login():
 
             if current_country not in allowed_list:
                 flash("Login from your region is not allowed.", "danger")
+                log_user_action(
+                    user_id=user['id'],
+                    session_id=None,
+                    action=f"Login blocked - Disallowed region ({current_country}) | IP: {ip_address} | Agent: {user_agent}"
+                )
                 return redirect(url_for('login'))
 
             # Password validation
@@ -1318,6 +1375,11 @@ def login():
                 if user.get('two_factor_status') == 'enabled':
                     send_otp_email(user['email'], user['id'], user['first_name'], user['last_name'])
                     session['pending_2fa_user_id'] = user['id']
+                    log_user_action(
+                        user_id=user['id'],
+                        session_id=None,
+                        action=f"Login passed password check, pending OTP | IP: {ip_address} | Agent: {user_agent}"
+                    )
                     return redirect(url_for('verify_otp', id=user['id']))
                 else:
                     session_id = log_session_activity(user['id'], 'login')
@@ -1337,6 +1399,11 @@ def login():
                     response = make_response(redirect(url_for('home')))
                     response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
                     flash('Login successful!', 'success')
+                    log_user_action(
+                        user_id=user['id'],
+                        session_id=session_id,
+                        action=f"Login successful (no 2FA) | IP: {ip_addr} | Agent: {user_agent}"
+                    )
                     return response
 
             flash('Incorrect password.', 'danger')
@@ -1418,6 +1485,9 @@ def send_otp_sms(phone_number, user_id, first_name, last_name):
 
 @app.route('/sms-verify-otp/<int:id>', methods=['GET', 'POST'])
 def sms_verify_otp(id):
+    hostname = socket.gethostname()
+    ip_addr = socket.gethostbyname(hostname)
+    user_agent = request.headers.get('User-Agent')
     if 'pending_2fa_user_id' not in session or session['pending_2fa_user_id'] != id:
         flash("Unauthorized access.", "error")
         return redirect(url_for('login'))
@@ -1481,6 +1551,12 @@ def sms_verify_otp(id):
             token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
             response = make_response(redirect(url_for('home')))
             response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
+
+            log_user_action(
+                user_id=user['id'],
+                session_id=session_id,
+                action=f"Login successful (via 2FA) | IP: {ip_addr} | Agent: {user_agent}"
+            )
 
             flash("Login successful!", "success")
             return response
@@ -1617,17 +1693,28 @@ def face_id(id):
     return render_template("accountPage/face_id.html", id=id)
 
 
-@app.route('/more_auth/<int:id>', methods=['GET'])
+@app.route('/more_auth/<int:id>')
 def more_auth(id):
-    # Ensure session still holds the pending 2FA user
     if 'pending_2fa_user_id' not in session or session['pending_2fa_user_id'] != id:
         flash("Unauthorized access.", "danger")
         return redirect(url_for('login'))
 
-    return render_template('/accountPage/more_auth.html', id=id)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
+    user = cursor.fetchone()
+    cursor.close()
+
+    if not user:
+        flash("User not found.", "danger")
+        return redirect(url_for('login'))
+
+    return render_template('/accountPage/more_auth.html', id=id, user=user)
+
+
 
 
 @app.route('/2FA/<int:id>', methods=['POST'])
+@jwt_required
 def enable_two_factor(id):
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
@@ -1648,6 +1735,12 @@ def enable_two_factor(id):
         mysql.connection.commit()
         flash('You have successfully enabled 2FA for this account', 'success')
 
+        log_user_action(
+            user_id=id,
+            session_id=g.user['session_id'] if hasattr(g, 'user') and g.user.get('session_id') else None,
+            action=f"Enabled 2FA"
+        )
+
     generate_recovery_code(id)
 
     cursor.close()
@@ -1655,6 +1748,7 @@ def enable_two_factor(id):
 
 
 @app.route('/disable2FA/<int:id>/', methods=['POST'])
+@jwt_required
 def disable_two_factor(id):
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
@@ -1673,12 +1767,20 @@ def disable_two_factor(id):
         mysql.connection.commit()
         flash("2FA has been disabled for this account.", "success")
 
+        log_user_action(
+            user_id=id,
+            session_id=g.user['session_id'] if hasattr(g, 'user') and g.user.get('session_id') else None,
+            action=f"Disabled 2FA"
+        )
+
     cursor.close()
     return redirect(url_for('accountInfo'))
 
 
 def log_session_activity(user_id, action):
     print(f"[DEBUG] Creating session log for user {user_id} at {datetime.now()}")
+    hostname = socket.gethostname()
+    ip_addr = socket.gethostbyname(hostname)
     try:
         cursor = mysql.connection.cursor()
 
@@ -1690,7 +1792,7 @@ def log_session_activity(user_id, action):
                 VALUES (%s, NOW(), %s, %s)
             ''', (
                 user_id,
-                request.remote_addr,
+                ip_addr,
                 request.headers.get('User-Agent')
             ))
 
@@ -1723,6 +1825,8 @@ def log_session_activity(user_id, action):
         return None
 
 
+
+
 def log_user_action(user_id, session_id, action):
     if not user_id or not session_id:
         print("[WARN] Missing user_id or session_id, skipping action log")
@@ -1740,66 +1844,188 @@ def log_user_action(user_id, session_id, action):
     except Exception as e:
         print("[ERROR] Action log failed:", e)
 
+@app.route('/export_activity_pdf')
+@jwt_required
+def export_activity_pdf():
+    user_id = g.user['user_id']
+    filter_type = request.args.get("filter", "all")
 
-@app.route('/test-log')
-def test_log():
-    log_session_activity(3, 'login')
-    return 'Test log done'
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    query = "SELECT * FROM user_session_activity WHERE user_id = %s"
+    params = [user_id]
+
+    if filter_type == "active":
+        query += " AND logout_time IS NULL"
+    elif filter_type == "revoked":
+        query += " AND logout_time IS NOT NULL"
+    elif filter_type.startswith("last_"):
+        try:
+            limit = int(filter_type.split("_")[1])
+            query += " ORDER BY login_time DESC LIMIT %s"
+            params.append(limit)
+        except:
+            pass
+    else:
+        query += " ORDER BY login_time DESC"
+
+    cursor.execute(query, tuple(params))
+    sessions = cursor.fetchall()
+
+    # Fetch all related actions
+    session_ids = [s['id'] for s in sessions]
+    actions_by_session = {sid: [] for sid in session_ids}
+
+    if session_ids:
+        format_strings = ','.join(['%s'] * len(session_ids))
+        cursor.execute(f"SELECT * FROM user_actions_log WHERE session_id IN ({format_strings}) ORDER BY timestamp", tuple(session_ids))
+        actions = cursor.fetchall()
+        for action in actions:
+            actions_by_session[action['session_id']].append(action)
+
+    cursor.close()
+
+    # Create PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    elements = []
+
+    elements.append(Paragraph(f"<b>Session Activity History</b>", styles['Title']))
+    elements.append(Spacer(1, 0.3 * inch))
+
+    for session in sessions:
+        login = session['login_time']
+        logout = session['logout_time'] or "Active Now"
+        ip = session['ip_address']
+        agent = session['user_agent']
+        revoked_by = session.get('revoked_by', 'N/A')
+        revoked_at = session.get('revoked_at', 'N/A')
+
+        session_info = f"""
+        <b>Session ID:</b> {session['id']}<br/>
+        <b>Login Time:</b> {login} <br/>
+        <b>Logout Time:</b> {logout} <br/>
+        <b>IP Address:</b> {ip} <br/>
+        <b>Device Info:</b> {agent} <br/>
+        <b>Revoked By:</b> {revoked_by} <br/>
+        <b>Revoked At:</b> {revoked_at} <br/>
+        """
+        elements.append(Paragraph(session_info, styles['Normal']))
+        elements.append(Spacer(1, 0.1 * inch))
+
+        # Actions for this session
+        actions = actions_by_session.get(session['id'], [])
+        if actions:
+            elements.append(Paragraph("<b>Actions:</b>", styles['Heading4']))
+            for a in actions:
+                action_line = f"{a['timestamp']} — {a['action']}"
+                elements.append(Paragraph(action_line, styles['Code']))
+        else:
+            elements.append(Paragraph("<i>No actions recorded for this session.</i>", styles['Italic']))
+
+        elements.append(Spacer(1, 0.3 * inch))
+        elements.append(Paragraph("<hr/>", styles['Normal']))
+
+    doc.build(elements)
+    buffer.seek(0)
+
+    return send_file(buffer, as_attachment=True, download_name='session_activity.pdf', mimetype='application/pdf')
 
 
 @app.route('/activity_history')
 @jwt_required
 def activity_history():
-    user_id = g.user['user_id']
+
+    current_user_id = g.user['user_id']
+    filter_type = request.args.get("filter", "all")  # default to "all"
+
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
-    # Fetch session activity logs
-    cursor.execute("""
-        SELECT id, login_time, logout_time, ip_address, user_agent
-        FROM user_session_activity
-        WHERE user_id = %s
-        ORDER BY login_time DESC
-        LIMIT 50
-    """, (user_id,))
+    query = "SELECT * FROM user_session_activity WHERE user_id = %s"
+    params = [current_user_id]
+
+    if filter_type == "active":
+        query += " AND logout_time IS NULL"
+    elif filter_type == "revoked":
+        query += " AND logout_time IS NOT NULL"
+    elif filter_type.startswith("last_"):
+        try:
+            limit = int(filter_type.split("_")[1])
+            query += " ORDER BY login_time DESC LIMIT %s"
+            params.append(limit)
+        except:
+            pass
+    else:
+        query += " ORDER BY login_time DESC"
+
+    cursor.execute(query, tuple(params))
     sessions = cursor.fetchall()
-
-    # For each session, fetch related actions
-    for s in sessions:
-        cursor.execute("""
-            SELECT action, timestamp
-            FROM user_actions_log
-            WHERE session_id = %s
-            ORDER BY timestamp ASC
-        """, (s['id'],))
-        s['actions'] = cursor.fetchall()
-
     cursor.close()
 
-    return render_template('/accountPage/activity.html', sessions=sessions)
+    for s in sessions:
+        session_id = s['id']
+        action_cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        action_cursor.execute("""
+            SELECT * FROM user_actions_log
+            WHERE session_id = %s
+            ORDER BY timestamp ASC
+        """, (session_id,))
+        s['actions'] = action_cursor.fetchall()
+        action_cursor.close()
+
+    return render_template("accountPage/activity.html", sessions=sessions, selected_filter=filter_type)
 
 
 @app.route('/revoke_session/<session_id>', methods=['POST'])
 @jwt_required
 def revoke_session(session_id):
-    user_id = g.user['user_id']
-    if not user_id:
-        flash("Unauthorized action.", "danger")
-        return redirect(url_for('login'))
+    current_user_id = g.user['user_id']
+    current_user_status = g.user['status']  # 'admin' or 'user'
 
-    cursor = mysql.connection.cursor()
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    # Get original session owner
+    cursor.execute("SELECT user_id FROM user_session_activity WHERE id = %s", (session_id,))
+    session_row = cursor.fetchone()
+
+    if not session_row:
+        flash("Session not found.", "danger")
+        return redirect(url_for('activity_history'))
+
+    session_owner_id = session_row['user_id']
+
+    # Determine who revoked it
+    revoked_by = 'self' if session_owner_id == current_user_id else current_user_status
+    revoked_by_id = current_user_id
+    revoked_at = datetime.utcnow()
+
+    # Update the session row
     cursor.execute("""
         UPDATE user_session_activity
-        SET logout_time = %s
-        WHERE id = %s AND user_id = %s AND logout_time IS NULL
-    """, (datetime.utcnow(), session_id, user_id))
+        SET logout_time = %s,
+            revoked_by = %s,
+            revoked_by_id = %s,
+            revoked_at = %s
+        WHERE id = %s
+    """, (revoked_at, revoked_by, revoked_by_id, revoked_at, session_id))
+
     mysql.connection.commit()
     cursor.close()
 
-    # ✅ Log under the correct session
-    log_user_action(user_id, g.user['session_id'], f"Manually revoked session {session_id}")
+    hostname = socket.gethostname()
+    ip_addr = socket.gethostbyname(hostname)
+    user_agent = request.headers.get('User-Agent')
 
-    flash("Session revoked successfully.", "success")
+    log_user_action(
+        user_id=current_user_id,
+        session_id=g.user.get('session_id'),
+        action=f"Revoked session ID {session_id} | Revoked by: {revoked_by} | IP: {ip_addr} | Agent: {user_agent}"
+    )
+
+    flash("Session has been revoked successfully.", "success")
     return redirect(url_for('activity_history'))
+
 
 
 @app.route('/check_session_validity')
@@ -1840,42 +2066,15 @@ def verify_jwt_token(token):
         return None  # Invalid token
 
 
-otp_store = {}
-
-
-def send_otp_email(email, user_id, first_name, last_name):
-    """
-    Generate a 6-digit OTP, store it with an expiration time,
-    and send it to the specified email address.
-
-    Args:
-        email (str): Recipient email address.
-        user_id (int): ID of the user to associate with the OTP.
-
-    Returns:
-        None
-    """
-    otp = f"{random.randint(0, 999999):06d}"
-    expires = time.time() + 60  # OTP valid for 60 seconds
-
-    # Store OTP and expiry time
-    otp_store[user_id] = {"otp": otp, "expires": expires}
-
-    # Prepare email content
-    subject = "[Cropzy] Cropzy Login 2FA OTP Code"
-    message = (f"Hello {first_name} {last_name},\n\nPlease enter the generated code below to authenticate yourself \n\n"
-               f"Your OTP code is: {otp} It expires in 1 minute. "
-               f"If you did not attempt to sign in to your account, your password may be compromised.\n\nVisit http://127.0.0.1:5000/accountSecurity to create a new, strong password for your Cropzy account.\n\n"
-               f"Thanks,\nCropzy Support Team")
-
-    # Call your existing email sending function
-    send_email(email, subject, message)
-
 
 # def send_otp_sms():
 
 @app.route('/verify-otp/<int:id>', methods=['GET', 'POST'])
 def verify_otp(id):
+    hostname = socket.gethostname()
+    ip_addr = socket.gethostbyname(hostname)
+    user_agent = request.headers.get('User-Agent')
+
     print(f"[DEBUG] OTP form submitted for user_id={id} at {datetime.now()}")
     if 'pending_2fa_user_id' not in session or session['pending_2fa_user_id'] != id:
         flash("Unauthorized access.", "error")
@@ -1928,6 +2127,12 @@ def verify_otp(id):
             response = make_response(redirect(url_for('home')))
             response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
 
+            log_user_action(
+                user_id=user['id'],
+                session_id=session_id,
+                action=f"Login successful (via 2FA) | IP: {ip_addr} | Agent: {user_agent}"
+            )
+
             flash("Login successful!", "success")
             return response
         else:
@@ -1971,8 +2176,15 @@ def recovery_auth(id):
                 response = make_response(redirect(url_for('home')))
                 response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
 
+                hostname = socket.gethostname()
+                ip_addr = socket.gethostbyname(hostname)
+                user_agent = request.headers.get('User-Agent')
                 # ✅ Use user action log instead of logging a new session
-                log_user_action(result['id'], session_id, "Logged in via recovery code")
+                log_user_action(
+                    user_id=result['id'],
+                    session_id=session_id,
+                    action=f"Login successful (via 2FA) | IP: {ip_addr} | Agent: {user_agent}"
+                )
 
                 flash('Recovery successful. You are now logged in.', 'success')
                 return response
@@ -2003,6 +2215,12 @@ def logout():
         ''', (session_id, user_id))
         mysql.connection.commit()
         cursor.close()
+
+    log_user_action(
+        user_id=user_id,
+        session_id=session_id,
+        action="User logged out"
+    )
 
     response = make_response(redirect(url_for('login')))
     response.delete_cookie('jwt_token')
@@ -2154,6 +2372,11 @@ def delete_user(id):
         cursor.execute("DELETE FROM accounts WHERE id = %s", (id,))
         mysql.connection.commit()
         cursor.close()
+        log_user_action(
+            user_id=current_user['user_id'],
+            session_id=current_user['session_id'],
+            action=f"User deleted own account (ID: {id})"
+        )
         flash("Your account has been deleted successfully!", "success")
         return redirect(url_for('logout'))  # Or home, depending on your flow
 
@@ -2162,6 +2385,11 @@ def delete_user(id):
         cursor.execute("DELETE FROM accounts WHERE id = %s", (id,))
         mysql.connection.commit()
         cursor.close()
+        log_user_action(
+            user_id=current_user['user_id'],
+            session_id=current_user['session_id'],
+            action=f"Admin deleted user account (ID: {id})"
+        )
         flash("User account deleted successfully.", "success")
         return redirect(url_for('dashboard'))
 
@@ -2172,6 +2400,7 @@ def delete_user(id):
 
 
 @app.route("/create_update", methods=['GET', 'POST'])
+@jwt_required
 def create_update():
     form = SeasonalUpdateForm()
     site_key = os.getenv("RECAPTCHA_SITE_KEY")
@@ -2198,6 +2427,7 @@ def create_update():
         try:
             decoded = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
             user_email = decoded['email']
+            session_id = decoded.get('session_id')
             user_id = decoded['user_id']
             print("[DEBUG] Decoded user:", decoded)
         except jwt.ExpiredSignatureError:
@@ -2222,10 +2452,18 @@ def create_update():
             user_id=user_id,
             update_data=update_data
         )
+
+        log_user_action(
+            user_id=user_id,
+            session_id=session_id,
+            action=f"Submitted seasonal update (title: {update_data['title']}) - Awaiting confirmation"
+        )
+
         flash("A confirmation email has been sent. Please verify to complete the update.", "info")
         return redirect(url_for('home'))
 
-    return render_template('/home/update.html', title='Update', form=form, site_key=site_key)
+    return render_template('/home/update.html', title='Update', form=form, site_key=site_key, is_edit=False)
+
 
 
 def send_update_confirmation_email(email, user_id, update_data):
@@ -2285,6 +2523,7 @@ def send_update_confirmation_email(email, user_id, update_data):
 
 
 @app.route('/confirm_update/<token>')
+@jwt_required
 def confirm_update(token):
     try:
         # Decode the token
@@ -2314,8 +2553,13 @@ def confirm_update(token):
                 updates.append(update_data)
                 db['updates'] = updates
 
-            log_user_action(user['id'], session.get('current_session_id'),
-                            f"Confirmed and created seasonal update: {update_data['title']}")
+            session_id = session.get('current_session_id') or session.get('session_id') or None
+
+            log_user_action(
+                user_id=user['id'],
+                session_id=session_id,
+                action=f"Confirmed and created seasonal update: {update_data['title']}"
+            )
             flash("Seasonal update created successfully!", "success")
         else:
             flash("User not found. Cannot restore session.", "danger")
@@ -2329,13 +2573,15 @@ def confirm_update(token):
 
 
 @app.route('/reject_update/<token>')
+@jwt_required
 def reject_update(token):
     try:
         decoded = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
         update_data = decoded['update_data']
         user_id = decoded['user_id']
 
-        log_user_action(user_id, session.get('current_session_id'), f"Rejected seasonal update: {update_data['title']}")
+        session_id = session.get('current_session_id') or session.get('session_id') or None
+        log_user_action(user_id, session_id, f"Rejected seasonal update: {update_data['title']}")
 
         flash("Update rejected and not saved.", "info")
     except Exception as e:
@@ -2343,7 +2589,9 @@ def reject_update(token):
     return redirect(url_for('home'))
 
 
+
 @app.route('/delete_update/<int:index>', methods=['POST'])
+@jwt_required
 def delete_update(index):
     try:
         with shelve.open('seasonal_updates.db', writeback=True) as db:
@@ -2351,11 +2599,15 @@ def delete_update(index):
             if 0 <= index < len(updates):
                 removed_update = updates.pop(index)
                 db['updates'] = updates  # Save the updated list
-                if 'user_id' in session:
-                    log_user_action(session['user_id'], session.get('current_session_id'),
-                                    f'Deleted seasonal update: {removed_update["title"]}')
 
-                flash(f'Update "{removed_update["title"]}" deleted successfully!', 'success')
+                if 'user_id' in session:
+                    log_user_action(
+                        session['user_id'],
+                        session.get('current_session_id'),
+                        f'Deleted seasonal update: {removed_update.get("title", "Untitled")}'
+                    )
+
+                flash(f'Update "{removed_update.get("title", "Untitled")}" deleted successfully!', 'success')
             else:
                 flash('Invalid update index.', 'danger')
     except Exception as e:
@@ -2365,6 +2617,7 @@ def delete_update(index):
 
 
 @app.route('/edit_update/<int:index>', methods=['GET', 'POST'])
+@jwt_required
 def edit_update(index):
     form = SeasonalUpdateForm()
     with shelve.open('seasonal_updates.db') as db:
@@ -2384,34 +2637,48 @@ def edit_update(index):
             'season': form.season.data,
         }
         with shelve.open('seasonal_updates.db') as db:
-            db['updates'] = updates  # Save the updated list back to the database
+            db['updates'] = updates
 
             if 'user_id' in session:
-                log_user_action(session['user_id'], session.get('current_session_id'),
-                                f'Edited seasonal update: {form.update.data}')
+                log_user_action(
+                    session['user_id'],
+                    session.get('current_session_id'),
+                    f'Edited seasonal update: {form.update.data}'
+                )
 
         flash(f'Update "{form.update.data}" updated successfully!', 'success')
         return redirect(url_for('home'))
 
-    # Pre-fill the form with current update data
-    form.update.data = update['title']
-    form.content.data = update['content']
-    form.date.data = datetime.strptime(update['date'], '%d-%m-%Y')  # Convert string to date
-    form.season.data = update['season']
+    # Pre-fill the form with current update data safely
+    form.update.data = update.get('title', '')
+    form.content.data = update.get('content', '')
+    form.date.data = datetime.strptime(update.get('date', '01-01-2025'), '%d-%m-%Y')
+    form.season.data = update.get('season', '')
 
-    return render_template('/home/update.html', title='Edit Update', form=form)
+    return render_template('/home/update.html', title='Edit Update', form=form, is_edit=True, index=index)
+
 
 
 @app.route('/request_delete/<int:index>', methods=['GET'])
+@jwt_required
 def request_delete(index):
     with shelve.open('seasonal_updates.db') as db:
         updates = db.get('updates', [])
         if 0 <= index < len(updates):
             update = updates[index]
+
+            if 'user_id' in session:
+                log_user_action(
+                    session['user_id'],
+                    session.get('current_session_id'),
+                    f'Requested delete confirmation for seasonal update: {update["title"]}'
+                )
+
             return render_template('/home/confirm_delete.html', update=update, index=index)
         else:
             flash('Invalid update index.', 'danger')
             return redirect(url_for('home'))
+
 
 
 @app.route('/update_cart', methods=['POST'])
@@ -2430,6 +2697,14 @@ def update_cart():
 
     session["cart"] = cart  # update session cart
     session.modified = True  # save changes
+
+    if 'user_id' in session:
+        log_user_action(
+            user_id=session['user_id'],
+            session_id=session.get('current_session_id'),
+            action=f"Updated cart: Product ID {product_id}, Action {action}"
+        )
+
     return redirect(url_for('buy_product'))
 
 
@@ -2458,6 +2733,14 @@ def add_to_cart(product_id):
     session.modified = True
 
     flash(f"✅ {product.name} added to cart!", "success")
+
+    if 'user_id' in session:
+        log_user_action(
+            user_id=session['user_id'],
+            session_id=session.get('current_session_id'),
+            action=f"Added to cart: {product.name} (ID {product.id})"
+        )
+
     return redirect(url_for('buy_product'))
 
 
@@ -2466,6 +2749,14 @@ def clear_cart():
     session["cart"] = {}
     session.modified = True
     flash("🛒 Cart cleared!", "info")
+
+    if 'user_id' in session:
+        log_user_action(
+            user_id=session['user_id'],
+            session_id=session.get('current_session_id'),
+            action="Cleared shopping cart"
+        )
+
     return redirect(url_for('buy_product'))
 
 
@@ -2579,6 +2870,13 @@ def thank_you():
                 ]
             })
             session.modified = True
+
+            if 'user_id' in session:
+                log_user_action(
+                    user_id=session['user_id'],
+                    session_id=session.get('current_session_id'),
+                    action=f"Completed purchase - Transaction ID: {transaction_id}, Total: ${total_price}"
+                )
 
             # send confirmation email
             if customer.get("email"):
