@@ -78,3 +78,14 @@ class CreateProductForm(FlaskForm):
     product_image = FileField('Product Image', validators=[FileAllowed(['jpg', 'png', 'jpeg'], 'Only images allowed!')])
 
     submit = SubmitField('Create Product')
+
+class ResetPassRequest(Form):
+    email = EmailField('Email*',[validators.Email(), validators.DataRequired()])
+
+class ResetPass(Form):
+    new_pswd = PasswordField('New Password:',
+                             [validators.Length(min=8, message='Password must be at least 8 characters.'),
+                              validators.DataRequired()])
+    confirm_pswd = PasswordField('Confirm New Password:',
+                                 [validators.Length(min=8, message='Password must be at least 8 characters.'),
+                                  validators.DataRequired()])
