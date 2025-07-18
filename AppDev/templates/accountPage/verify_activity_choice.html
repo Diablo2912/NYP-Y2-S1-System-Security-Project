@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container text-center mt-4">
+  <h3>Verify Your Identity</h3>
+  <p>To access your session activity, please verify using one method below:</p>
+  <a href="{{ url_for('send_activity_email_token', id=id) }}" class="btn btn-primary mb-3">Verify via Email</a><br>
+  <a href="{{ url_for('face_verify_activity', id=id) }}" class="btn btn-success">Verify via Face ID</a>
+</div>
+{% endblock %}

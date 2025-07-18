@@ -50,6 +50,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.units import inch
 from reportlab.lib import colors
+from itsdangerous import URLSafeTimedSerializer
 
 
 app = Flask(__name__)
@@ -58,6 +59,7 @@ UPLOAD_FOLDER = 'static/uploads/'  # Define where images are stored
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 stripe.api_key = "sk_test_51Qrle9CddzoT6fzjpqNPd1g3UV8ScbnxiiPK5uYT0clGPV82Gn7QPwcakuijNv4diGpcbDadJjzunwRcWo0eOXvb00uDZ2Gnw6"
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=90)
+serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 
 load_dotenv()
 print("Loaded ENV value for TEST_VAR =", os.getenv("TEST_VAR"))
@@ -67,8 +69,8 @@ images = UploadSet('images', IMAGES)
 app.register_blueprint(main_blueprint)
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
-app.config['MAIL_USERNAME'] = 'ngiam.brandon@gmail.com'
-app.config['MAIL_PASSWORD'] = 'isgw cesr jdbs oytx'
+app.config['MAIL_USERNAME'] = 'cropzyssp@gmail.com'
+app.config['MAIL_PASSWORD'] = 'wivz gtou ftjo dokp'
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
 mail = Mail(app)
@@ -90,8 +92,10 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
+MAIL_USE_TLS = True
 EMAIL_SENDER = "sadevdulneth6@gmail.com"
 EMAIL_PASSWORD = "isgw cesr jdbs oytx"
+
 
 # SETUP UR DB CONFIG ACCORDINGLY
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
@@ -1932,18 +1936,150 @@ def export_activity_pdf():
 
     return send_file(buffer, as_attachment=True, download_name='session_activity.pdf', mimetype='application/pdf')
 
+@app.route('/send_activity_email_token/<int:id>')
+@jwt_required
+def send_activity_email_token(id):
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("SELECT email FROM accounts WHERE id = %s", (id,))
+    user = cursor.fetchone()
+    cursor.close()
+
+    if not user:
+        flash("User not found.", "danger")
+        return redirect(url_for('home'))
+
+    token = serializer.dumps({'id': id}, salt='activity-verification')
+    link = url_for('confirm_activity_access', token=token, _external=True)
+
+    msg = Message(
+        "[Cropzy] Session Activity Verification",
+        sender=EMAIL_SENDER,
+        recipients=[user['email']]
+    )
+    msg.body = f"Click to confirm access to session activity (valid for 5 minutes):\n\n{link}"
+    mail.send(msg)
+
+    flash("Verification email sent. Please check your inbox.", "info")
+    return redirect(url_for('home'))
+
+
+@app.route('/confirm_activity_access/<token>')
+def confirm_activity_access(token):
+    try:
+        data = serializer.loads(token, salt='activity-verification', max_age=300)
+        user_id = data['id']
+
+        # Update user's verification timestamp in DB
+        cursor = mysql.connection.cursor()
+        cursor.execute("""
+            UPDATE accounts SET activity_verified_at = %s WHERE id = %s
+        """, (datetime.utcnow(), user_id))
+        mysql.connection.commit()
+        cursor.close()
+
+        return render_template("accountPage/verification_success.html")
+
+    except Exception:
+        flash("Verification link expired or invalid.", "danger")
+        return redirect(url_for('verify_before_activity'))
+
+@app.route('/verification_success_message/<token>')
+def verification_success_message(token):
+    return render_template("accountPage/verification_success.html", token=token)
+
+@app.route('/face_verify_activity/<int:id>', methods=['GET', 'POST'])
+@jwt_required
+def face_verify_activity(id):
+    if request.method == 'POST':
+        base64_img = request.form.get('face_image')
+        if not base64_img or "," not in base64_img:
+            flash("Face not captured.", "danger")
+            return redirect(request.url)
+
+        image_data = base64_img.split(",")[1]
+        temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f"temp_verify_user_{id}.png")
+        with open(temp_path, 'wb') as f:
+            f.write(base64.b64decode(image_data))
+
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute("SELECT face FROM accounts WHERE id = %s", (id,))
+        user_face_data = cursor.fetchone()
+        cursor.close()
+
+        if not user_face_data or not user_face_data['face']:
+            flash("No registered face found.", "danger")
+            return redirect(url_for('setup_face_id', id=id))
+
+        registered_path = os.path.join(app.config['UPLOAD_FOLDER'], f"user_{id}_face.png")
+        with open(registered_path, 'wb') as f:
+            f.write(user_face_data['face'])
+
+        try:
+            result = DeepFace.verify(
+                img1_path=temp_path,
+                img2_path=registered_path,
+                model_name='VGG-Face',
+                enforce_detection=False
+            )
+            os.remove(temp_path)
+            os.remove(registered_path)
+
+            if result["verified"]:
+                cursor = mysql.connection.cursor()
+                cursor.execute("""
+                    UPDATE accounts SET activity_verified_at = %s WHERE id = %s
+                """, (datetime.utcnow(), id))
+                mysql.connection.commit()
+                cursor.close()
+
+                flash("Face verified. Access granted.", "success")
+                return redirect(url_for('activity_history'))
+            else:
+                flash("Face does not match.", "danger")
+
+        except Exception as e:
+            flash(f"Face verification error: {str(e)}", "danger")
+
+    return render_template("accountPage/face_id_activity.html", id=id)
+
+
+
+@app.route('/verify_before_activity')
+@jwt_required
+def verify_before_activity():
+    return render_template('accountPage/verify_activity_choice.html', id=g.user['user_id'])
+
+
 
 @app.route('/activity_history')
 @jwt_required
 def activity_history():
-
-    current_user_id = g.user['user_id']
-    filter_type = request.args.get("filter", "all")  # default to "all"
-
+    user_id = g.user['user_id']
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("SELECT activity_verified_at FROM accounts WHERE id = %s", (user_id,))
+    result = cursor.fetchone()
+    cursor.close()
 
+    if not result or not result['activity_verified_at']:
+        return redirect(url_for('verify_before_activity'))
+
+    last_verified = result['activity_verified_at']
+    if (datetime.utcnow() - last_verified).total_seconds() > 300:
+        # Clear it from DB
+        cursor = mysql.connection.cursor()
+        cursor.execute("UPDATE accounts SET activity_verified_at = NULL WHERE id = %s", (user_id,))
+        mysql.connection.commit()
+        cursor.close()
+        flash("Access expired. Please re-verify to view session activity.", "warning")
+        return redirect(url_for('verify_before_activity'))
+
+    time_left = 300 - int((datetime.utcnow() - last_verified).total_seconds())
+
+    # --- Fetch session activity logic here ---
+    filter_type = request.args.get("filter", "all")
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     query = "SELECT * FROM user_session_activity WHERE user_id = %s"
-    params = [current_user_id]
+    params = [user_id]
 
     if filter_type == "active":
         query += " AND logout_time IS NULL"
@@ -1974,7 +2110,12 @@ def activity_history():
         s['actions'] = action_cursor.fetchall()
         action_cursor.close()
 
-    return render_template("accountPage/activity.html", sessions=sessions, selected_filter=filter_type)
+    return render_template("accountPage/activity.html",
+                           sessions=sessions,
+                           selected_filter=filter_type,
+                           time_left=time_left)
+
+
 
 
 @app.route('/revoke_session/<session_id>', methods=['POST'])

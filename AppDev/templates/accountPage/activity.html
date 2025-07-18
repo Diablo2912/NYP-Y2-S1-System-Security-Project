@@ -4,13 +4,19 @@
 <div class="container mt-4">
     <h2 class="mb-4 text-center">Session Activity History</h2>
 
+    {% if time_left %}
+    <div class="alert alert-info text-center fw-bold">
+        Time remaining to view session history:
+        <span id="countdown">{{ time_left }}</span> seconds
+    </div>
+    {% endif %}
+
     <div class="text-center mb-4">
         <a href="{{ url_for('export_activity_pdf', filter=selected_filter) }}" class="btn btn-outline-dark">
             🧾 Export to PDF
         </a>
     </div>
 
-    <!-- ✅ Filter dropdown -->
     <form method="GET" action="{{ url_for('activity_history') }}" class="text-center mb-4">
         <label for="filter" class="me-2 fw-bold">Filter:</label>
         <select name="filter" id="filter" onchange="this.form.submit()" class="form-select d-inline w-auto">
@@ -79,48 +85,48 @@
                             <div class="accordion-item">
                                 <h2 class="accordion-header" id="heading{{ loop.index }}">
                                     <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                                        data-bs-target="#collapse{{ loop.index }}" aria-expanded="false" aria-controls="collapse{{ loop.index }}">
+                                            data-bs-target="#collapse{{ loop.index }}" aria-expanded="false" aria-controls="collapse{{ loop.index }}">
                                         📝 {{ session.login_time }} — Session Actions
                                     </button>
                                 </h2>
                                 <div id="collapse{{ loop.index }}" class="accordion-collapse collapse"
-                                    aria-labelledby="heading{{ loop.index }}" data-bs-parent="#accordionSession{{ loop.index }}">
+                                     aria-labelledby="heading{{ loop.index }}" data-bs-parent="#accordionSession{{ loop.index }}">
                                     <div class="accordion-body">
                                         {% if session.actions %}
-                                            <table class="table table-sm table-hover align-middle">
-                                                <thead class="table-light">
-                                                    <tr>
-                                                        <th>Timestamp</th>
-                                                        <th>Activity</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {% for action in session.actions %}
-                                                    <tr>
-                                                        <td class="text-muted" style="white-space: nowrap;">{{ action.timestamp }}</td>
-                                                        <td>
-                                                            {% if 'login' in action.action.lower() %}
-                                                                <span class="text-success">🔓 {{ action.action }}</span>
-                                                            {% elif 'logout' in action.action.lower() %}
-                                                                <span class="text-secondary">🔒 {{ action.action }}</span>
-                                                            {% elif 'added to cart' in action.action.lower() %}
-                                                                <span class="text-primary">🛒 {{ action.action }}</span>
-                                                            {% elif 'deleted' in action.action.lower() %}
-                                                                <span class="text-danger">❌ {{ action.action }}</span>
-                                                            {% elif 'created' in action.action.lower() %}
-                                                                <span class="text-success">🆕 {{ action.action }}</span>
-                                                            {% elif 'updated' in action.action.lower() %}
-                                                                <span class="text-info">✏️ {{ action.action }}</span>
-                                                            {% else %}
-                                                                {{ action.action }}
-                                                            {% endif %}
-                                                        </td>
-                                                    </tr>
-                                                    {% endfor %}
-                                                </tbody>
-                                            </table>
+                                        <table class="table table-sm table-hover align-middle">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Timestamp</th>
+                                                    <th>Activity</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for action in session.actions %}
+                                                <tr>
+                                                    <td class="text-muted" style="white-space: nowrap;">{{ action.timestamp }}</td>
+                                                    <td>
+                                                        {% if 'login' in action.action.lower() %}
+                                                            <span class="text-success">🔓 {{ action.action }}</span>
+                                                        {% elif 'logout' in action.action.lower() %}
+                                                            <span class="text-secondary">🔒 {{ action.action }}</span>
+                                                        {% elif 'added to cart' in action.action.lower() %}
+                                                            <span class="text-primary">🛒 {{ action.action }}</span>
+                                                        {% elif 'deleted' in action.action.lower() %}
+                                                            <span class="text-danger">❌ {{ action.action }}</span>
+                                                        {% elif 'created' in action.action.lower() %}
+                                                            <span class="text-success">🆕 {{ action.action }}</span>
+                                                        {% elif 'updated' in action.action.lower() %}
+                                                            <span class="text-info">✏️ {{ action.action }}</span>
+                                                        {% else %}
+                                                            {{ action.action }}
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
                                         {% else %}
-                                            <p class="text-muted">No actions recorded for this session.</p>
+                                        <p class="text-muted">No actions recorded for this session.</p>
                                         {% endif %}
                                     </div>
                                 </div>
@@ -140,4 +146,22 @@
         <a href="{{ url_for('accountInfo') }}" class="btn btn-secondary">Back to Account</a>
     </div>
 </div>
+
+{% if time_left %}
+<script>
+    let countdown = {{ time_left }};
+    const countdownEl = document.getElementById('countdown');
+
+    const timer = setInterval(() => {
+        countdown--;
+        countdownEl.innerText = countdown;
+
+        if (countdown <= 0) {
+            clearInterval(timer);
+            alert("Your access to session activity has expired. Please re-verify.");
+            window.location.href = "{{ url_for('verify_before_activity') }}";
+        }
+    }, 1000);
+</script>
+{% endif %}
 {% endblock %}
