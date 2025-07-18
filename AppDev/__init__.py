@@ -44,6 +44,7 @@ from deepface import DeepFace
 from PIL import Image
 import io
 from scipy.spatial.distance import cosine
+from collections import defaultdict
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '5791262abcdefg'
@@ -1027,11 +1028,36 @@ def logging_analytics():
     closed_result = cursor.fetchone()
     closed_count = closed_result['closed_count']
 
+    # Determine which date to show login activity for
+    login_date = request.args.get('login_date') or request.args.get('start_date') or today_str
+
+    # Query login counts by hour and status
+    cursor.execute("""
+        SELECT HOUR(login_time) AS login_hour, status, COUNT(*) AS count
+        FROM user_session_activity
+        WHERE DATE(login_time) = %s
+        GROUP BY login_hour, status
+        ORDER BY login_hour, status
+    """, (login_date,))
+    login_activity_rows = cursor.fetchall()
+
+    # Initialize hourly login dictionary
+    login_activity = {hour: {'admin': 0, 'manager': 0, 'user': 0} for hour in range(24)}
+
+    # Populate it
+    for row in login_activity_rows:
+        hour = int(row['login_hour'])
+        status = row['status'].lower()
+        count = row['count']
+        if status in login_activity[hour]:
+            login_activity[hour][status] = count
+
 
     cursor.close()
 
     return render_template(
         'logging_analytics.html',
+        login_activity=login_activity,
         chart_data=chart_data,
         dates_iso=dates_iso,
         dates_display=dates_display,
@@ -1715,17 +1741,29 @@ def disable_two_factor(id):
 
 def log_session_activity(user_id, action):
     print(f"[DEBUG] Creating session log for user {user_id} at {datetime.now()}")
+
     try:
         cursor = mysql.connection.cursor()
 
-        session_id = None  # default
+        # ✅ Fetch the user's role/status from the accounts table
+        cursor.execute("SELECT status FROM accounts WHERE id = %s", (user_id,))
+        result = cursor.fetchone()
+
+        if not result:
+            print("[ERROR] User ID not found in accounts table")
+            return None
+
+        account_status = result[0]  # e.g., 'admin', 'manager', 'user'
+
+        session_id = None
 
         if action == 'login':
             cursor.execute('''
-                INSERT INTO user_session_activity (user_id, login_time, ip_address, user_agent)
-                VALUES (%s, NOW(), %s, %s)
+                INSERT INTO user_session_activity (user_id, status, login_time, ip_address, user_agent)
+                VALUES (%s, %s, NOW(), %s, %s)
             ''', (
                 user_id,
+                account_status,
                 request.remote_addr,
                 request.headers.get('User-Agent')
             ))
@@ -1743,16 +1781,11 @@ def log_session_activity(user_id, action):
                 LIMIT 1
             ''', (user_id,))
 
-        # Diagnostic
-        cursor.execute('SELECT DATABASE()')
-        current_db = cursor.fetchone()
-        print("[DEBUG] Connected to DB:", current_db)
-
         mysql.connection.commit()
         cursor.close()
-        print("[DEBUG] Log saved to DB")
+        print("[DEBUG] Session log saved")
 
-        return session_id  # ✅ return this always (None for logout)
+        return session_id
 
     except Exception as e:
         print("[ERROR] Session log failed:", e)
