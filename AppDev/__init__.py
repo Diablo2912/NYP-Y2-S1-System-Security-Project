@@ -645,7 +645,8 @@ def accountInfo():
     cursor.execute("SELECT * FROM accounts WHERE id = %s", (user_id,))
     user = cursor.fetchone()
     cursor.close()
-    return render_template('/accountPage/accountInfo.html', user=user)
+    return render_template('/accountPage/accountInfo.html', user=user)  # ❗️Passing as `user`, not updating current_user
+
 
 
 @app.route('/accountSecurity', methods=['GET', 'POST'])
@@ -942,6 +943,11 @@ def logging():
 
     cursor.execute(query, params)
     logs = cursor.fetchall()
+
+    cursor.execute("SELECT COUNT(*) AS logs_count FROM logs")
+    logs_result = cursor.fetchone()
+    logs_count = logs_result['logs_count']
+
     cursor.close()
 
     current_date = date.today().isoformat()
@@ -957,6 +963,7 @@ def logging():
         sort_by=sort_by,
         sort_order=sort_order,
         start_date=start_date,
+        logs_count=logs_count
     )
 
 @app.route('/logging_analytics', methods=['GET'])
@@ -1027,6 +1034,9 @@ def logging_analytics():
     closed_result = cursor.fetchone()
     closed_count = closed_result['closed_count']
 
+    cursor.execute("SELECT COUNT(*) AS logs_count FROM logs")
+    logs_result = cursor.fetchone()
+    logs_count = logs_result['logs_count']
 
     cursor.close()
 
@@ -1042,6 +1052,7 @@ def logging_analytics():
         start_date=display_start_date,
         category_summary=category_summary,
         closed_count=closed_count,
+        logs_count=logs_count,
         num_days=num_days
     )
 
@@ -1652,15 +1663,22 @@ def face_id(id):
 
     return render_template("accountPage/face_id.html", id=id)
 
-
 @app.route('/more_auth/<int:id>', methods=['GET'])
 def more_auth(id):
-    # Ensure session still holds the pending 2FA user
     if 'pending_2fa_user_id' not in session or session['pending_2fa_user_id'] != id:
         flash("Unauthorized access.", "danger")
         return redirect(url_for('login'))
 
-    return render_template('/accountPage/more_auth.html', id=id)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
+    user = cursor.fetchone()
+    cursor.close()
+
+    if not user:
+        flash("User not found.", "danger")
+        return redirect(url_for('login'))
+
+    return render_template('/accountPage/more_auth.html', id=id, user=user)
 
 
 @app.route('/2FA/<int:id>', methods=['POST'])
@@ -1704,7 +1722,7 @@ def disable_two_factor(id):
     if user['two_factor_status'] == 'disabled':
         flash("2FA is already disabled for this account.", "info")
     else:
-        cursor.execute("UPDATE accounts SET two_factor_status = %s, recovery_code = NULL WHERE id = %s",
+        cursor.execute("UPDATE accounts SET two_factor_status = %s, recovery_code = NULL , face = NULL WHERE id = %s",
                        ('disabled', id))
         mysql.connection.commit()
         flash("2FA has been disabled for this account.", "success")

@@ -1,17 +1,55 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container text-center">
-  <h3 class="mt-3">Scan Your Face for Registration</h3>
+<div class="container mt-4">
+  <h3 class="text-center">Scan Your Face for Registration</h3>
 
-  <video id="video" width="320" height="240" autoplay class="mb-3 border border-dark rounded"></video>
-  <canvas id="canvas" width="320" height="240" class="d-none"></canvas>
+  <div class="row justify-content-center">
+    <!-- Left: Instructions -->
+    <div class="col-md-5 mx-auto">
+      <h5 class="text-center mb-4">Steps To Register Your Face</h5>
+      <ul class="list-group mb-3">
+        <li class="list-group-item">
+          <strong>1. Allow Camera Access:</strong><br>
+          Click “Allow” when prompted. If it doesn’t work, check your browser’s camera permissions.
+        </li>
+        <li class="list-group-item">
+          <strong>2. Capture Your Face:</strong><br>
+          Face the camera clearly with no obstructions, then click “Capture Face.”
+        </li>
+        <li class="list-group-item">
+          <strong>3. Follow Instructions:</strong><br>
+          Move your head slowly when prompted to help capture multiple angles.
+        </li>
+        <li class="list-group-item">
+          <strong>4. Register Face:</strong><br>
+          If satisfied with the image, click “Register Face” to complete the process.
+        </li>
+      </ul>
+    </div>
 
-  <button id="capture" class="btn btn-primary mb-2">Capture Face</button>
+    <!-- Right: Video and Capture Controls -->
+    <div class="col-md-5 text-center mx-auto">
+      <!-- Live Video Feed -->
+      <div class="mb-3 mt-5 d-flex justify-content-center">
+        <video id="video" width="320" height="240" autoplay class="border border-dark rounded"></video>
+      </div>
 
-  <form method="POST" id="faceForm">
-    <input type="hidden" name="face_image" id="face_image">
-    <button type="submit" class="btn btn-success">Register Face</button>
-  </form>
+      <!-- Captured Image Preview -->
+      <div id="capturedSection" class="d-none mb-3">
+        <h6 class="text-success mb-2">Captured Image:</h6>
+        <canvas id="canvas" width="320" height="240" class="border border-success rounded"></canvas>
+      </div>
+
+      <!-- Capture Button -->
+      <button id="capture" class="btn btn-primary mb-2">Capture Face</button>
+
+      <!-- Registration Form -->
+      <form method="POST" id="faceForm">
+        <input type="hidden" name="face_image" id="face_image">
+        <button type="submit" class="btn btn-success">Register Face</button>
+      </form>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -19,18 +57,26 @@
   const canvas = document.getElementById('canvas');
   const captureButton = document.getElementById('capture');
   const faceInput = document.getElementById('face_image');
+  const capturedSection = document.getElementById('capturedSection');
 
+  // Request camera access
   navigator.mediaDevices.getUserMedia({ video: true })
     .then(stream => {
       video.srcObject = stream;
+    })
+    .catch(err => {
+      alert('Unable to access the camera. Please check permissions.');
     });
 
+  // Capture face image
   captureButton.addEventListener('click', function () {
     const context = canvas.getContext('2d');
-    canvas.classList.remove('d-none');
-    context.drawImage(video, 0, 0, 320, 240);
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
     const dataURL = canvas.toDataURL('image/png');
     faceInput.value = dataURL;
+
+    // Show captured section
+    capturedSection.classList.remove('d-none');
   });
 </script>
 {% endblock %}
