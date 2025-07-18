@@ -44,6 +44,8 @@ from deepface import DeepFace
 from PIL import Image
 import io
 from scipy.spatial.distance import cosine
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '5791262abcdefg'
@@ -89,20 +91,20 @@ EMAIL_PASSWORD = "isgw cesr jdbs oytx"
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'glen'
-app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
-
-# BRANDON SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
 # app.config['MYSQL_HOST'] = '127.0.0.1'
 # app.config['MYSQL_USER'] = 'glen'
 # app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
 # app.config['MYSQL_DB'] = 'ssp_db'
 # app.config['MYSQL_PORT'] = 3306
+
+#BRANDON SQL DB CONFIG
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'brandon'
+app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+app.config['MYSQL_DB'] = 'ssp_db'
+app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -127,6 +129,7 @@ with app.app_context():
 
 ALGORITHM = 'pbkdf2_sha256'
 
+limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
 
 # CFT on SQL#
 # SQL LOGGING
@@ -142,6 +145,9 @@ def sanitize_input(user_input):
 
     return bleach.clean(user_input, tags=allowed_tags, attributes=allowed_attributes)
 
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return render_template("errors/429.html", error=str(e)), 429
 
 def login_required(f):
     @wraps(f)
@@ -1173,6 +1179,7 @@ def verify_password(password, password_hash):
 
 
 @app.route('/signUp', methods=['GET', 'POST'])
+@limiter.limit("50 per 1 minutes")
 def sign_up():
     sign_up_form = SignUpForm(request.form)
 
@@ -1281,6 +1288,7 @@ def inject_user():
 
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("50 per 1 minutes")
 def login():
     login_form = LoginForm(request.form)
 
