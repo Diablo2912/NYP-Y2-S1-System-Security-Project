@@ -29,26 +29,10 @@
             </div>
           </div>
           <ul class="list-group list-group-flush small">
-            <li class="list-group-item px-2 py-1">
-              <a href="/roleManagement" class="d-flex align-items-center text-decoration-none text-dark">
-                <img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Role Management
-              </a>
-            </li>
-            <li class="list-group-item px-2 py-1">
-              <a href="/createAdmin" class="d-flex align-items-center text-decoration-none text-dark">
-                <img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Create Staff
-              </a>
-            </li>
-            <li class="list-group-item px-2 py-1">
-              <a href="/logging" class="d-flex align-items-center text-decoration-none text-dark">
-                <img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Logs
-              </a>
-            </li>
-            <li class="list-group-item px-2 py-1">
-              <a href="/logging_analytics" class="d-flex align-items-center text-decoration-none text-dark">
-                <img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Logging Analytics
-              </a>
-            </li>
+            <li class="list-group-item px-2 py-1"><a href="/roleManagement" class="d-flex align-items-center text-decoration-none text-dark"><img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Role Management</a></li>
+            <li class="list-group-item px-2 py-1"><a href="/createAdmin" class="d-flex align-items-center text-decoration-none text-dark"><img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Create Staff</a></li>
+            <li class="list-group-item px-2 py-1"><a href="/logging" class="d-flex align-items-center text-decoration-none text-dark"><img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Logs</a></li>
+            <li class="list-group-item px-2 py-1"><a href="/logging_analytics" class="d-flex align-items-center text-decoration-none text-dark"><img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Logging Analytics</a></li>
           </ul>
         </div>
       </div>
@@ -61,154 +45,172 @@
         <p>Last Refresh Time: {{ current_time }}</p>
 
         <a href="{{ url_for('logging_analytics') }}?start_date={{ today_str }}&end_date={{ today_str }}" class="btn btn-primary mb-3">
-          Last 24 Hours
+            Show logs from today
         </a>
+       <!-- Filters Row -->
+       <div class="row mb-4 g-3">
 
-        <!-- Filters Row -->
-        <div class="row mb-4 g-3">
+         <!-- Filters Row (Smaller Version) -->
+         <div class="row mb-3 g-2 small">
+           <!-- Slider Control -->
+           <div class="col-lg-4">
+             <div class="border border-dark rounded p-2 h-100">
+               <label for="logRange" class="form-label mb-3"><strong>Logs From Past Days</strong></label>
+               <div class="position-relative" style="max-width: 200px;">
+                 <div id="rangeBubble" class="range-bubble">10</div>
+                 <input type="range" class="form-range mt-1" min="1" max="20" step="1" id="logRange"
+                        value="{{ num_days or 10 }}">
+               </div>
+               <p class="mb-1">Showing last <output id="rangeOutput">{{ num_days or 10 }}</output> day(s) including today</p>
+               {% if request.args.get('start_date') and request.args.get('end_date') %}
+                 <p class="mb-0 small">From <u>{{ request.args.get('start_date') }}</u> to <u>{{ request.args.get('end_date') }}</u></p>
+               {% else %}
+                 <p class="mb-0 small">From <u>{{ start_date }}</u> until <u>{{ current_day }}</u></p>
+               {% endif %}
+             </div>
+           </div>
 
-          <!-- Filters Row (Smaller Version) -->
-          <div class="row mb-3 g-2 small">
-            <!-- Slider Control -->
-            <div class="col-lg-4">
-              <div class="border border-dark rounded p-2 h-100">
-                <label for="logRange" class="form-label mb-3"><strong>Logs From Past Days</strong></label>
-                <div class="position-relative" style="max-width: 200px;">
-                  <div id="rangeBubble" class="range-bubble">10</div>
-                  <input type="range" class="form-range mt-1" min="1" max="20" step="1" id="logRange"
-                         value="{{ num_days or 10 }}">
-                </div>
-                <p class="mb-1">Showing last <output id="rangeOutput">{{ num_days or 10 }}</output> day(s) including today</p>
-                {% if request.args.get('start_date') and request.args.get('end_date') %}
-                  <p class="mb-0 small">From <u>{{ request.args.get('start_date') }}</u> to <u>{{ request.args.get('end_date') }}</u></p>
-                {% else %}
-                  <p class="mb-0 small">From <u>{{ start_date }}</u> until <u>{{ current_day }}</u></p>
-                {% endif %}
-              </div>
-            </div>
+           <!-- Date Filter -->
+           <div class="col-lg-4">
+             <div class="border border-dark rounded p-2 h-100">
+               <strong>Recent Logs Range</strong>
+               <p class="small mb-1"><i>Max range: 20 days</i></p>
+               <p class="mb-2 small">
+                 From <u>{{ request.args.get('start_date') or start_date }}</u>
+                 to <u>{{ request.args.get('end_date') or current_day }}</u>
+               </p>
+               <div class="d-flex flex-column flex-sm-row gap-2 align-items-end">
+                 <div>
+                   <label for="X-DATE" class="form-label small">Start</label>
+                   <input type="date" id="X-DATE" class="form-control form-control-sm">
+                 </div>
+                 <div>
+                   <label for="Y-DATE" class="form-label small">End</label>
+                   <input type="date" id="Y-DATE" class="form-control form-control-sm">
+                 </div>
+                 <div>
+                   <label class="form-label d-none d-sm-block invisible">Submit</label>
+                   <button id="dateSearchBtn" class="btn btn-sm btn-secondary w-100">Filter</button>
+                 </div>
+               </div>
+             </div>
+           </div>
 
-            <!-- Date Filter -->
-            <div class="col-lg-4">
-              <div class="border border-dark rounded p-2 h-100">
-                <strong>Log Activity Between Dates</strong>
-                <p class="small mb-1"><i>Max range: 20 days</i></p>
-                <p class="mb-2 small">From <u>{{ request.args.get('start_date') }}</u> to <u>{{ request.args.get('end_date') }}</u></p>
-                <div class="d-flex flex-column flex-sm-row gap-2 align-items-end">
-                  <div>
-                    <label for="X-DATE" class="form-label small">Start</label>
-                    <input type="date" id="X-DATE" class="form-control form-control-sm">
-                  </div>
-                  <div>
-                    <label for="Y-DATE" class="form-label small">End</label>
-                    <input type="date" id="Y-DATE" class="form-control form-control-sm">
-                  </div>
-                  <div>
-                    <label class="form-label d-none d-sm-block invisible">Submit</label>
-                    <button id="dateSearchBtn" class="btn btn-sm btn-secondary w-100">Filter</button>
-                  </div>
-                </div>
-              </div>
-            </div>
+           <!-- Date Filter -->
+           <div class="col-lg-3">
+             <div class="border border-dark rounded p-2 h-100">
+               <strong>Log Activity: Choose Date Range</strong>
+               <p class="small mb-1"><i>Max range: 20 days</i></p>
+               <p class="mb-2 small">Date: <u>{{ request.args.get('start_date') }}</u></p>
+               <div class="d-flex flex-column flex-sm-row gap-2 align-items-end">
+                 <div>
+                   <input type="date" id="loginDATE" class="form-control form-control-sm">
+                 </div>
+                 <div>
+                   <label class="form-label d-none d-sm-block invisible">Submit</label>
+                   <button id="SearchBtn" class="btn btn-sm btn-secondary w-100">Filter</button>
+                 </div>
+               </div>
+             </div>
+           </div>
+         </div>
 
-            <!-- Date Filter -->
-            <div class="col-lg-3">
-              <div class="border border-dark rounded p-2 h-100">
-                <strong>Login Activity Filter</strong>
-                <p class="small mb-1"><i>Max range: 20 days</i></p>
-                <p class="mb-2 small">Date: <u>{{ request.args.get('start_date') }}</u></p>
-                <div class="d-flex flex-column flex-sm-row gap-2 align-items-end">
-                  <div>
-                    <input type="date" id="loginDATE" class="form-control form-control-sm">
-                  </div>
-                  <div>
-                    <label class="form-label d-none d-sm-block invisible">Submit</label>
-                    <button id="SearchBtn" class="btn btn-sm btn-secondary w-100">Filter</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+        <!-- Log Summary Cards (5 in a row) -->
+         <!-- Summary Cards -->
+       <h4>Application Incident Management:</h4>
+       <h5>Total Logs: </h5>
+       <div class="five-card-row mt-3">
+         {% for category in ['Info', 'Warning', 'Error', 'Critical'] %}
+         <div class="card-wrapper">
+           <div class="card text-white
+             {% if category == 'Info' %} bg-success
+             {% elif category == 'Warning' %} bg-warning text-dark
+             {% elif category == 'Error' %} bg-orange
+             {% elif category == 'Critical' %} bg-danger
+             {% endif %}">
+             <div class="card-body py-2 px-2 text-center">
+               <h6 class="card-title mb-1">
+                 {{ category }}
+                 <i class="fa-solid fa-circle-info ms-1"
+                   title="{% if category == 'Info' %}
+                            Indicates routine operations or successful actions that require no intervention.
+                          {% elif category == 'Warning' %}
+                            Flags unusual or unexpected behavior that may need monitoring.
+                          {% elif category == 'Error' %}
+                            Represents failures that prevent a specific task from completing.
+                          {% elif category == 'Critical' %}
+                            Denotes severe issues that threaten system stability or security and need immediate action.
+                          {% endif %}">
+                 </i>
+               </h6>
+               <p class="card-text fs-6 mb-0">{{ category_summary[category] }}</p>
+             </div>
+           </div>
+         </div>
+         {% endfor %}
 
-        <!-- Summary Cards -->
-        <h4>Application Incident Management:</h4>
-        <div class="five-card-row mt-3">
-          {% for category in ['Info', 'Warning', 'Error', 'Critical'] %}
-          <div class="card-wrapper">
-            <div class="card text-white
-              {% if category == 'Info' %} bg-success
-              {% elif category == 'Warning' %} bg-warning text-dark
-              {% elif category == 'Error' %} bg-orange
-              {% elif category == 'Critical' %} bg-danger
-              {% endif %}">
-              <div class="card-body py-2 px-2 text-center">
-                <h6 class="card-title mb-1">
-                  {{ category }}
-                  <i class="fa-solid fa-circle-info ms-1"
-                    title="{% if category == 'Info' %}
-                             Indicates routine operations or successful actions that require no intervention.
-                           {% elif category == 'Warning' %}
-                             Flags unusual or unexpected behavior that may need monitoring.
-                           {% elif category == 'Error' %}
-                             Represents failures that prevent a specific task from completing.
-                           {% elif category == 'Critical' %}
-                             Denotes severe issues that threaten system stability or security and need immediate action.
-                           {% endif %}">
-                  </i>
-                </h6>
-                <p class="card-text fs-6 mb-0">{{ category_summary[category] }}</p>
-              </div>
-            </div>
-          </div>
-          {% endfor %}
-
-          <!-- 5th Card -->
-          <div class="card-wrapper">
-            <div class="card bg-primary text-white">
-              <div class="card-body py-2 px-2 text-center">
-                <h6 class="card-title mb-1">
-                  Resolved
-                  <i class="fa-solid fa-circle-info" title="Issues that have been resolved or no further action is required"></i>
-                </h6>
-                <p class="card-text fs-6 mb-0">{{ closed_count }}</p>
-              </div>
-            </div>
-          </div>
-        </div>
+         <!-- 5th Card -->
+         <div class="card-wrapper">
+           <div class="card bg-primary text-white">
+             <div class="card-body py-2 px-2 text-center">
+               <h6 class="card-title mb-1">
+                 Resolved
+                 <i class="fa-solid fa-circle-info" title="Issues that have been resolved or no further action is required"></i>
+               </h6>
+               <p class="card-text fs-6 mb-0">{{ closed_count }}</p>
+             </div>
+           </div>
+         </div>
+       </div>
 
         <!-- Pie Chart & 24-Hour Login Activity Side by Side -->
-        <div class="row mt-5 gx-3 d-flex align-items-stretch">
-          <!-- Pie Chart -->
+       <div class="row mt-5 gx-3 d-flex align-items-stretch">
+
+         <!-- Pie Chart & Bar Chart Toggle Card -->
           <div class="col-lg-4 col-md-12 mb-3">
             <div class="h-100">
-              <div class="card p-3 shadow-sm h-100">
+              <div class="card p-3 shadow-sm h-100" style="min-height: 400px;">
                 <h5 class="text-center mb-3">Log Category Distribution</h5>
-                <canvas id="pieChart" width="100%" height="250"></canvas>
+
+                <!-- Toggle Buttons -->
+                <div class="d-flex flex-column flex-sm-row gap-2 mb-3">
+                  <button id="showPieChart" type="button" class="btn btn-primary w-100 w-sm-auto">Pie Chart</button>
+                  <button id="showBarChart" type="button" class="btn btn-primary w-100 w-sm-auto opacity-50">Bar Chart</button>
+                </div>
+
+                <!-- Charts -->
+                <div id="pieChartWrapper">
+                  <canvas id="pieChart" width="100%" height="250"></canvas>
+                </div>
+                <div id="barChartWrapper" style="display: none;">
+                  <canvas id="barChart" width="100%" height="100"></canvas>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Line Activity Chart -->
-          <div class="col-lg-8 col-md-12 mb-3">
-            <div class="h-100">
-              <div class="card p-3 shadow-sm h-100">
-                <h5 class="text-center mb-3">Login Activity for <u>{{ current_day }}</u></h5>
-                <canvas id="lineActivityChart" width="100%" height="50"></canvas>
-              </div>
-            </div>
-          </div>
-        </div>
+         <!-- Line Activity Chart -->
+         <div class="col-lg-8 col-md-12 mb-3">
+           <div class="h-100">
+             <div class="card p-3 shadow-sm h-100">
+               <h5 class="text-center mb-3">Login Activity for <u>{{ current_day }}</u></h5>
+               <canvas id="lineActivityChart" width="100%" height="50"></canvas>
+             </div>
+           </div>
+         </div>
+       </div>
 
-        <!-- Line Chart -->
-        <div class="mt-5">
-          <h4 class="mb-3">Log Category Trend</h4>
-          <p>Showing last <output id="range2Output">{{ num_days or 10 }}</output> day(s) including today</p>
-          {% if request.args.get('start_date') and request.args.get('end_date') %}
-            <p>Showing logs from <u>{{ request.args.get('start_date') }}</u> to <u>{{ request.args.get('end_date') }}</u></p>
-          {% else %}
-            <p>Showing logs from <u>{{ start_date }}</u> until today, <u>{{ current_day }}</u>.</p>
-          {% endif %}
-          <canvas id="lineChart" height="120"></canvas>
-        </div>
+       <!-- Line Chart -->
+       <div class="mt-5">
+         <h4 class="mb-3">Log Category Trend</h4>
+         <p>Showing last <output id="range2Output">{{ num_days or 10 }}</output> day(s) including today</p>
+         {% if request.args.get('start_date') and request.args.get('end_date') %}
+           <p>Showing logs from <u>{{ request.args.get('start_date') }}</u> to <u>{{ request.args.get('end_date') }}</u></p>
+         {% else %}
+           <p>Showing logs from <u>{{ start_date }}</u> until today, <u>{{ current_day }}</u>.</p>
+         {% endif %}
+         <canvas id="lineChart" height="120"></canvas>
+       </div>
 
         <!-- Logs Summary -->
         <div class="col-lg-10 col-md-9 col-sm-12 mt-3">
@@ -218,7 +220,6 @@
       </div>
     </div>
   </div>
-</div>
 </div>
 
 
@@ -240,9 +241,23 @@
 </style>
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-ywzG+YB8q1YQk... (shortened)" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-ywzG+YB8q1YQk... (shortened)" crossorigin="anonymous" referrerpolicy="no-referrer" />
 <script>
-  // Prevent selecting future dates - Date range
+  document.getElementById("showPieChart").addEventListener("click", () => {
+  document.getElementById("pieChartWrapper").style.display = "block";
+  document.getElementById("barChartWrapper").style.display = "none";
+  document.getElementById("showPieChart").classList.remove("opacity-50");
+  document.getElementById("showBarChart").classList.add("opacity-50");
+});
+
+document.getElementById("showBarChart").addEventListener("click", () => {
+  document.getElementById("pieChartWrapper").style.display = "none";
+  document.getElementById("barChartWrapper").style.display = "block";
+  document.getElementById("showPieChart").classList.add("opacity-50");
+  document.getElementById("showBarChart").classList.remove("opacity-50");
+});
+
+  // Prevent selecting future dates -  Date range
   window.addEventListener("DOMContentLoaded", () => {
     const today = new Date().toISOString().split("T")[0];
     document.getElementById("X-DATE").setAttribute("max", today);
@@ -265,32 +280,29 @@
     return colors[category] || '#000';
   }
 
-  // Generate 24-hour labels: ["00:00", "01:00", ..., "23:00"]
-  const hours24 = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0') + ":00");
+  // Line Chart
+  const lineDatasets = categories.map(cat => ({
+    label: cat,
+    data: datesISO.map(date => chartData[date][cat]),
+    borderColor: getColor(cat),
+    backgroundColor: getColor(cat),
+    fill: false,
+    tension: 0.3
+  }));
 
-  // Login Activity Chart (Blank for now)
-  const loginActivityData = {
-    labels: hours24,
-    datasets: [{
-      label: "Login Count",
-      data: [], // Replace with real login counts if available
-      borderColor: '#0d6efd',
-      backgroundColor: '#0d6efd',
-      fill: false,
-      tension: 0.3
-    }]
-  };
-
-  // Line Chart: Login Activity (Last 24 Hours)
-  new Chart(document.getElementById('lineActivityChart').getContext('2d'), {
+  const lineCtx = document.getElementById('lineChart').getContext('2d');
+  new Chart(lineCtx, {
     type: 'line',
-    data: loginActivityData,
+    data: {
+      labels: datesDisplay,
+      datasets: lineDatasets
+    },
     options: {
       responsive: true,
       plugins: {
         title: {
           display: true,
-          text: 'Login Activity'
+          text: 'Number of Logs Per Category'
         },
         legend: {
           position: 'top'
@@ -307,104 +319,135 @@
     }
   });
 
-  // Prepare dataset
-  const lineDatasets = categories.map(cat => ({
-    label: cat,
-    data: datesISO.map(date => chartData[date][cat]),
-    borderColor: getColor(cat),
-    backgroundColor: getColor(cat),
-    fill: false,
-    tension: 0.3
-  }));
+  // Pie Chart
+  const pieCtx = document.getElementById('pieChart').getContext('2d');
+  new Chart(pieCtx, {
+    type: 'pie',
+    data: {
+      labels: categories,
+      datasets: [{
+        data: categories.map(cat => categorySummary[cat]),
+        backgroundColor: categories.map(cat => getColor(cat))
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'top',
+        },
+        title: {
+          display: true,
+          text: 'Log Category Distribution'
+        }
+      }
+    }
+  });
 
-  // Flatten all data points into a single array
-  const allLineData = lineDatasets.flatMap(ds => ds.data);
-
-  // Check if all values are zero or undefined
-  const hasLineData = allLineData.some(val => val > 0);
-
-  if (hasLineData) {
-    // Render chart if data exists
-    new Chart(document.getElementById('lineChart').getContext('2d'), {
-      type: 'line',
-      data: {
-        labels: datesDisplay,
-        datasets: lineDatasets
+  // Bar Chart
+  const barCtx = document.getElementById('barChart').getContext('2d');
+  new Chart(barCtx, {
+    type: 'bar',
+    data: {
+      labels: categories,
+      datasets: [{
+        label: 'Log Count',
+        data: categories.map(cat => categorySummary[cat]),
+        backgroundColor: categories.map(cat => getColor(cat))
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          display: false // You can enable this if needed
+        },
+        title: {
+          display: true,
+          text: 'Log Category Distribution'
+        }
       },
-      options: {
-        responsive: true,
-        plugins: {
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1,
+            callback: function(value) {
+              if (Number.isInteger(value)) {
+                return value;
+              }
+            }
+          },
           title: {
             display: true,
-            text: 'Number of Logs Per Category'
-          },
-          legend: {
-            position: 'top'
+            text: 'Number of Logs'
           }
         },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: { precision: 0 }
+        x: {
+          title: {
+            display: true,
+            text: 'Category'
           }
         }
       }
-    });
-  } else {
-    // Replace chart with fallback message
-    const lineChartContainer = document.getElementById('lineChart').parentElement;
-    lineChartContainer.innerHTML =
-    `
-    <h5 class="text-center mb-3">Log Category Trend</h5>
-    <p class="text-center text-muted fw-semibold mt-4">No log data available to display.</p>
-    `;
-  }
+    }
+  });
 
-  // Pie Chart
-  const pieValues = categories.map(cat => categorySummary[cat]);
+ // Generate 24-hour labels: ["00:00", "01:00", ..., "23:00"]
+ const hours24 = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0') + ":00");
 
-  const hasPieData = pieValues.some(v => v > 0);
+ // Login Activity Chart (Blank for now)
+ const loginActivityData = {
+   labels: hours24,
+   datasets: [{
+     label: "Login Count",
+     data: [], // Replace with real login counts if available
+     borderColor: '#0d6efd',
+     backgroundColor: '#0d6efd',
+     fill: false,
+     tension: 0.3
+   }]
+ };
 
-  if (hasPieData) {
-    new Chart(document.getElementById('pieChart').getContext('2d'), {
-      type: 'pie',
-      data: {
-        labels: categories,
-        datasets: [{
-          data: pieValues,
-          backgroundColor: categories.map(cat => getColor(cat))
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { position: 'top' },
-          title: { display: true, text: 'Log Category Distribution' }
-        }
-      }
-    });
-  } else {
-    // Replace chart with message
-    const pieContainer = document.getElementById('pieChart').parentElement;
-    pieContainer.innerHTML =
-    `
-    <h5 class="text-center mb-3">Log Category Distribution</h5>
-    <p class="text-center text-muted">No log data available to display.</p>
-    `;
-  }
+ // Line Chart: Login Activity (Last 24 Hours)
+ new Chart(document.getElementById('lineActivityChart').getContext('2d'), {
+   type: 'line',
+   data: loginActivityData,
+   options: {
+     responsive: true,
+     plugins: {
+       title: {
+         display: true,
+         text: 'Login Activity'
+       },
+       legend: {
+         position: 'top'
+       }
+     },
+     scales: {
+       y: {
+         beginAtZero: true,
+         ticks: {
+           precision: 0
+         }
+       }
+     }
+   }
+ });
 
-  // Range slider behavior
+
   let timeout;
   const slider = document.getElementById('logRange');
+
   slider.addEventListener('change', function () {
     const days = this.value;
     clearTimeout(timeout);
     timeout = setTimeout(() => {
       window.location.href = `/logging_analytics?days=${days}`;
-    }, 300);
+    }, 300);  // wait 300ms to avoid spamming
   });
 
-  // Bubble label on slider
+  //bubble on slider
   const rangeOutput = document.getElementById('rangeOutput');
   const rangeBubble = document.getElementById('rangeBubble');
 
@@ -413,6 +456,8 @@
     const min = slider.min;
     const max = slider.max;
     const percent = (val - min) / (max - min);
+
+    // Position bubble
     const sliderWidth = slider.offsetWidth;
     const bubbleOffset = slider.offsetLeft + percent * sliderWidth;
 
@@ -424,30 +469,30 @@
   slider.addEventListener("input", updateBubble);
   window.addEventListener("load", updateBubble);
 
-  // Date range button logic
   document.getElementById("dateSearchBtn").addEventListener("click", function () {
-    const startDate = document.getElementById("X-DATE").value;
-    const endDate = document.getElementById("Y-DATE").value;
+  const startDate = document.getElementById("X-DATE").value;
+  const endDate = document.getElementById("Y-DATE").value;
 
-    if (!startDate || !endDate) {
-      alert("Please select both start and end dates.");
-      return;
-    }
+  if (!startDate || !endDate) {
+    alert("Please select both start and end dates.");
+    return;
+  }
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const diffTime = Math.abs(end - start);
-    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+  // Check range does not exceed 20 days
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const diffTime = Math.abs(end - start);
+  const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
-    if (diffDays > 20) {
-      alert("The date range cannot exceed 20 days.");
-      return;
-    }
+  if (diffDays > 20) {
+    alert("The date range cannot exceed 20 days.");
+    return;
+  }
 
-    window.location.href = `/logging_analytics?start_date=${startDate}&end_date=${endDate}`;
-  });
+  window.location.href = `/logging_analytics?start_date=${startDate}&end_date=${endDate}`;
+});
+
 </script>
-
 
 <style>
 .range-bubble {
