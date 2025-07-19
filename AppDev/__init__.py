@@ -1,7 +1,7 @@
 from flask import Flask, g, Response, render_template, request, redirect, url_for, session, jsonify, flash, \
     make_response
 from functools import wraps
-from Forms import SignUpForm, CreateAdminForm, CreateProductForm, LoginForm, ChangeDetForm, ChangePswdForm
+from Forms import SignUpForm, CreateAdminForm, CreateProductForm, LoginForm, ChangeDetForm, ChangePswdForm, ResetPassRequest, ResetPass
 import shelve, User
 from FeaturedArticles import get_featured_articles
 from Filter import main_blueprint
@@ -2642,6 +2642,91 @@ def chat():
     bot_response = generate_response(user_message)
     return jsonify({'response': bot_response})
 
+def send_reset_pass(email, user_id):
+    try:
+        token = secrets.token_urlsafe(32)
+        sg_time = datetime.utcnow() + timedelta(hours=8)
+        expires_at = sg_time + timedelta(minutes=5)
+
+        # Store token in DB
+        cursor = mysql.connection.cursor()
+        cursor.execute(
+            "INSERT INTO password_resets (email, token, expires_at) VALUES (%s, %s, %s)",
+            (email, token, expires_at)
+        )
+        mysql.connection.commit()
+        cursor.close()
+
+        # Construct URL
+        reset_url = url_for('reset_password', token=token, _external=True)
+        subject = "[Cropzy] Reset Your Password"
+        message = (
+            f"Hi,\n\n"
+            f"We received a request to reset your password. You can reset it by clicking the link below:\n\n"
+            f"{reset_url}\n\n"
+            f"This link will expire in 10 minutes.\n\n"
+            f"Thanks,\nCropzy Support")
+        send_email(email, subject, message)
+
+    except Exception as e:
+        print(f"[ERROR] Failed to send reset password email: {e}")
+
+@app.route('/reset_password_request', methods=['GET', 'POST'])
+def reset_password_request():
+    form = ResetPassRequest(request.form)
+
+    if request.method == 'POST' and form.validate():
+        email = form.email.data  # Define this helper to fetch user_id
+        cursor = mysql.connection.cursor()
+        cursor.execute("SELECT id FROM accounts WHERE email = %s", (email,))
+        user = cursor.fetchone()
+        cursor.close()
+
+        if user:
+            send_reset_pass(email, user[0])
+
+        # Always show same message regardless
+        flash("If an account with that email exists, a reset link has been sent.", "info")
+
+
+    return render_template("accountPage/reset_pass_request.html", form=form)
+
+@app.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    form = ResetPass(request.form)
+    cursor = mysql.connection.cursor()
+
+    cursor.execute("SELECT email, expires_at FROM password_resets WHERE token = %s", (token,))
+    row = cursor.fetchone()
+
+    if not row:
+        flash("Invalid or expired token.", "danger")
+        return redirect(url_for('reset_password_request'))
+
+    email, expires_at = row
+    if datetime.now() > expires_at:
+        flash("Reset link has expired.", "danger")
+        return redirect(url_for('reset_password_request'))
+
+    if request.method == 'POST' and form.validate():
+        new_password = form.new_pswd.data
+        confirm_password = form.confirm_pswd.data
+
+        if new_password != confirm_password:
+            flash("Passwords do not match.", "danger")
+            return redirect(url_for('reset_password', token=token,_external=True))
+        else:
+            hashed_pw = hash_password(new_password)
+            cursor.execute("UPDATE accounts SET password = %s WHERE email = %s", (hashed_pw, email))
+            cursor.execute("DELETE FROM password_resets WHERE token = %s", (token,))
+            mysql.connection.commit()
+            cursor.close()
+
+        flash("Password reset successfully.", "success")
+        return redirect(url_for('login'))
+
+    cursor.close()
+    return render_template("accountPage/reset_pass.html", form=form)
 
 if __name__ == '__main__':
     app.run(debug=True)
