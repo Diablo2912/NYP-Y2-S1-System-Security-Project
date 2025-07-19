@@ -222,7 +222,7 @@
 
          <div class="d-flex justify-content-center my-3">
             <button id="generateReportBtn" class="btn btn-primary px-3 py-2">Generate Report</button>
-          </div>
+         </div>
       </div>
     </div>
   </div>
@@ -230,6 +230,18 @@
 
 
 <style>
+  .range-bubble {
+  position: absolute;
+  top: -15px;
+  background: #0d6efd;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  white-space: nowrap;
+}
   .bg-orange {
   background-color: #fd7e14 !important; /* Bootstrap's orange-500 */
   }
@@ -249,6 +261,10 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-ywzG+YB8q1YQk... (shortened)" crossorigin="anonymous" referrerpolicy="no-referrer" />
 <script>
+
+  document.getElementById("generateReportBtn").addEventListener("click", function () {
+  window.location.href = "/download_pdf_report";
+});
 
   //Pass login activity to JS
   const loginActivity = {{ login_activity | tojson }};
@@ -557,20 +573,5 @@ document.getElementById("showBarChart").addEventListener("click", () => {
 });
 
 </script>
-
-<style>
-.range-bubble {
-  position: absolute;
-  top: -15px;
-  background: #0d6efd;
-  color: white;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-  transform: translateX(-50%);
-  pointer-events: none;
-  white-space: nowrap;
-}
-</style>
 
 {% endblock %}
