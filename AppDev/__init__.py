@@ -651,7 +651,8 @@ def accountInfo():
     cursor.execute("SELECT * FROM accounts WHERE id = %s", (user_id,))
     user = cursor.fetchone()
     cursor.close()
-    return render_template('/accountPage/accountInfo.html', user=user)
+    return render_template('/accountPage/accountInfo.html', user=user)  # ❗️Passing as `user`, not updating current_user
+
 
 
 @app.route('/accountSecurity', methods=['GET', 'POST'])
@@ -902,13 +903,16 @@ def logging():
 
     search_query = request.args.get("search", "").strip().lower()
     selected_roles = request.args.getlist("roles")
-    selected_statuses = request.args.getlist("statuses")  # ✅ added
+    selected_statuses = request.args.getlist("statuses")
+    sort_by = request.args.get("sort_by", "date")
+    sort_order = request.args.get("sort_order", "desc")
+    start_date = request.args.get("start_date")
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute("SELECT * FROM accounts WHERE id = %s", (current_user['user_id'],))
     user_info = cursor.fetchone()
 
-    query = "SELECT id, date, time, category, activity, status, ip_address FROM logs WHERE 1=1"
+    query = "SELECT id, user_id, date, time, category, activity, status, ip_address FROM logs WHERE 1=1"
     params = []
 
     if selected_roles:
@@ -926,8 +930,30 @@ def logging():
         like_term = f"%{search_query}%"
         params.extend([like_term, like_term, like_term])
 
+    if start_date:
+        try:
+            datetime.strptime(start_date, "%Y-%m-%d")  # validate format
+            query += " AND date >= %s"
+            params.append(start_date)
+        except ValueError:
+            flash("Invalid date format provided.", "warning")
+
+    sortable_columns = {
+        "date": "date",
+        "category": "FIELD(category, 'Critical', 'Error', 'Warning', 'Info')"
+    }
+
+    if sort_by in sortable_columns:
+        order_clause = sortable_columns[sort_by]
+        query += f" ORDER BY {order_clause} {'ASC' if sort_order == 'asc' else 'DESC'}"
+
     cursor.execute(query, params)
     logs = cursor.fetchall()
+
+    cursor.execute("SELECT COUNT(*) AS logs_count FROM logs")
+    logs_result = cursor.fetchone()
+    logs_count = logs_result['logs_count']
+
     cursor.close()
 
     current_date = date.today().isoformat()
@@ -939,9 +965,12 @@ def logging():
         selected_roles=selected_roles,
         selected_statuses=selected_statuses,
         current_date=current_date,
-        search_query=search_query
+        search_query=search_query,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        start_date=start_date,
+        logs_count=logs_count
     )
-
 
 @app.route('/logging_analytics', methods=['GET'])
 @jwt_required
@@ -987,10 +1016,10 @@ def logging_analytics():
         today = datetime.today().date()
         dates_iso = [(today - timedelta(days=i)).isoformat() for i in range(num_days - 1, -1, -1)]
         dates_display = [(today - timedelta(days=i)).strftime('%d - %m - %Y') for i in range(num_days - 1, -1, -1)]
-        display_start_date = (datetime.now() - timedelta(days=num_days)).strftime("%d/%m/%Y")
+        start_date_obj = datetime.now().date() - timedelta(days=num_days - 1)
+        display_start_date = start_date_obj.strftime("%d/%m/%Y")
 
     log_data = cursor.fetchall()
-    cursor.close()
 
     categories = ['Info', 'Warning', 'Error', 'Critical']
     chart_data = {date: {cat: 0 for cat in categories} for date in dates_iso}
@@ -1005,6 +1034,17 @@ def logging_analytics():
             category_summary[cat] += count
 
     current_time = datetime.now().strftime("%d-%m-%Y , %I:%M %p")
+    current_day = datetime.now().strftime("%d-%m-%Y")
+
+    cursor.execute("SELECT COUNT(*) AS closed_count FROM logs WHERE status = 'Closed'")
+    closed_result = cursor.fetchone()
+    closed_count = closed_result['closed_count']
+
+    cursor.execute("SELECT COUNT(*) AS logs_count FROM logs")
+    logs_result = cursor.fetchone()
+    logs_count = logs_result['logs_count']
+
+    cursor.close()
 
     return render_template(
         'logging_analytics.html',
@@ -1013,9 +1053,12 @@ def logging_analytics():
         dates_display=dates_display,
         categories=categories,
         current_time=current_time,
+        current_day=current_day,
         today_str=today_str,
         start_date=display_start_date,
         category_summary=category_summary,
+        closed_count=closed_count,
+        logs_count=logs_count,
         num_days=num_days
     )
 
@@ -1058,18 +1101,22 @@ def admin_log_activity(mysql, activity, category="Info"):
     if not mysql:
         raise ValueError("MySQL connection object is required.")
 
-    hostname = socket.gethostname()
-    ip_addr = socket.gethostbyname(hostname)
+    user_id = g.user['user_id']
+
+    user_id = user_id
     date = datetime.now().strftime('%Y-%m-%d')
     time = datetime.now().strftime('%I:%M %p')
+    status = 'Open'
+    hostname = socket.gethostname()
+    ip_addr = socket.gethostbyname(hostname)
 
     # Insert log into DB
     cursor = mysql.connection.cursor()
     try:
         cursor.execute('''
-            INSERT INTO logs (date, time, category, activity, ip_address)
+            INSERT INTO logs (user_id, date, time, category, activity, status, ip_address)
             VALUES (%s, %s, %s, %s, %s)
-        ''', (date, time, category, activity, ip_addr))
+        ''', (user_id, date, time, category, activity, status, ip_addr))
         mysql.connection.commit()
     finally:
         cursor.close()
@@ -1222,8 +1269,8 @@ def sign_up():
 
         # Insert new user with hashed password
         cursor.execute('''
-            INSERT INTO accounts (first_name, last_name, gender, phone_number, email, password, status, two_factor_status) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO accounts (first_name, last_name, gender, phone_number, email, password, status, two_factor_status, countries) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         ''', (
             first_name,
             last_name,
@@ -1233,11 +1280,11 @@ def sign_up():
             hashed_password,
             status,
             'disabled',
-            user_country  # this is the country code like 'SG', 'MY', etc.
+            user_country
         ))
 
         # Log registration
-        admin_log_activity(mysql, "User signed up successfully", category="Critical")
+        # admin_log_activity(mysql, "User signed up successfully", category="Critical")
 
         mysql.connection.commit()
         cursor.close()
@@ -1624,15 +1671,22 @@ def face_id(id):
 
     return render_template("accountPage/face_id.html", id=id)
 
-
 @app.route('/more_auth/<int:id>', methods=['GET'])
 def more_auth(id):
-    # Ensure session still holds the pending 2FA user
     if 'pending_2fa_user_id' not in session or session['pending_2fa_user_id'] != id:
         flash("Unauthorized access.", "danger")
         return redirect(url_for('login'))
 
-    return render_template('/accountPage/more_auth.html', id=id)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
+    user = cursor.fetchone()
+    cursor.close()
+
+    if not user:
+        flash("User not found.", "danger")
+        return redirect(url_for('login'))
+
+    return render_template('/accountPage/more_auth.html', id=id, user=user)
 
 
 @app.route('/2FA/<int:id>', methods=['POST'])
@@ -1676,7 +1730,7 @@ def disable_two_factor(id):
     if user['two_factor_status'] == 'disabled':
         flash("2FA is already disabled for this account.", "info")
     else:
-        cursor.execute("UPDATE accounts SET two_factor_status = %s, recovery_code = NULL WHERE id = %s",
+        cursor.execute("UPDATE accounts SET two_factor_status = %s, recovery_code = NULL , face = NULL WHERE id = %s",
                        ('disabled', id))
         mysql.connection.commit()
         flash("2FA has been disabled for this account.", "success")
