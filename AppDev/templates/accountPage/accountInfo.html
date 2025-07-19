@@ -17,7 +17,7 @@
 
 <div class="container">
   <div class="row">
-    {% if current_user %}
+    {% if user %}
     <!-- Left Container -->
     <div class="col-lg-4 p-3">
       <div class="card d-flex mb-3 m-3">
@@ -25,8 +25,8 @@
           <div class="d-flex mb-3">
             <img class="flex" src="{{ url_for('static', filename='assets/person.svg') }}" width="60" height="60">
             <div class="flex-grow-1 ms-3">
-              <h2 class="card-title mb-1">{{ current_user.first_name }}</h2>
-              <h6 class="card-subtitle text-body-secondary">{{ current_user.email }}</h6>
+              <h2 class="card-title mb-1">{{ user.first_name }}</h2>
+              <h6 class="card-subtitle text-body-secondary">{{ user.email }}</h6>
             </div>
           </div>
 
@@ -69,35 +69,35 @@
           <ul class="list-group list-group-flush">
             <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
               <label class="col-md-3 m-1 fs-6">Name</label>
-              <span class="fs-5 p-0">{{ current_user.first_name }}</span>
-              <span class="fs-5 ps-1">{{ current_user.last_name }}</span>
+              <span class="fs-5 p-0">{{ user.first_name }}</span>
+              <span class="fs-5 ps-1">{{ user.last_name }}</span>
             </li>
             <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
               <label class="col-md-3 m-1 fs-6">User ID</label>
-              <span class="fs-5 p-0">{{ current_user.user_id }}</span>
+              <span class="fs-5 p-0">{{ user.id }}</span>
             </li>
             <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
               <label class="col-md-3 m-1 fs-6">Gender</label>
-              <span class="fs-5 p-0">{{ current_user.gender }}</span>
+              <span class="fs-5 p-0">{{ user.gender }}</span>
             </li>
             <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
               <label class="col-md-3 m-1 fs-6">Phone Number</label>
-              <span class="fs-5 p-0">{{ current_user.phone }}</span>
+              <span class="fs-5 p-0">{{ user.phone_number }}</span>
             </li>
             <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
               <label class="col-md-3 m-1 fs-6">Email</label>
-              <span class="fs-5 p-0">{{ current_user.email }}</span>
+              <span class="fs-5 p-0">{{ user.email }}</span>
             </li>
           </ul>
 
           <div class="text-end m-2 mt-5">
-            <a href="{{ url_for('change_dets', id=current_user.user_id) }}" class="btn btn-success">Change Details</a>
+            <a href="{{ url_for('change_dets', id=user.id) }}" class="btn btn-success">Change Details</a>
 
-            <form action="{{ url_for('delete_user', id=current_user.user_id) }}" method="POST" class="d-inline-block">
-              <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal_{{ current_user.user_id }}">
+            <form action="{{ url_for('delete_user', id=user.id) }}" method="POST" class="d-inline-block">
+              <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal_{{ user.id }}">
                 Delete Account
               </button>
-              <div class="modal" id="deleteModal_{{ current_user.user_id }}">
+              <div class="modal" id="deleteModal_{{ user.id }}">
                 <div class="modal-dialog">
                   <div class="modal-content">
                     <div class="modal-header">
@@ -105,7 +105,7 @@
                       <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body text-start">
-                      Are you sure you want to delete {{ current_user.first_name }} {{ current_user.last_name }}?
+                      Are you sure you want to delete {{ user.first_name }} {{ user.last_name }}?
                     </div>
                     <div class="modal-footer">
                       <input type="submit" value="Delete" class="btn btn-danger">
@@ -121,13 +121,22 @@
               <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#disable2FAModal_{{ user.id }}">
                 Disable 2FA
               </button>
-              <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#viewCodeModal_{{ user.id }}">
+
+              <button type="button" class="btn btn-warning mb-1" data-bs-toggle="modal" data-bs-target="#viewCodeModal_{{ user.id }}">
                 View Recovery Code
               </button>
-              <a href="{{ url_for('setup_face_id', id=user.id) }}" class="btn btn-warning">
-                Setup Face ID
-              </a>
 
+              {% if user.face is none %}
+                <a href="{{ url_for('setup_face_id', id=user.id) }}" class="btn btn-warning">
+                  Setup Face ID
+                </a>
+              {% else %}
+                <a href="{{ url_for('delete_face_id', id=user.id) }}" class="btn btn-warning">
+                  Delete Face ID
+                </a>
+              {% endif %}
+
+              <!-- Disable 2FA Modal -->
               <div class="modal fade" id="disable2FAModal_{{ user.id }}" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog">
                   <div class="modal-content">
@@ -137,7 +146,7 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                       </div>
                       <div class="modal-body text-start">
-                        <strong>Disabling 2FA will reduce this account’s security.</strong><br><br>
+                        <strong>Disabling 2FA will reduce your account’s security.</strong><br><br>
                         Are you sure you want to <strong>disable</strong> 2FA for {{ user.email }}?
                       </div>
                       <div class="modal-footer">
@@ -149,6 +158,7 @@
                 </div>
               </div>
 
+              <!-- View Recovery Code Modal -->
               <div class="modal fade" id="viewCodeModal_{{ user.id }}" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog">
                   <div class="modal-content">
@@ -167,6 +177,7 @@
                 </div>
               </div>
             {% else %}
+              <!-- Enable 2FA -->
               <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#enable2FAModal_{{ user.id }}">
                 Enable 2FA
               </button>
@@ -181,7 +192,7 @@
                       </div>
                       <div class="modal-body text-start">
                         <strong>Enabling 2FA adds extra protection to your account.</strong><br><br>
-                        Are you sure you want to <strong>enable</strong> 2FA for email: <strong>{{ current_user.email }}</strong>?
+                        Are you sure you want to enable 2FA for <strong>{{ user.email }}</strong>?
                       </div>
                       <div class="modal-footer">
                         <button type="submit" class="btn btn-success">Confirm</button>
@@ -193,7 +204,6 @@
               </form>
             {% endif %}
           </div>
-
         </div>
       </div>
     </div>

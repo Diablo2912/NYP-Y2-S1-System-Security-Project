@@ -51,6 +51,9 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 import io
 
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '5791262abcdefg'
 UPLOAD_FOLDER = 'static/uploads/'  # Define where images are stored
@@ -95,20 +98,20 @@ EMAIL_PASSWORD = "isgw cesr jdbs oytx"
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'glen'
-app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
-
-# BRANDON SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
 # app.config['MYSQL_HOST'] = '127.0.0.1'
 # app.config['MYSQL_USER'] = 'glen'
 # app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
 # app.config['MYSQL_DB'] = 'ssp_db'
 # app.config['MYSQL_PORT'] = 3306
+
+#BRANDON SQL DB CONFIG
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'brandon'
+app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+app.config['MYSQL_DB'] = 'ssp_db'
+app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -133,6 +136,7 @@ with app.app_context():
 
 ALGORITHM = 'pbkdf2_sha256'
 
+limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
 
 # CFT on SQL#
 # SQL LOGGING
@@ -148,6 +152,9 @@ def sanitize_input(user_input):
 
     return bleach.clean(user_input, tags=allowed_tags, attributes=allowed_attributes)
 
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return render_template("errors/429.html", error=str(e)), 429
 
 def login_required(f):
     @wraps(f)
@@ -651,7 +658,8 @@ def accountInfo():
     cursor.execute("SELECT * FROM accounts WHERE id = %s", (user_id,))
     user = cursor.fetchone()
     cursor.close()
-    return render_template('/accountPage/accountInfo.html', user=user)
+    return render_template('/accountPage/accountInfo.html', user=user)  # ❗️Passing as `user`, not updating current_user
+
 
 
 @app.route('/accountSecurity', methods=['GET', 'POST'])
@@ -948,6 +956,11 @@ def logging():
 
     cursor.execute(query, params)
     logs = cursor.fetchall()
+
+    cursor.execute("SELECT COUNT(*) AS logs_count FROM logs")
+    logs_result = cursor.fetchone()
+    logs_count = logs_result['logs_count']
+
     cursor.close()
 
     current_date = date.today().isoformat()
@@ -963,6 +976,7 @@ def logging():
         sort_by=sort_by,
         sort_order=sort_order,
         start_date=start_date,
+        logs_count=logs_count
     )
 
 @app.route('/logging_analytics', methods=['GET'])
@@ -1399,6 +1413,7 @@ def verify_password(password, password_hash):
 
 
 @app.route('/signUp', methods=['GET', 'POST'])
+@limiter.limit("50 per 1 minutes")
 def sign_up():
     sign_up_form = SignUpForm(request.form)
 
@@ -1507,6 +1522,7 @@ def inject_user():
 
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("50 per 1 minutes")
 def login():
     login_form = LoginForm(request.form)
 
@@ -1842,15 +1858,22 @@ def face_id(id):
 
     return render_template("accountPage/face_id.html", id=id)
 
-
 @app.route('/more_auth/<int:id>', methods=['GET'])
 def more_auth(id):
-    # Ensure session still holds the pending 2FA user
     if 'pending_2fa_user_id' not in session or session['pending_2fa_user_id'] != id:
         flash("Unauthorized access.", "danger")
         return redirect(url_for('login'))
 
-    return render_template('/accountPage/more_auth.html', id=id)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
+    user = cursor.fetchone()
+    cursor.close()
+
+    if not user:
+        flash("User not found.", "danger")
+        return redirect(url_for('login'))
+
+    return render_template('/accountPage/more_auth.html', id=id, user=user)
 
 
 @app.route('/2FA/<int:id>', methods=['POST'])
@@ -1894,7 +1917,7 @@ def disable_two_factor(id):
     if user['two_factor_status'] == 'disabled':
         flash("2FA is already disabled for this account.", "info")
     else:
-        cursor.execute("UPDATE accounts SET two_factor_status = %s, recovery_code = NULL WHERE id = %s",
+        cursor.execute("UPDATE accounts SET two_factor_status = %s, recovery_code = NULL , face = NULL WHERE id = %s",
                        ('disabled', id))
         mysql.connection.commit()
         flash("2FA has been disabled for this account.", "success")
