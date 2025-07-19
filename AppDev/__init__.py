@@ -1699,6 +1699,11 @@ def login():
                 flash("Account is frozen. Check your email to unfreeze it.", "danger")
                 return redirect(url_for('login'))
 
+
+            if is_account_frozen(user['id']):
+                flash("Account is frozen. Check your email to unfreeze it.", "danger")
+                return redirect(url_for('login'))
+
             # Password validation
             stored_password_hash = user['password']
             if verify_password(password, stored_password_hash):
