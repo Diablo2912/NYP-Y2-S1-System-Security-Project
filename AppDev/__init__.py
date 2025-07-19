@@ -98,20 +98,20 @@ EMAIL_PASSWORD = "isgw cesr jdbs oytx"
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'glen'
-# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-# app.config['MYSQL_DB'] = 'ssp_db'
-# app.config['MYSQL_PORT'] = 3306
-
-#BRANDON SQL DB CONFIG
 app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
 app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'brandon'
-app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+app.config['MYSQL_USER'] = 'glen'
+app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
 app.config['MYSQL_DB'] = 'ssp_db'
 app.config['MYSQL_PORT'] = 3306
+
+#BRANDON SQL DB CONFIG
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'brandon'
+# app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -1448,8 +1448,14 @@ def sign_up():
 
         # Get user IP (use real IP for deployment)
         ip_address = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
-        # If testing locally, uncomment this line:
-        # ip_address = requests.get("https://api.ipify.org").text
+
+        # If running locally (private IP), use real public IP
+        if ip_address.startswith("127.") or ip_address.startswith("192.") or ip_address.startswith(
+                "10.") or ip_address.startswith("172."):
+            ip_address = get_public_ip()
+
+        current_country = get_user_country(ip_address)
+        print(f"User IP: {ip_address}, Country: {current_country}")
 
         # Get country code from IP
         user_country = get_user_country(ip_address)
@@ -1484,18 +1490,12 @@ def sign_up():
 SECRET_KEY = 'asdsa8f7as8d67a8du289p1eu89hsad7y2189eha8'  # You can change this to a more secure value
 
 
-@app.context_processor
-def inject_user():
-    token = request.cookies.get('jwt_token')
-    user = verify_jwt_token(token) if token else None
-    return dict(current_user=user)
-
-
 def get_user_country(ip_address):
     try:
-        res = requests.get(f"https://ipwho.is/{ip_address}")
-        data = res.json()
-        if data.get('success', False):
+        response = requests.get(f"https://ipwho.is/{ip_address}")
+        data = response.json()
+        print(f"GeoIP lookup for {ip_address}: {data}")
+        if data.get('success'):
             return data.get('country_code', 'Unknown')
         return "Unknown"
     except Exception as e:
@@ -1505,7 +1505,7 @@ def get_user_country(ip_address):
 
 def get_public_ip():
     try:
-        return requests.get("https://api.ipify.org").text
+        return requests.get("https://api.ipify.org").text.strip()
     except Exception as e:
         print("IP fetch error:", e)
         return "127.0.0.1"
@@ -1537,12 +1537,19 @@ def login():
 
         if user:
             # Hardcoded IP (Singapore - SG) for testing purposes
-            ip_address = '183.90.84.148'
+            # ip_address = '183.90.84.148'
             # Hardcoded IP (Malaysia - MYS) for testing purposes
             # Hardcoded IP (Japan - JPN) for testing purposes
             # #Uncomment if not run on code editor, but on Proxy or Load Balancer
             # Eg: Nginx, Heroku, Apache, Cloudflare
-            # ip_address = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+            # Get IP address from headers or fallback to remote_addr
+            ip_address = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+
+            # If running locally (private IP), use real public IP
+            if ip_address.startswith("127.") or ip_address.startswith("192.") or ip_address.startswith(
+                    "10.") or ip_address.startswith("172."):
+                ip_address = get_public_ip()
+
             current_country = get_user_country(ip_address)
             print(f"User IP: {ip_address}, Country: {current_country}")
 
@@ -1733,7 +1740,7 @@ def sms_verify_otp(id):
 
 
 def generate_recovery_code(id):
-    code = f"{random.randint(0, 999999):012d}"  # Generate 12-digit code
+    code = f"{random.randint(0, 999999):06d}"  # Generate 6-digit code
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
