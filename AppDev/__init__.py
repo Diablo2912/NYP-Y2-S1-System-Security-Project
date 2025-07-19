@@ -129,7 +129,7 @@ with app.app_context():
 
 ALGORITHM = 'pbkdf2_sha256'
 
-limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
+limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "500 per hour"])
 
 # CFT on SQL#
 # SQL LOGGING
@@ -1179,7 +1179,7 @@ def verify_password(password, password_hash):
 
 
 @app.route('/signUp', methods=['GET', 'POST'])
-@limiter.limit("50 per 1 minutes")
+@limiter.limit("500 per 1 minutes")
 def sign_up():
     sign_up_form = SignUpForm(request.form)
 
@@ -1288,7 +1288,7 @@ def inject_user():
 
 
 @app.route('/login', methods=['GET', 'POST'])
-@limiter.limit("50 per 1 minutes")
+@limiter.limit("500 per 1 minutes")
 def login():
     login_form = LoginForm(request.form)
 
@@ -1318,6 +1318,11 @@ def login():
 
             if current_country not in allowed_list:
                 flash("Login from your region is not allowed.", "danger")
+                return redirect(url_for('login'))
+
+
+            if is_account_frozen(user['id']):
+                flash("Account is frozen. Check your email to unfreeze it.", "danger")
                 return redirect(url_for('login'))
 
             # Password validation
@@ -2727,6 +2732,59 @@ def reset_password(token):
 
     cursor.close()
     return render_template("accountPage/reset_pass.html", form=form)
+
+def freeze_account(user_id, email, reason):
+    token = secrets.token_urlsafe(32)
+    expires = datetime.utcnow() + timedelta(minutes=30)
+
+    cursor = mysql.connection.cursor()
+    cursor.execute("""
+        INSERT INTO frozen_account (user_id, reason, freeze_token, freeze_token_expires)
+        VALUES (%s, %s, %s, %s)
+    """, (user_id, reason, token, expires))
+    mysql.connection.commit()
+    cursor.close()
+    #
+    # send_unfreeze_email(email, token)
+
+def is_account_frozen(user_id):
+    cursor = mysql.connection.cursor()
+    cursor.execute("""
+        SELECT is_active FROM frozen_account
+        WHERE user_id = %s AND is_active = TRUE
+    """, (user_id,))
+    frozen = cursor.fetchone()
+    cursor.close()
+    return frozen is not None
+
+@app.route('/unfreeze/<token>')
+def unfreeze_account(token):
+    cursor = mysql.connection.cursor()
+    cursor.execute("""
+        SELECT id, user_id, freeze_token_expires FROM frozen_account
+        WHERE freeze_token = %s AND is_active = TRUE
+    """, (token,))
+    row = cursor.fetchone()
+
+    if not row:
+        flash("Invalid or expired token.", "danger")
+        return redirect(url_for('login'))
+
+    freeze_id, user_id, expires = row
+    if datetime.utcnow() > expires:
+        flash("Unfreeze link has expired.", "danger")
+        return redirect(url_for('login'))
+
+    cursor.execute("""
+        UPDATE frozen_account
+        SET is_active = FALSE, freeze_token = NULL, freeze_token_expires = NULL
+        WHERE id = %s
+    """, (freeze_id,))
+    mysql.connection.commit()
+    cursor.close()
+
+    flash("Account unfrozen. You may log in.", "success")
+    return redirect(url_for('login'))
 
 if __name__ == '__main__':
     app.run(debug=True)

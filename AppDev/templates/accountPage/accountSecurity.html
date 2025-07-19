@@ -57,7 +57,16 @@
     <div class="col-lg-8 p-3">
       <div class="card d-flex mb-3 m-3 bg-success-subtle">
         <div class="card-body">
-          <h1 class="card-title">Security Info</h1>
+          <div class="container">
+            <div class="row">
+              <div class="d-flex">
+                <h1 class="card-title col-8">Security Info</h1>
+                <button class="btn btn-outline-danger col-4 fs-4 fw-bold" type="button">
+                  Freeze Account
+                </button>
+              </div>
+            </div>
+          </div>
           <div>
             <ul class="list-group list-group-flush">
               <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
@@ -115,6 +124,7 @@
     </div>
     {% endif %}
   </div>
+</div>
 </div>
 
 <script>
