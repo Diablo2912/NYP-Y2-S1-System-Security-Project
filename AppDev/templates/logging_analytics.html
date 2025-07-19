@@ -104,7 +104,8 @@
                <p class="mb-2 small">Date: <u>{{ request.args.get('start_date') }}</u></p>
                <div class="d-flex flex-column flex-sm-row gap-2 align-items-end">
                  <div>
-                   <input type="date" id="loginDate" class="form-control form-control-sm">
+                   <input type="date" id="loginDate" class="form-control form-control-sm"
+                      value="{{ request.args.get('login_date') or request.args.get('start_date') or today_str }}">
                  </div>
                  <div>
                    <label class="form-label d-none d-sm-block invisible">Submit</label>
@@ -193,7 +194,7 @@
          <div class="col-lg-8 col-md-12 mb-3">
            <div class="h-100">
              <div class="card p-3 shadow-sm h-100">
-               <h5 class="text-center mb-3">Login Activity for <u>{{ current_day }}</u></h5>
+               <h5 class="text-center mb-3">Login Activity for <u>{{ request.args.get('login_date') or request.args.get('start_date') or current_day }}</u></h5>
                <canvas id="lineActivityChart" width="100%" height="50"></canvas>
              </div>
            </div>
@@ -221,7 +222,7 @@
 
          <div class="d-flex justify-content-center my-3">
             <button id="generateReportBtn" class="btn btn-primary px-3 py-2">Generate Report</button>
-          </div>
+         </div>
       </div>
     </div>
   </div>
@@ -229,6 +230,18 @@
 
 
 <style>
+  .range-bubble {
+  position: absolute;
+  top: -15px;
+  background: #0d6efd;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  white-space: nowrap;
+}
   .bg-orange {
   background-color: #fd7e14 !important; /* Bootstrap's orange-500 */
   }
@@ -248,6 +261,13 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-ywzG+YB8q1YQk... (shortened)" crossorigin="anonymous" referrerpolicy="no-referrer" />
 <script>
+  document.getElementById("generateReportBtn").addEventListener("click", function () {
+  window.location.href = "/download_pdf_report";
+});
+
+  //Pass login activity to JS
+  const loginActivity = {{ login_activity | tojson }};
+
   // Event listener for Log Category Distribtuion
   document.getElementById("showPieChart").addEventListener("click", () => {
   document.getElementById("pieChartWrapper").style.display = "block";
@@ -261,6 +281,31 @@ document.getElementById("showBarChart").addEventListener("click", () => {
   document.getElementById("barChartWrapper").style.display = "block";
   document.getElementById("showPieChart").classList.add("opacity-50");
   document.getElementById("showBarChart").classList.remove("opacity-50");
+});
+
+  // Log Activity Filter
+  document.getElementById("SearchBtn").addEventListener("click", function () {
+  const loginDate = document.getElementById("loginDate").value;
+  if (!loginDate) {
+    alert("Please select a date.");
+    return;
+  }
+
+  // Preserve existing filters if needed
+  const urlParams = new URLSearchParams(window.location.search);
+  const startDate = urlParams.get("start_date");
+  const endDate = urlParams.get("end_date");
+  const days = urlParams.get("days");
+
+  // Rebuild the URL
+  let newUrl = `/logging_analytics?login_date=${loginDate}`;
+  if (startDate && endDate) {
+    newUrl += `&start_date=${startDate}&end_date=${endDate}`;
+  } else if (days) {
+    newUrl += `&days=${days}`;
+  }
+
+  window.location.href = newUrl;
 });
 
   // Prevent selecting future dates -  Date range
@@ -405,20 +450,42 @@ document.getElementById("showBarChart").addEventListener("click", () => {
     }
   });
 
- // Generate 24-hour labels: ["00:00", "01:00", ..., "23:00"]
- const hours24 = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0') + ":00");
+  // Generate 24-hour labels
+  const hours24 = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0') + ":00");
 
- // Login Activity Chart (Blank for now)
- const loginActivityData = {
-   labels: hours24,
-   datasets: [{
-     label: "Login Count",
-     data: [], // Replace with real login counts if available
-     backgroundColor: '#692196',
-     fill: false,
-     tension: 0.3
-   }]
- };
+  const userData = [], managerData = [], adminData = [];
+
+  for (let i = 0; i < 24; i++) {
+    const hourData = loginActivity[i] || { user: 0, manager: 0, admin: 0 };
+    userData.push(hourData.user || 0);
+    managerData.push(hourData.manager || 0);
+    adminData.push(hourData.admin || 0);
+  }
+
+   // Login Activity Chart
+  const loginActivityData = {
+    labels: hours24,
+    datasets: [
+      {
+        label: "User",
+        data: userData,
+        backgroundColor: 'rgb(255, 99, 132)',
+        tension: 0
+      },
+      {
+        label: "Manager",
+        data: managerData,
+        backgroundColor: 'rgb(54, 162, 235)',
+        tension: 0
+      },
+      {
+        label: "Admin",
+        data: adminData,
+        backgroundColor: '#ffc107',
+        tension: 0
+      }
+    ]
+  };
 
  // Line Chart: Login Activity (Last 24 Hours)
  new Chart(document.getElementById('lineActivityChart').getContext('2d'), {
@@ -504,20 +571,5 @@ document.getElementById("showBarChart").addEventListener("click", () => {
 });
 
 </script>
-
-<style>
-.range-bubble {
-  position: absolute;
-  top: -15px;
-  background: #0d6efd;
-  color: white;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-  transform: translateX(-50%);
-  pointer-events: none;
-  white-space: nowrap;
-}
-</style>
 
 {% endblock %}
