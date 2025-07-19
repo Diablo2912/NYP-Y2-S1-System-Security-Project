@@ -2645,7 +2645,8 @@ def chat():
 def send_reset_pass(email, user_id):
     try:
         token = secrets.token_urlsafe(32)
-        expires_at = datetime.utcnow() + timedelta(minutes=10)
+        sg_time = datetime.utcnow() + timedelta(hours=8)
+        expires_at = sg_time + timedelta(minutes=5)
 
         # Store token in DB
         cursor = mysql.connection.cursor()
@@ -2664,12 +2665,8 @@ def send_reset_pass(email, user_id):
             f"We received a request to reset your password. You can reset it by clicking the link below:\n\n"
             f"{reset_url}\n\n"
             f"This link will expire in 10 minutes.\n\n"
-            f"Thanks,\nCropzy Support"
-        )
-
-        print("[DEBUG] Sending reset password email...")
+            f"Thanks,\nCropzy Support")
         send_email(email, subject, message)
-        print("[DEBUG] Email send function completed.")
 
     except Exception as e:
         print(f"[ERROR] Failed to send reset password email: {e}")
@@ -2707,7 +2704,7 @@ def reset_password(token):
         return redirect(url_for('reset_password_request'))
 
     email, expires_at = row
-    if datetime.utcnow() > expires_at:
+    if datetime.now() > expires_at:
         flash("Reset link has expired.", "danger")
         return redirect(url_for('reset_password_request'))
 
@@ -2717,6 +2714,7 @@ def reset_password(token):
 
         if new_password != confirm_password:
             flash("Passwords do not match.", "danger")
+            return redirect(url_for('reset_password', token=token,_external=True))
         else:
             hashed_pw = hash_password(new_password)
             cursor.execute("UPDATE accounts SET password = %s WHERE email = %s", (hashed_pw, email))
