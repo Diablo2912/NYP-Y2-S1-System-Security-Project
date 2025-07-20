@@ -62,8 +62,25 @@
       eyeIcon.classList.add("fa-eye");
     }
   }
-</script>
 
+  function sendUnfreezeRequest(apiUrl) {
+    fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({})
+    })
+    .then(response => response.json())
+    .then(data => {
+      alert(data.message); // Optionally use toast or nicer alert
+    })
+    .catch(error => {
+      alert("Failed to send unfreeze email.");
+      console.error(error);
+    });
+}
+</script>
 
 <!-- Add FontAwesome for the eye icon -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
