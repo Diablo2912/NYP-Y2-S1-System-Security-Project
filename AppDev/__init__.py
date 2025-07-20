@@ -3626,7 +3626,7 @@ def send_reset_pass(email, user_id):
     try:
         token = secrets.token_urlsafe(32)
         sg_time = datetime.utcnow() + timedelta(hours=8)
-        expires_at = sg_time + timedelta(minutes=5)
+        expires_at = sg_time + timedelta(minutes=1)
 
         # Store token in DB
         cursor = mysql.connection.cursor()
@@ -3713,13 +3713,6 @@ def set_clickjacking_protection(response):
     response.headers['Content-Security-Policy'] = "frame-ancestors 'none';"
     return response
 
-@app.after_request
-def set_clickjacking_protection(response):
-    response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['Content-Security-Policy'] = "frame-ancestors 'none';"
-    return response
-
-
 @app.route('/freeze_account/<int:user_id>', methods=['POST'])
 def freeze_account(user_id):
     cursor = mysql.connection.cursor()
@@ -3730,10 +3723,12 @@ def freeze_account(user_id):
 
     mysql.connection.commit()
     cursor.close()
-
+    session.clear()
+    response = make_response(redirect(url_for('login')))
+    response.delete_cookie('jwt_token')
     flash("Account has been frozen.", "danger")
 
-    return redirect(url_for('login'))  # Or wherever you're managing users
+    return response  # Or wherever you're managing users
 
 
 def is_account_frozen(user_id):
@@ -3749,7 +3744,7 @@ def is_account_frozen(user_id):
 def send_unfreeze_email(user_id, email):
     try:
         token = secrets.token_urlsafe(32)
-        expires_at = datetime.utcnow() + timedelta(minutes=10)
+        expires_at = datetime.utcnow() + timedelta(minutes=1)
 
         cursor = mysql.connection.cursor()
         cursor.execute("""
