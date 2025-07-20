@@ -61,9 +61,28 @@
             <div class="row">
               <div class="d-flex">
                 <h1 class="card-title col-8">Security Info</h1>
-                <button class="btn btn-outline-danger col-4 fs-4 fw-bold" type="button">
-                  Freeze Account
-                </button>
+                <form class="col-4" method="POST" action="{{ url_for('freeze_account', user_id=user.id) }}">
+                  <button class="btn btn-outline-danger fs-4 fw-bold" data-bs-toggle="modal" data-bs-target="#freezeConfirmModal">
+                    Freeze Account
+                  </button>
+                  <div class="modal" tabindex="-1">
+                    <div class="modal-dialog">
+                      <div class="modal-content">
+                        <div class="modal-header">
+                          <h5 class="modal-title">Account Freeze Confirmation</h5>
+                          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                          <p>Are you sure you want to freeze this account?</p>
+                        </div>
+                        <div class="modal-footer">
+                          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                          <button type="button" class="btn btn-success">Confirm</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </form>
               </div>
             </div>
           </div>
