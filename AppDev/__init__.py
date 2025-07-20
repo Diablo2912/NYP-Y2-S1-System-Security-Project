@@ -107,12 +107,12 @@ EMAIL_PASSWORD = "wivz gtou ftjo dokp"
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'glen'
-app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'glen'
+# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 
 
 #BRANDON SQL DB CONFIG
@@ -133,10 +133,10 @@ app.config['MYSQL_PORT'] = 3306
 # app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
-# app.config['MYSQL_HOST'] = 'localhost'
-# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-# app.config['MYSQL_DB'] = 'sspCropzy'
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+app.config['MYSQL_DB'] = 'sspCropzy'
 #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -3007,7 +3007,11 @@ If you did not initiate this, you can ignore this email.
 def finalize_create(token):
     try:
         data = serializer.loads(token, salt='create-update-verification', max_age=300)
-        pending_id = data['pending_id']
+        pending_id = data.get('pending_id')
+
+        if not pending_id:
+            flash("Invalid or expired token.", "danger")
+            return redirect(url_for('home'))
 
         with shelve.open('seasonal_updates.db', writeback=True) as db:
             pending = db.get('pending_updates', {})
@@ -3028,59 +3032,17 @@ def finalize_create(token):
             action=f"Confirmed and created seasonal update: {entry['update_data']['title']}"
         )
 
-        @app.route('/finalize_create/<token>')
-        def finalize_create(token):
-            try:
-                data = serializer.loads(token, salt='create-update-verification', max_age=300)
-                pending_id = data['pending_id']
+        notify_user_action(
+            to_email=entry['email'],
+            action_type="Created Seasonal Update",
+            item_name=entry['update_data']['title']
+        )
 
-                with shelve.open('seasonal_updates.db', writeback=True) as db:
-                    pending = db.get('pending_updates', {})
-                    entry = pending.pop(pending_id, None)
-                    db['pending_updates'] = pending
-
-                    if not entry:
-                        flash("This update has already been confirmed or expired.", "warning")
-                        return redirect(url_for('home'))
-
-                    updates = db.get('updates', [])
-                    updates.append(entry['update_data'])
-                    db['updates'] = updates
-
-                log_user_action(
-                    user_id=entry['user_id'],
-                    session_id=entry['session_id'],
-                    action=f"Confirmed and created seasonal update: {entry['update_data']['title']}"
-                )
-
-                # ✅ Send notification email
-                try:
-                    notify_user_action(
-                        to_email=entry['email'],
-                        action_type="Created Seasonal Update",
-                        item_name=entry['update_data']['title']
-                    )
-                except Exception as e:
-                    print(f"[ERROR] Notification failed: {e}")
-
-                flash("Seasonal update successfully created!", "success")
-                return redirect(url_for('home'))
-
-            except Exception:
-                flash("Verification link is invalid or expired.", "danger")
-                return redirect(url_for('home'))
-
-        flash("Seasonal update successfully created!", "success")
         return redirect(url_for('home'))
 
-    except Exception:
-        flash("Verification link is invalid or expired.", "danger")
+    except Exception as e:
+        flash("Something went wrong or the link has expired.", "danger")
         return redirect(url_for('home'))
-
-
-
-
-
 
 
 @app.route('/delete_update/<int:index>', methods=['POST'])
