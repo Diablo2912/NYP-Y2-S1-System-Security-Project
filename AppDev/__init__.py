@@ -2728,5 +2728,11 @@ def reset_password(token):
     cursor.close()
     return render_template("accountPage/reset_pass.html", form=form)
 
+@app.after_request
+def set_clickjacking_protection(response):
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Content-Security-Policy'] = "frame-ancestors 'none';"
+    return response
+
 if __name__ == '__main__':
     app.run(debug=True)
