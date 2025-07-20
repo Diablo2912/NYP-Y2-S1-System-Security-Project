@@ -20,28 +20,33 @@
 <div class="d-flex justify-content-center align-items-center mt-3 p-3">
   <div class="card bg-success-subtle w-100" style="max-width: 500px;">
     <div class="card-body">
-      <h1 class="text-center mb-4">Login</h1>
+      <h1 class="text-center mb-4">Reset Password</h1>
 
       <form method="POST" action="" class="row g-3">
+        <!-- New Password Field -->
         <div class="form-group col-md-12">
           <div class="input-group">
-          {{ render_field(form.email, class="form-control") }}</div>
+            {{ render_field(form.new_pswd, class="form-control ms-1", id="newPasswordField", type="password") }}
+            <button type="button" class="btn btn-outline-success btn-sm" onclick="togglePassword('newPasswordField', 'newEyeIcon')">
+              <i id="newEyeIcon" class="fa fa-eye"></i>
+            </button>
+          </div>
         </div>
 
+        <!-- Confirm Password Field -->
         <div class="form-group col-md-12">
           <div class="input-group">
-            {{ render_field(form.pswd, class="form-control ms-1", id="confirmPasswordField") }}
+            {{ render_field(form.confirm_pswd, class="form-control ms-1", id="confirmPasswordField", type="password") }}
             <button type="button" class="btn btn-outline-success btn-sm" onclick="togglePassword('confirmPasswordField', 'confirmEyeIcon')">
               <i id="confirmEyeIcon" class="fa fa-eye"></i>
             </button>
           </div>
         </div>
 
-        <input type="submit" value="Login" class="btn btn-success mt-4"/>
-        <div class="form-group col-md-12">
-          <p class="text-center mb-0">Forgot your password? Reset <a href="{{ url_for('reset_password_request') }}">here</a></p>
-        </div>
+        <!-- Submit Button -->
+        <input type="submit" value="Submit" class="btn btn-success mt-4"/>
       </form>
+
     </div>
   </div>
 </div>
@@ -51,21 +56,17 @@
     var passwordField = document.getElementById(passwordFieldId);
     var eyeIcon = document.getElementById(eyeIconId);
 
-    // Toggle password visibility
     if (passwordField.type === "password") {
-      passwordField.type = "text";  // Show password
-      eyeIcon.classList.remove("fa-eye");  // Change icon to "eye-slash"
+      passwordField.type = "text";
+      eyeIcon.classList.remove("fa-eye");
       eyeIcon.classList.add("fa-eye-slash");
     } else {
-      passwordField.type = "password";  // Hide password
-      eyeIcon.classList.remove("fa-eye-slash");  // Change icon back to "eye"
+      passwordField.type = "password";
+      eyeIcon.classList.remove("fa-eye-slash");
       eyeIcon.classList.add("fa-eye");
     }
   }
 </script>
 
-
-<!-- Add FontAwesome for the eye icon -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-
 {% endblock %}
