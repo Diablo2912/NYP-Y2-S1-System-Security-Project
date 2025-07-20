@@ -3641,10 +3641,12 @@ def freeze_account(user_id):
 
     mysql.connection.commit()
     cursor.close()
-
+    session.clear()
+    response = make_response(redirect(url_for('login')))
+    response.delete_cookie('jwt_token')
     flash("Account has been frozen.", "danger")
 
-    return redirect(url_for('login'))  # Or wherever you're managing users
+    return response  # Or wherever you're managing users
 
 
 def is_account_frozen(user_id):
