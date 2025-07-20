@@ -3710,7 +3710,7 @@ def unfreeze_account(token):
 
 @app.route('/send_unfreeze_email', methods=['POST'])
 def ajax_send_unfreeze_email():
-    user_id = session.get('user_id')  # or from request.json
+    user_id = request.args.get('user_id')  # or from request.json
 
     if not user_id:
         return jsonify({'status': 'error', 'message': 'User not logged in.'}), 403
