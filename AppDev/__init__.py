@@ -58,6 +58,8 @@ from reportlab.lib import colors
 from itsdangerous import URLSafeTimedSerializer
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from transformers import pipeline
+from collections import defaultdict, Counter
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '5791262abcdefg'
@@ -1136,6 +1138,8 @@ def logging_analytics():
     if current_user['status'] != 'admin':
         return render_template('404.html')
 
+    summary = summarize_recent_logs(mysql)
+
     today_str = datetime.today().strftime("%Y-%m-%d")
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
@@ -1241,8 +1245,45 @@ def logging_analytics():
         category_summary=category_summary,
         closed_count=closed_count,
         logs_count=logs_count,
-        num_days=num_days
+        num_days=num_days,
+        logs_summary=summary,
+        summary_date=today
     )
+
+
+summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+
+
+def summarize_recent_logs(mysql):
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    today = datetime.now().date()
+    five_days_ago = today - timedelta(days=5)
+
+    cursor.execute('''
+        SELECT date, activity 
+        FROM logs 
+        WHERE DATE(date) BETWEEN %s AND %s
+        ORDER BY date DESC
+    ''', (five_days_ago, today))
+    logs = cursor.fetchall()
+
+    daily_activities = defaultdict(Counter)
+    for log in logs:
+        date_obj = log['date']
+        if isinstance(date_obj, str):
+            date_obj = datetime.strptime(date_obj.strip(), '%Y-%m-%d').date()
+        date_str = date_obj.strftime('%Y-%m-%d')
+        daily_activities[date_str][log['activity']] += 1
+
+    summary_lines = []
+    for date, activities in sorted(daily_activities.items(), key=lambda x: x[0], reverse=True):
+        summary_lines.append(f"{date}:")
+        for activity, count in activities.items():
+            summary_lines.append(f"- {activity} (x{count})" if count > 1 else f"- {activity}")
+        summary_lines.append("")  # blank line between dates
+
+    return "\n".join(summary_lines) if summary_lines else "No significant activities in the past 5 days."
 
 def generate_log_report_pdf(filename, login_activity, category_summary, trend_data, trend_dates):
     c = canvas.Canvas(filename, pagesize=A4)
