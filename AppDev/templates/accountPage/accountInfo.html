@@ -131,12 +131,34 @@
                   Setup Face ID
                 </a>
               {% else %}
-                <form action="{{ url_for('delete_face_id', id=user.id) }}" method="POST" style="display: inline;">
-                  <button type="submit" class="btn btn-warning" onclick="return confirm('Are you sure you want to delete your Face ID?');">
-                    Delete Face ID
-                  </button>
-                </form>
+                <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#disableFaceIDModal_{{ user.id }}">
+                  Disable Face ID
+                </button>
               {% endif %}
+
+
+            <!-- Disable 2FA Modal -->
+            <div class="modal fade" id="disableFaceIDModal_{{ user.id }}" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog">
+                <div class="modal-content">
+                  <form action="{{ url_for('delete_face_id', id=user.id) }}" method="POST">
+                    <div class="modal-header">
+                      <h5 class="modal-title">Disable Face ID</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body text-start">
+                      <strong>Disabling Face ID will remove an additional method of authentication.</strong><br><br>
+                      Are you sure you want to <strong>disable</strong> Face ID for <strong>{{ user.email }}</strong>?
+                      <br><br>You can always re-register your face later from this page.
+                    </div>
+                    <div class="modal-footer">
+                      <button type="submit" class="btn btn-danger">Disable Face ID</button>
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
 
               <!-- Disable 2FA Modal -->
               <div class="modal fade" id="disable2FAModal_{{ user.id }}" tabindex="-1" aria-hidden="true">

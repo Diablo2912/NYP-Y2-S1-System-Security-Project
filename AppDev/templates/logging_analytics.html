@@ -43,7 +43,8 @@
       <div class="container mt-3">
         <h2 class="mb-3">Log Overview</h2>
         <p>Last Refresh Time: {{ current_time }}</p>
-
+<!---->
+        <!---->
         <a href="{{ url_for('logging_analytics') }}?start_date={{ today_str }}&end_date={{ today_str }}" class="btn btn-primary mb-3">
             Show logs from today
         </a>
@@ -298,11 +299,11 @@ document.getElementById("showBarChart").addEventListener("click", () => {
   const days = urlParams.get("days");
 
   // Rebuild the URL
-  let newUrl = /logging_analytics?login_date=${loginDate};
+  let newUrl = `/logging_analytics?login_date=${loginDate}`;
   if (startDate && endDate) {
-    newUrl += &start_date=${startDate}&end_date=${endDate};
+    newUrl += `&start_date=${startDate}&end_date=${endDate}`;
   } else if (days) {
-    newUrl += &days=${days};
+    newUrl += `&days=${days}`;
   }
 
   window.location.href = newUrl;
@@ -521,7 +522,7 @@ document.getElementById("showBarChart").addEventListener("click", () => {
     const days = this.value;
     clearTimeout(timeout);
     timeout = setTimeout(() => {
-      window.location.href = /logging_analytics?days=${days};
+      window.location.href = `/logging_analytics?days=${days}`;
     }, 300);  // wait 300ms to avoid spamming
   });
 
@@ -540,7 +541,7 @@ document.getElementById("showBarChart").addEventListener("click", () => {
     const bubbleOffset = slider.offsetLeft + percent * sliderWidth;
 
     rangeBubble.textContent = val;
-    rangeBubble.style.left = ${bubbleOffset}px;
+    rangeBubble.style.left = `${bubbleOffset}px`;
     rangeOutput.textContent = val;
   }
 
@@ -567,7 +568,7 @@ document.getElementById("showBarChart").addEventListener("click", () => {
     return;
   }
 
-  window.location.href = /logging_analytics?start_date=${startDate}&end_date=${endDate};
+  window.location.href = `/logging_analytics?start_date=${startDate}&end_date=${endDate}`;
 });
 
 </script>

@@ -107,21 +107,21 @@ EMAIL_PASSWORD = "isgw cesr jdbs oytx"
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'glen'
-# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-# app.config['MYSQL_DB'] = 'ssp_db'
-# app.config['MYSQL_PORT'] = 3306
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'glen'
+app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+app.config['MYSQL_DB'] = 'ssp_db'
+app.config['MYSQL_PORT'] = 3306
 
 
 #BRANDON SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'brandon'
-app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'brandon'
+# app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
 
@@ -982,13 +982,16 @@ def logging():
 
     search_query = request.args.get("search", "").strip().lower()
     selected_roles = request.args.getlist("roles")
-    selected_statuses = request.args.getlist("statuses")  # ✅ added
+    selected_statuses = request.args.getlist("statuses")
+    sort_by = request.args.get("sort_by", "date")
+    sort_order = request.args.get("sort_order", "desc")
+    start_date = request.args.get("start_date")
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute("SELECT * FROM accounts WHERE id = %s", (current_user['user_id'],))
     user_info = cursor.fetchone()
 
-    query = "SELECT id, date, time, category, activity, status, ip_address FROM logs WHERE 1=1"
+    query = "SELECT id, user_id, date, time, category, activity, status, ip_address FROM logs WHERE 1=1"
     params = []
 
     if selected_roles:
@@ -1006,8 +1009,30 @@ def logging():
         like_term = f"%{search_query}%"
         params.extend([like_term, like_term, like_term])
 
+    if start_date:
+        try:
+            datetime.strptime(start_date, "%Y-%m-%d")  # validate format
+            query += " AND date >= %s"
+            params.append(start_date)
+        except ValueError:
+            flash("Invalid date format provided.", "warning")
+
+    sortable_columns = {
+        "date": "date",
+        "category": "FIELD(category, 'Critical', 'Error', 'Warning', 'Info')"
+    }
+
+    if sort_by in sortable_columns:
+        order_clause = sortable_columns[sort_by]
+        query += f" ORDER BY {order_clause} {'ASC' if sort_order == 'asc' else 'DESC'}"
+
     cursor.execute(query, params)
     logs = cursor.fetchall()
+
+    cursor.execute("SELECT COUNT(*) AS logs_count FROM logs")
+    logs_result = cursor.fetchone()
+    logs_count = logs_result['logs_count']
+
     cursor.close()
 
     current_date = date.today().isoformat()
@@ -1026,7 +1051,11 @@ def logging():
         selected_roles=selected_roles,
         selected_statuses=selected_statuses,
         current_date=current_date,
-        search_query=search_query
+        search_query=search_query,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        start_date=start_date,
+        logs_count=logs_count
     )
 
 
