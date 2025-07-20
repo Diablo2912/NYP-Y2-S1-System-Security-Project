@@ -99,12 +99,12 @@ EMAIL_PASSWORD = "isgw cesr jdbs oytx"
 # app.config['MYSQL_PORT'] = 3306
 
 #BRANDON SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'brandon'
-app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'brandon'
+# app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -115,12 +115,12 @@ app.config['MYSQL_PORT'] = 3306
 # app.config['MYSQL_PORT'] = 3306
 #
 # #SADEV SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'glen'
-# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-# app.config['MYSQL_DB'] = 'ssp_db'
-# app.config['MYSQL_PORT'] = 3306
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'glen'
+app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+app.config['MYSQL_DB'] = 'ssp_db'
+app.config['MYSQL_PORT'] = 3306
 
 mysql = MySQL(app)
 
@@ -1291,6 +1291,9 @@ def inject_user():
 @limiter.limit("50 per 1 minutes")
 def login():
     login_form = LoginForm(request.form)
+    #redirect
+    if 'jwt_token' in request.cookies:
+        return redirect(url_for('profile'))
 
     if request.method == 'POST' and login_form.validate():
         email = sanitize_input(login_form.email.data.lower())
@@ -1350,8 +1353,11 @@ def login():
             flash('Incorrect password.', 'danger')
         else:
             flash('Email not found. Please sign up.', 'danger')
-
-    return render_template('/accountPage/login.html', form=login_form)
+      #no cache
+    response = make_response(render_template('/accountPage/login.html', form=login_form))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    return response
 
 
 # A helper function to verify JWT token
