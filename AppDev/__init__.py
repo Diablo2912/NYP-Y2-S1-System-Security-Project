@@ -107,12 +107,12 @@ EMAIL_PASSWORD = "wivz gtou ftjo dokp"
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'glen'
-# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-# app.config['MYSQL_DB'] = 'ssp_db'
-# app.config['MYSQL_PORT'] = 3306
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'glen'
+app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+app.config['MYSQL_DB'] = 'ssp_db'
+app.config['MYSQL_PORT'] = 3306
 
 
 #BRANDON SQL DB CONFIG
@@ -133,10 +133,10 @@ EMAIL_PASSWORD = "wivz gtou ftjo dokp"
 # app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-app.config['MYSQL_DB'] = 'sspCropzy'
+# app.config['MYSQL_HOST'] = 'localhost'
+# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+# app.config['MYSQL_DB'] = 'sspCropzy'
 #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -1707,7 +1707,7 @@ def login():
                     )
                     return redirect(url_for('verify_otp', id=user['id']))
                 else:
-                    session_id = log_session_activity(user['id'], 'login')
+                    session_id = log_session_activity(user['id'], user['status'], 'login')
                     payload = {
                         'user_id': user['id'],
                         'first_name': user['first_name'],
@@ -2160,21 +2160,22 @@ def disable_two_factor(id):
     return redirect(url_for('accountInfo'))
 
 
-def log_session_activity(user_id, action):
+def log_session_activity(user_id, status, action):
     print(f"[DEBUG] Creating session log for user {user_id} at {datetime.now()}")
     hostname = socket.gethostname()
     ip_addr = socket.gethostbyname(hostname)
+
     try:
         cursor = mysql.connection.cursor()
-
         session_id = None  # default
 
         if action == 'login':
             cursor.execute('''
-                INSERT INTO user_session_activity (user_id, login_time, ip_address, user_agent)
-                VALUES (%s, NOW(), %s, %s)
+                INSERT INTO user_session_activity (user_id, status, login_time, ip_address, user_agent)
+                VALUES (%s, %s, NOW(), %s, %s)
             ''', (
                 user_id,
+                status,
                 ip_addr,
                 request.headers.get('User-Agent')
             ))
@@ -2200,13 +2201,11 @@ def log_session_activity(user_id, action):
         mysql.connection.commit()
         cursor.close()
         print("[DEBUG] Log saved to DB")
-
-        return session_id  # ✅ return this always (None for logout)
+        return session_id
 
     except Exception as e:
         print("[ERROR] Session log failed:", e)
         return None
-
 
 
 
