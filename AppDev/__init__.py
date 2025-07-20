@@ -1797,6 +1797,18 @@ def face_id(id):
                 if os.path.exists(temp_path): os.remove(temp_path)
                 if os.path.exists(registered_path): os.remove(registered_path)
 
+                log_user_action(
+                    user_id=user['id'],
+                    session_id=session_id,
+                    action="Login successful (via Face ID)"
+                )
+
+                notify_user_action(
+                    to_email=user['email'],
+                    action_type="Face ID Login",
+                    item_name="You have successfully logged in using Face ID."
+                )
+
                 flash("Face matched. Logged in successfully!", "success")
                 return response
             else:
@@ -1856,6 +1868,12 @@ def enable_two_factor(id):
             action=f"Enabled 2FA"
         )
 
+        notify_user_action(
+            to_email=g.user['email'],
+            action_type="Enabled 2FA",
+            item_name="You have successfully enabled 2FA for your account."
+        )
+
     generate_recovery_code(id)
 
     cursor.close()
@@ -1886,6 +1904,12 @@ def disable_two_factor(id):
             user_id=id,
             session_id=g.user['session_id'] if hasattr(g, 'user') and g.user.get('session_id') else None,
             action=f"Disabled 2FA"
+        )
+
+        notify_user_action(
+            to_email=g.user['email'],
+            action_type="Disabled 2FA",
+            item_name="You have successfully disabled 2FA for your account."
         )
 
     cursor.close()
@@ -2272,7 +2296,13 @@ def revoke_session(session_id):
     log_user_action(
         user_id=current_user_id,
         session_id=g.user.get('session_id'),
-        action=f"Revoked session ID {session_id} | Revoked by: {revoked_by} | IP: {ip_addr} | Agent: {user_agent}"
+        action=f"Revoked an active session | Revoked by: {revoked_by} | IP: {ip_addr} | Agent: {user_agent}"
+    )
+
+    notify_user_action(
+        to_email=g.user['email'],
+        action_type="Revoked Session",
+        item_name=f"You revoked a session from IP {ip_addr}"
     )
 
     flash("Session has been revoked successfully.", "success")
@@ -2305,21 +2335,6 @@ def check_session_validity():
         return jsonify({"valid": False})
 
     return jsonify({"valid": True})
-
-
-# A helper function to verify JWT token
-def verify_jwt_token(token):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-        return payload
-    except jwt.ExpiredSignatureError:
-        return None  # Token expired
-    except jwt.InvalidTokenError:
-        return None  # Invalid token
-
-
-
-# def send_otp_sms():
 
 @app.route('/verify-otp/<int:id>', methods=['GET', 'POST'])
 def verify_otp(id):
@@ -2385,6 +2400,12 @@ def verify_otp(id):
                 action=f"Login successful (via 2FA) | IP: {ip_addr} | Agent: {user_agent}"
             )
 
+            notify_user_action(
+                to_email=user['email'],
+                action_type="Login Success (2FA)",
+                item_name=f"You logged in via OTP from IP {ip_addr} using {user_agent}."
+            )
+
             flash("Login successful!", "success")
             return response
         else:
@@ -2436,6 +2457,12 @@ def recovery_auth(id):
                     user_id=result['id'],
                     session_id=session_id,
                     action=f"Login successful (via 2FA) | IP: {ip_addr} | Agent: {user_agent}"
+                )
+
+                notify_user_action(
+                    to_email=result['email'],
+                    action_type="Login Success (Recovery Code)",
+                    item_name=f"You logged in using a recovery code from IP {ip_addr} using {user_agent}."
                 )
 
                 flash('Recovery successful. You are now logged in.', 'success')
@@ -2529,6 +2556,12 @@ def change_dets(id):
             if 'user_id' in session:
                 log_user_action(session['user_id'], session.get('current_session_id'), "Changed account details")
 
+            notify_user_action(
+                to_email=change_dets_form.email.data,
+                action_type="Account Update",
+                item_name="Your account details were updated successfully."
+            )
+
             cursor.close()
 
             # Update session
@@ -2596,6 +2629,11 @@ def change_pswd(id):
         # ✅ Log user action
         log_user_action(user_id, session.get('current_session_id'), "Changed password")
 
+        notify_user_action(
+            to_email=user['email'],
+            action_type="Password Change",
+            item_name="Your password has been successfully changed. If this wasn't you, reset your password immediately."
+        )
         # Update session value too
         session['password'] = confirm_pswd
 
