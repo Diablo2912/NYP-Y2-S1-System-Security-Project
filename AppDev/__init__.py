@@ -124,7 +124,6 @@ EMAIL_PASSWORD = "wivz gtou ftjo dokp"
 # app.config['MYSQL_PORT'] = 3306
 #
 # #SADEV SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
 # app.config['MYSQL_HOST'] = '127.0.0.1'
 # app.config['MYSQL_USER'] = 'root'
 # app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
@@ -3633,6 +3632,12 @@ def reset_password(token):
 
     cursor.close()
     return render_template("accountPage/reset_pass.html", form=form)
+
+@app.after_request
+def set_clickjacking_protection(response):
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Content-Security-Policy'] = "frame-ancestors 'none';"
+    return response
 
 @app.after_request
 def set_clickjacking_protection(response):
