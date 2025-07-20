@@ -1,3 +1,5 @@
+import tempfile
+
 from flask import Flask, g, Response, render_template, request, redirect, url_for, session, jsonify, flash, \
     make_response, send_file
 from functools import wraps
@@ -44,6 +46,9 @@ from deepface import DeepFace
 from PIL import Image
 import io
 from scipy.spatial.distance import cosine
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.utils import ImageReader
+import io
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.styles import getSampleStyleSheet
@@ -102,12 +107,12 @@ EMAIL_PASSWORD = "isgw cesr jdbs oytx"
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'glen'
-app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'glen'
+# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 
 
 #BRANDON SQL DB CONFIG
@@ -1069,10 +1074,10 @@ def logging_analytics():
         today = datetime.today().date()
         dates_iso = [(today - timedelta(days=i)).isoformat() for i in range(num_days - 1, -1, -1)]
         dates_display = [(today - timedelta(days=i)).strftime('%d - %m - %Y') for i in range(num_days - 1, -1, -1)]
-        display_start_date = (datetime.now() - timedelta(days=num_days)).strftime("%d/%m/%Y")
+        start_date_obj = datetime.now().date() - timedelta(days=num_days - 1)
+        display_start_date = start_date_obj.strftime("%d/%m/%Y")
 
     log_data = cursor.fetchall()
-    cursor.close()
 
     categories = ['Info', 'Warning', 'Error', 'Critical']
     chart_data = {date: {cat: 0 for cat in categories} for date in dates_iso}
@@ -1087,19 +1092,212 @@ def logging_analytics():
             category_summary[cat] += count
 
     current_time = datetime.now().strftime("%d-%m-%Y , %I:%M %p")
+    current_day = datetime.now().strftime("%d-%m-%Y")
+
+    cursor.execute("SELECT COUNT(*) AS closed_count FROM logs WHERE status = 'Closed'")
+    closed_result = cursor.fetchone()
+    closed_count = closed_result['closed_count']
+
+    cursor.execute("SELECT COUNT(*) AS logs_count FROM logs")
+    logs_result = cursor.fetchone()
+    logs_count = logs_result['logs_count']
+
+    # Determine which date to show login activity for
+    login_date = request.args.get('login_date') or request.args.get('start_date') or today_str
+
+    # Query login counts by hour and status
+    cursor.execute("""
+        SELECT HOUR(login_time) AS login_hour, status, COUNT(*) AS count
+        FROM user_session_activity
+        WHERE DATE(login_time) = %s
+        GROUP BY login_hour, status
+        ORDER BY login_hour, status
+    """, (login_date,))
+    login_activity_rows = cursor.fetchall()
+
+    # Initialize hourly login dictionary
+    login_activity = {hour: {'admin': 0, 'manager': 0, 'user': 0} for hour in range(24)}
+
+    # Populate it
+    for row in login_activity_rows:
+        hour = int(row['login_hour'])
+        status = row['status'].lower()
+        count = row['count']
+        if status in login_activity[hour]:
+            login_activity[hour][status] = count
+
+    cursor.close()
 
     return render_template(
         'logging_analytics.html',
+        login_activity=login_activity,
         chart_data=chart_data,
         dates_iso=dates_iso,
         dates_display=dates_display,
         categories=categories,
         current_time=current_time,
+        current_day=current_day,
         today_str=today_str,
         start_date=display_start_date,
         category_summary=category_summary,
+        closed_count=closed_count,
+        logs_count=logs_count,
         num_days=num_days
     )
+
+def generate_log_report_pdf(filename, login_activity, category_summary, trend_data, trend_dates):
+    c = canvas.Canvas(filename, pagesize=A4)
+    width, height = A4
+
+    def draw_chart(fig, x, y, scale=0.4):
+        img_io = io.BytesIO()
+        fig.savefig(img_io, format='PNG', bbox_inches='tight')
+        img_io.seek(0)
+        image = ImageReader(img_io)
+        c.drawImage(image, x, y, width=fig.get_figwidth() * 72 * scale, preserveAspectRatio=True, mask='auto')
+        plt.close(fig)
+
+    # Title
+    c.setFont("Helvetica-Bold", 18)
+    c.drawString(50, height - 50, "System Logging Analytics Report")
+    c.setFont("Helvetica", 12)
+    c.drawString(50, height - 70, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+    # Chart positions
+    login_x, login_y = 40, height - 300
+    pie_x, pie_y = width / 2 + 20, height - 300
+    bar_x, bar_y = 40, height - 540
+    trend_x, trend_y = 40, height - 760
+
+    # --- Log Category card counter  ---
+    c.drawString(50, 780, "Info:")
+
+    # --- Login Activity Line Chart ---
+    fig, ax = plt.subplots(figsize=(5, 3))
+    hours = [f"{i:02d}:00" for i in range(24)]
+    for role in ['user', 'manager', 'admin']:
+        role_data = [login_activity.get(h, {}).get(role, 0) for h in hours]
+        ax.plot(hours, role_data, label=role.capitalize())
+    ax.set_title('Login Activity')
+    ax.set_xlabel('Hour')
+    ax.set_ylabel('Logins')
+    ax.legend()
+    ax.grid(True)
+    draw_chart(fig, x=login_x, y=login_y)
+
+    # --- Pie Chart ---
+    fig, ax = plt.subplots(figsize=(4, 3))
+    labels = list(category_summary.keys())
+    values = [category_summary[k] for k in labels]
+    ax.pie(values, labels=labels, autopct='%1.1f%%', startangle=140)
+    ax.set_title("Log Category Distribution")
+    draw_chart(fig, x=pie_x, y=pie_y)
+
+    # --- Bar Chart ---
+    fig, ax = plt.subplots(figsize=(5, 2.5))
+    ax.bar(labels, values, color=['green', 'orange', 'orangered', 'red'])
+    ax.set_title("Log Category Distribution (Bar)")
+    ax.set_ylabel("Count")
+    draw_chart(fig, x=bar_x, y=bar_y)
+
+    # --- Trend Line Chart ---
+    fig, ax = plt.subplots(figsize=(7, 2.5))
+    for category, counts in trend_data.items():
+        ax.plot(trend_dates, counts, label=category)
+    ax.set_title("Log Trend Over Time")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Logs")
+    ax.legend()
+    ax.grid(True)
+    draw_chart(fig, x=trend_x, y=trend_y)
+
+    c.save()
+    return filename
+
+@app.route("/generate_pdf_report")
+@jwt_required
+def download_pdf_report():
+    current_user = g.user
+    if current_user['status'] != 'admin':
+        return render_template('404.html')
+
+    today_str = datetime.today().strftime("%Y-%m-%d")
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    num_days = request.args.get('days')
+
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    # Determine date range
+    if start_date and end_date:
+        cursor.execute("""
+            SELECT DATE(date) AS date, category, COUNT(*) AS count
+            FROM logs
+            WHERE DATE(date) BETWEEN %s AND %s
+            GROUP BY DATE(date), category
+            ORDER BY date
+        """, (start_date, end_date))
+
+        date_range = pd.date_range(start=start_date, end=end_date)
+        dates_iso = [d.date().isoformat() for d in date_range]
+    else:
+        num_days = int(num_days or 10)
+        cursor.execute("""
+            SELECT DATE(date) AS date, category, COUNT(*) AS count
+            FROM logs
+            WHERE DATE(date) >= CURDATE() - INTERVAL %s DAY
+            GROUP BY DATE(date), category
+            ORDER BY date
+        """, (num_days - 1,))
+        today = datetime.today().date()
+        dates_iso = [(today - timedelta(days=i)).isoformat() for i in range(num_days - 1, -1, -1)]
+
+    log_data = cursor.fetchall()
+    categories = ['Info', 'Warning', 'Error', 'Critical']
+
+    # Prepare trend data and category summary
+    chart_data = {date: {cat: 0 for cat in categories} for date in dates_iso}
+    category_summary = {cat: 0 for cat in categories}
+
+    for row in log_data:
+        db_date = str(row['date'])
+        cat = row['category']
+        count = row['count']
+        if db_date in chart_data and cat in chart_data[db_date]:
+            chart_data[db_date][cat] = count
+            category_summary[cat] += count
+
+    trend_dates = dates_iso
+    trend_data = {cat: [chart_data[date][cat] for date in trend_dates] for cat in categories}
+
+    # Determine login activity date
+    login_date = request.args.get('login_date') or request.args.get('start_date') or today_str
+    cursor.execute("""
+        SELECT HOUR(login_time) AS login_hour, status, COUNT(*) AS count
+        FROM user_session_activity
+        WHERE DATE(login_time) = %s
+        GROUP BY login_hour, status
+        ORDER BY login_hour, status
+    """, (login_date,))
+    login_activity_rows = cursor.fetchall()
+
+    # Build login activity per hour
+    login_activity = {f"{h:02d}:00": {'admin': 0, 'manager': 0, 'user': 0} for h in range(24)}
+    for row in login_activity_rows:
+        hour = int(row['login_hour'])
+        status = row['status'].lower()
+        count = row['count']
+        if status in login_activity[f"{hour:02d}:00"]:
+            login_activity[f"{hour:02d}:00"][status] = count
+
+    cursor.close()
+
+    # Generate PDF
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+    filepath = temp_file.name
+    generate_log_report_pdf(filepath, login_activity, category_summary, trend_data, trend_dates)
+
+    return send_file(filepath, as_attachment=True, download_name="Log_Report.pdf", mimetype='application/pdf')
 
 
 ALGORITHM = "pbkdf2_sha256"
@@ -1368,12 +1566,13 @@ def login():
 
         if user:
             # Hardcoded IP (Singapore - SG) for testing purposes
-            ip_address = '183.90.84.148'
-            # Hardcoded IP (Malaysia - MYS) for testing purposes
-            # Hardcoded IP (Japan - JPN) for testing purposes
-            # #Uncomment if not run on code editor, but on Proxy or Load Balancer
-            # Eg: Nginx, Heroku, Apache, Cloudflare
-            # ip_address = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+            ip_address = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+
+            # If running locally (private IP), use real public IP
+            if ip_address.startswith("127.") or ip_address.startswith("192.") or ip_address.startswith(
+                    "10.") or ip_address.startswith("172."):
+                ip_address = get_public_ip()
+
             current_country = get_user_country(ip_address)
             print(f"User IP: {ip_address}, Country: {current_country}")
 
