@@ -58,6 +58,9 @@ from reportlab.lib import colors
 from itsdangerous import URLSafeTimedSerializer
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from cryptography.fernet import Fernet
+
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '5791262abcdefg'
@@ -69,6 +72,8 @@ serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 
 load_dotenv()
 print("Loaded ENV value for TEST_VAR =", os.getenv("TEST_VAR"))
+fernet_key = os.getenv('FERNET_KEY')
+fernet = Fernet(fernet_key)
 
 images = UploadSet('images', IMAGES)
 
@@ -123,10 +128,12 @@ EMAIL_PASSWORD = "wivz gtou ftjo dokp"
 # app.config['MYSQL_DB'] = 'ssp_db'
 # app.config['MYSQL_PORT'] = 3306
 #
-# #SADEV SQL DB CONFIG
+# #SACHIN SQL DB CONFIG
+
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
 # app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'root'
-# app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+# app.config['MYSQL_USER'] = 'glen'
+# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
 # app.config['MYSQL_DB'] = 'ssp_db'
 # app.config['MYSQL_PORT'] = 3306
 #
@@ -137,11 +144,12 @@ EMAIL_PASSWORD = "wivz gtou ftjo dokp"
 # app.config['MYSQL_DB'] = 'sspCropzy'
 #
 # #SADEV SQL DB CONFIG
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
 app.config['MYSQL_HOST'] = '127.0.0.1'
 app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
 app.config['MYSQL_DB'] = 'ssp_db'
-
+app.config['MYSQL_PORT'] = 3306
 
 mysql = MySQL(app)
 
@@ -715,6 +723,19 @@ def accountInfo():
     cursor.execute("SELECT * FROM accounts WHERE id = %s", (user_id,))
     user = cursor.fetchone()
     cursor.close()
+
+    # 🛠 Fix: MySQL stores BLOBs or bytes — decode to string first
+    if user and user.get('recovery_code'):
+        try:
+            encrypted = user['recovery_code']
+            if isinstance(encrypted, bytearray):  # MySQL may return bytearray
+                encrypted = bytes(encrypted)
+            decrypted_code = fernet.decrypt(encrypted).decode()
+            user['recovery_code'] = decrypted_code
+        except Exception as e:
+            print(f"[Decryption Error] {e}")
+            user['recovery_code'] = "[Decryption Failed]"
+
     return render_template('/accountPage/accountInfo.html', user=user)
 
 
@@ -1927,7 +1948,9 @@ def generate_recovery_code(id):
         return False  # User not found
 
     # Update recovery code
-    cursor.execute("UPDATE accounts SET recovery_code = %s WHERE id = %s", (code, id))
+    encrypted_code = fernet.encrypt(code.encode())
+    cursor.execute("UPDATE accounts SET recovery_code = %s WHERE id = %s", (encrypted_code, id))
+
     mysql.connection.commit()
     cursor.close()
 
