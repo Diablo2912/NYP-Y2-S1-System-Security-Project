@@ -79,7 +79,7 @@ serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 
 load_dotenv()
 print("Loaded ENV value for TEST_VAR =", os.getenv("TEST_VAR"))
-fernet_key = os.getenv('FERNET_KEY')
+fernet_key = Fernet.generate_key()
 fernet = Fernet(fernet_key)
 
 images = UploadSet('images', IMAGES)
@@ -132,12 +132,12 @@ EMAIL_PASSWORD = "wivz gtou ftjo dokp"
 
 
 #BRANDON SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'brandon'
-# app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
-# app.config['MYSQL_DB'] = 'ssp_db'
-# app.config['MYSQL_PORT'] = 3306
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'brandon'
+app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+app.config['MYSQL_DB'] = 'ssp_db'
+app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
 
@@ -155,12 +155,12 @@ EMAIL_PASSWORD = "wivz gtou ftjo dokp"
 # app.config['MYSQL_DB'] = 'sspCropzy'
 #
 # #SADEV SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'root'
+# app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 
 mysql = MySQL(app)
 
