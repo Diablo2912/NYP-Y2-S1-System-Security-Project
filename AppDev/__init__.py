@@ -3635,6 +3635,12 @@ def reset_password(token):
     cursor.close()
     return render_template("accountPage/reset_pass.html", form=form)
 
+@app.after_request
+def set_clickjacking_protection(response):
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Content-Security-Policy'] = "frame-ancestors 'none';"
+    return response
+
 
 @app.route('/freeze_account/<int:user_id>', methods=['POST'])
 def freeze_account(user_id):
