@@ -416,6 +416,19 @@ def create_product():
             session_id=current_user['session_id'],
             action=f"Created new product: {name} (Category: {category})"
         )
+
+        log_user_action(
+            user_id=current_user['user_id'],
+            session_id=current_user['session_id'],
+            action=f"Created new product: {name} (Category: {category})"
+        )
+
+        notify_user_action(
+            to_email=g.user['email'],
+            action_type="Created New Product",
+            item_name=name
+        )
+
         return redirect(url_for('buy_product'))
 
     return render_template('/productPage/createProduct.html', form=form)
@@ -493,6 +506,12 @@ def update_product(id):
             action=f"Updated product: {product.name} (ID: {product.id})"
         )
 
+        notify_user_action(
+            to_email=g.user['email'],
+            action_type="Updated Product",
+            item_name=product.name
+        )
+
         return redirect(url_for('manageProduct'))
 
     return render_template('/productPage/updateProduct.html', form=form, product=product)
@@ -516,6 +535,12 @@ def delete_product(id):
         session_id=g.user['session_id'],
         action=f"Deleted product: {product.name} (ID: {product.id})"
     )
+    notify_user_action(
+        to_email=g.user['email'],
+        action_type="Deleted Product",
+        item_name=product.name
+    )
+
     return redirect(url_for('manageProduct'))
 
 
@@ -815,6 +840,12 @@ def dashboard():
         action="Accessed admin dashboard"
     )
 
+    notify_user_action(
+        to_email=jwt_user['email'],
+        action_type="Accessed Admin Dashboard",
+        item_name="Dashboard View"
+    )
+
     return render_template(
         'dashboard.html',
         user=user_info,
@@ -842,8 +873,10 @@ def update_user_status(id):
 
     cursor = mysql.connection.cursor()
     # Fetch previous status before update (for user_action_log in session activity tracking)
-    cursor.execute("SELECT status FROM accounts WHERE id = %s", (id,))
-    old_status = cursor.fetchone()[0]
+    cursor.execute("SELECT email, status FROM accounts WHERE id = %s", (id,))
+    user_record = cursor.fetchone()
+    user_email = user_record[0]
+    old_status = user_record[1]
 
     cursor.execute("UPDATE accounts SET status = %s WHERE id = %s", (new_status, id))
     mysql.connection.commit()
@@ -852,6 +885,19 @@ def update_user_status(id):
         session_id=current_user['session_id'],
         action=f"Updated user ID {id}'s status from '{old_status}' to '{new_status}'"
     )
+
+    notify_user_action(
+        to_email=user_email,
+        action_type="Status Change",
+        item_name=f"Your account status has been changed from '{old_status}' to '{new_status}'."
+    )
+
+    notify_user_action(
+        to_email=current_user['email'],
+        action_type="Status Change",
+        item_name=f"You changed user ID {id}'s status from '{old_status}' to '{new_status}'."
+    )
+
     cursor.close()
 
     flash("User status updated successfully.", "success")
@@ -916,6 +962,13 @@ def createAdmin():
             session_id=current_user['session_id'],
             action=f"Created admin account for {email}"
         )
+
+        notify_user_action(
+            to_email=current_user['email'],
+            action_type="Created Admin Account",
+            item_name=f"You created an admin account for {email}."
+        )
+
         cursor.close()
 
         flash('Admin account created successfully.', 'success')
@@ -943,6 +996,12 @@ def update_log_status(id):
         action=f"Updated log status (Log ID: {id}) to '{new_status}'"
     )
 
+    notify_user_action(
+        to_email=current_user['email'],
+        action_type="Log Status Update",
+        item_name=f"You changed the status of Log ID {id} to '{new_status}'."
+    )
+
     cursor.close()
 
     flash("Log status updated successfully.", "success")
@@ -968,6 +1027,11 @@ def delete_log(id):
         action=f"Deleted log entry with ID: {id}"
     )
 
+    notify_user_action(
+        to_email=current_user['email'],
+        action_type="Deleted Log Entry",
+        item_name=f"You deleted the log entry with ID: {id}."
+    )
 
     flash("Log deleted successfully.", "success")
     return redirect(url_for('logging'))
@@ -1041,6 +1105,12 @@ def logging():
         user_id=current_user['user_id'],
         session_id=current_user['session_id'],
         action="Viewed log dashboard"
+    )
+
+    notify_user_action(
+        to_email=current_user['email'],
+        action_type="Viewed Logs",
+        item_name="You accessed the log dashboard and viewed recent activities."
     )
 
 
@@ -1526,6 +1596,12 @@ def sign_up():
         # Log registration
         admin_log_activity(mysql, "User signed up successfully", category="Critical")
 
+        notify_user_action(
+            to_email=email,
+            action_type="Sign Up Successful",
+            item_name=f"Welcome to Cropzy, {first_name}! Your account has been successfully created."
+        )
+
         mysql.connection.commit()
         cursor.close()
 
@@ -1653,6 +1729,12 @@ def login():
                         session_id=session_id,
                         action=f"Login successful (no 2FA) | IP: {ip_addr} | Agent: {user_agent}"
                     )
+                    notify_user_action(
+                        to_email=user['email'],
+                        action_type="Login Notification",
+                        item_name=f"Your Cropzy account was just logged in from IP: {ip_addr}\n\nDevice: {user_agent}"
+                    )
+
                     return response
 
             flash('Incorrect password.', 'danger')
@@ -1807,6 +1889,12 @@ def sms_verify_otp(id):
                 action=f"Login successful (via 2FA) | IP: {ip_addr} | Agent: {user_agent}"
             )
 
+            notify_user_action(
+                to_email=user['email'],
+                action_type="Login Notification (2FA)",
+                item_name=f"Your Cropzy account was just logged in via 2FA from IP: {ip_addr}\n\nDevice: {user_agent}"
+            )
+
             flash("Login successful!", "success")
             return response
         else:
@@ -1853,6 +1941,12 @@ def setup_face_id(id):
         cursor.execute("UPDATE accounts SET face = %s WHERE id = %s", (img_bytes, id))
         mysql.connection.commit()
         cursor.close()
+
+        notify_user_action(
+            to_email=g.user['email'],
+            action_type="Face ID Setup",
+            item_name="You have successfully registered a Face ID for your Cropzy account."
+        )
 
         flash("Face ID registered successfully!", "success")
         return redirect(url_for('accountInfo'))
@@ -2896,10 +2990,47 @@ def finalize_create(token):
             action=f"Confirmed and created seasonal update: {entry['update_data']['title']}"
         )
 
-        try:
-            notify_user_action(entry['email'], "Created Seasonal Update", entry['update_data']['title'])
-        except Exception as e:
-            print(f"[ERROR] Notification failed: {e}")
+        @app.route('/finalize_create/<token>')
+        def finalize_create(token):
+            try:
+                data = serializer.loads(token, salt='create-update-verification', max_age=300)
+                pending_id = data['pending_id']
+
+                with shelve.open('seasonal_updates.db', writeback=True) as db:
+                    pending = db.get('pending_updates', {})
+                    entry = pending.pop(pending_id, None)
+                    db['pending_updates'] = pending
+
+                    if not entry:
+                        flash("This update has already been confirmed or expired.", "warning")
+                        return redirect(url_for('home'))
+
+                    updates = db.get('updates', [])
+                    updates.append(entry['update_data'])
+                    db['updates'] = updates
+
+                log_user_action(
+                    user_id=entry['user_id'],
+                    session_id=entry['session_id'],
+                    action=f"Confirmed and created seasonal update: {entry['update_data']['title']}"
+                )
+
+                # ✅ Send notification email
+                try:
+                    notify_user_action(
+                        to_email=entry['email'],
+                        action_type="Created Seasonal Update",
+                        item_name=entry['update_data']['title']
+                    )
+                except Exception as e:
+                    print(f"[ERROR] Notification failed: {e}")
+
+                flash("Seasonal update successfully created!", "success")
+                return redirect(url_for('home'))
+
+            except Exception:
+                flash("Verification link is invalid or expired.", "danger")
+                return redirect(url_for('home'))
 
         flash("Seasonal update successfully created!", "success")
         return redirect(url_for('home'))
@@ -2964,9 +3095,9 @@ def finalize_delete(token):
 
                 # ✅ Send email notification
                 notify_user_action(
-                    email=user_email,
-                    action="Deleted Seasonal Update",
-                    title=removed['title']
+                    to_email=user_email,
+                    action_type="Deleted Seasonal Update",
+                    item_name=removed['title']
                 )
 
                 flash(f"Update \"{removed['title']}\" deleted successfully!", "success")
@@ -3077,9 +3208,9 @@ def finalize_edit(token):
 
                 # ✅ Send confirmation notification
                 notify_user_action(
-                    email=user_email,
-                    action="Edited Seasonal Update",
-                    title=edit_entry['data']['title']
+                    to_email=user_email,
+                    action_type="Edited Seasonal Update",
+                    item_name=edit_entry['data']['title']
                 )
 
                 flash("Update successfully edited.", "success")
@@ -3247,11 +3378,31 @@ def checkout():
     return render_template('/checkout/checkout.html', cart=cart, total_price=total_price)
 
 
-def notify_user_action(to_email, action_type, update_title):
+def notify_user_action(to_email, action_type, item_name=None, details=None):
+    """
+    Send a general-purpose email notification to the user.
+
+    Parameters:
+    - to_email: Recipient's email address.
+    - action_type: What action occurred (e.g., "Deleted Product", "Edited Update").
+    - item_name: Optional name/title of the item involved.
+    - details: Optional extra details to include in the email.
+    """
     try:
         subject = f"[Cropzy] {action_type}"
-        message = f"The following seasonal update has been {action_type.lower()}:\n\nTitle: {update_title}"
+        message = f"The following action was performed on your Cropzy account:\n\n"
+        message += f"Action: {action_type}\n"
 
+        if item_name:
+            message += f"Item: {item_name}\n"
+
+        if details:
+            message += f"Details: {details}\n"
+
+        message += f"\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        message += "\nIf you did not authorize this action, please contact support immediately.\n\n- Cropzy Team"
+
+        # Construct and send email
         msg = MIMEMultipart()
         msg['From'] = app.config['MAIL_USERNAME']
         msg['To'] = to_email
@@ -3265,6 +3416,7 @@ def notify_user_action(to_email, action_type, update_title):
         server.quit()
 
         print(f"[DEBUG] Notification sent to {to_email}")
+
     except Exception as e:
         print(f"[ERROR] Failed to send notification: {e}")
 
