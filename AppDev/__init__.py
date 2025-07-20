@@ -61,6 +61,13 @@ from flask_limiter.util import get_remote_address
 from cryptography.fernet import Fernet
 
 
+import pathlib
+from datetime import datetime, timedelta
+from cryptography import x509
+from cryptography.x509.oid import NameOID
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from flask_wtf import CSRFProtect
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '5791262abcdefg'
@@ -76,6 +83,10 @@ fernet_key = os.getenv('FERNET_KEY')
 fernet = Fernet(fernet_key)
 
 images = UploadSet('images', IMAGES)
+
+#csrf (activate global CSRF protection)
+csrf = CSRFProtect()
+
 
 app.register_blueprint(main_blueprint)
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -166,6 +177,51 @@ limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "5
 # Warning
 # Error
 # Critical
+
+#ssl
+
+def generate_self_signed_cert(cert_file='certs/cert.pem', key_file='certs/key.pem'):
+    cert_path = pathlib.Path(cert_file)
+    key_path = pathlib.Path(key_file)
+
+    cert_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if cert_path.exists() and key_path.exists():
+        print("✅ SSL certs already exist. Skipping generation.")
+        return
+
+    print("🔐 Generating self-signed SSL certificate...")
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = x509.Name([
+        x509.NameAttribute(NameOID.COUNTRY_NAME, u"SG"),
+        x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, u"Singapore"),
+        x509.NameAttribute(NameOID.LOCALITY_NAME, u"Singapore"),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"FlaskApp"),
+        x509.NameAttribute(NameOID.COMMON_NAME, u"localhost"),
+    ])
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.utcnow())
+        .not_valid_after(datetime.utcnow() + timedelta(days=365))
+        .sign(key, hashes.SHA256())
+    )
+
+    with open(key_file, "wb") as f:
+        f.write(key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.TraditionalOpenSSL,
+            serialization.NoEncryption()
+        ))
+
+    with open(cert_file, "wb") as f:
+        f.write(cert.public_bytes(serialization.Encoding.PEM))
+
+    print("✅ Certificate saved to", cert_file)
+    print("✅ Private key saved to", key_file)
 
 # input sanitisation
 def sanitize_input(user_input):
@@ -3141,9 +3197,6 @@ def finalize_delete(token):
 
     return redirect(url_for('home'))
 
-
-
-
 @app.route('/edit_update/<int:index>', methods=['GET', 'POST'])
 @jwt_required
 def edit_update(index):
@@ -3275,8 +3328,6 @@ def request_delete(index):
         else:
             flash('Invalid update index.', 'danger')
             return redirect(url_for('home'))
-
-
 
 @app.route('/update_cart', methods=['POST'])
 def update_cart():
@@ -3765,5 +3816,8 @@ def ajax_send_unfreeze_email():
     return jsonify({'status': 'success', 'message': 'Unfreeze email sent.'})
 
 
-if __name__ == '__main__':
-    app.run(debug=True)
+
+if __name__ == "__main__":
+    generate_self_signed_cert()
+
+    app.run(ssl_context=("certs/cert.pem", "certs/key.pem"), host="127.0.0.1", port=443, debug=True)
