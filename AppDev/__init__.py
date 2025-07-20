@@ -109,12 +109,12 @@ EMAIL_PASSWORD = "isgw cesr jdbs oytx"
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'glen'
-# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-# app.config['MYSQL_DB'] = 'ssp_db'
-# app.config['MYSQL_PORT'] = 3306
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'glen'
+app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+app.config['MYSQL_DB'] = 'ssp_db'
+app.config['MYSQL_PORT'] = 3306
 
 
 #BRANDON SQL DB CONFIG
@@ -126,10 +126,10 @@ EMAIL_PASSWORD = "isgw cesr jdbs oytx"
 # app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-app.config['MYSQL_DB'] = 'sspCropzy'
+# app.config['MYSQL_HOST'] = 'localhost'
+# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+# app.config['MYSQL_DB'] = 'sspCropzy'
 #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -1862,6 +1862,22 @@ def setup_face_id(id):
         return redirect(url_for('accountInfo'))
 
     return render_template("accountPage/setup_face_id.html", id=id)
+
+
+@app.route('/delete_face_id/<int:id>', methods=['POST'])
+def delete_face_id(id):
+    try:
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute("UPDATE accounts SET face = NULL WHERE id = %s", (id,))
+        mysql.connection.commit()
+        cursor.close()
+
+        flash("Face ID deleted successfully!", "success")
+    except Exception as e:
+        print(f"Failed to delete Face ID: {e}")
+        flash("Failed to delete Face ID. Please try again.", "danger")
+
+    return redirect(url_for('accountInfo'))
 
 
 @app.route('/face_id/<int:id>', methods=['GET', 'POST'])

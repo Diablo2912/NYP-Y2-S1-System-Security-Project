@@ -131,9 +131,11 @@
                   Setup Face ID
                 </a>
               {% else %}
-                <a href="{{ url_for('delete_face_id', id=user.id) }}" class="btn btn-warning">
-                  Delete Face ID
-                </a>
+                <form action="{{ url_for('delete_face_id', id=user.id) }}" method="POST" style="display: inline;">
+                  <button type="submit" class="btn btn-warning" onclick="return confirm('Are you sure you want to delete your Face ID?');">
+                    Delete Face ID
+                  </button>
+                </form>
               {% endif %}
 
               <!-- Disable 2FA Modal -->
