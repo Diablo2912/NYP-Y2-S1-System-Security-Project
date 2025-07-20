@@ -19,7 +19,7 @@
 <div class="container-fluid pt-4">
   <div class="row">
     <!-- Left Panel -->
-    <div class="col-lg-2 col-md-3 col-sm-12 px-1 p-2 ">
+    <div class="col-lg-2 col-md-3 col-sm-12 px-1 p-3 ">
       <div class="card mb-3 ms-0">
         <div class="card-body pb-0">
           <div class="d-flex mb-3">
@@ -39,10 +39,11 @@
     </div>
 
     <!-- Right Container (Log Table) -->
-    <div class="col-lg-10 p-2">
+    <div class="col-lg-10 p-3">
       <div class="card shadow-sm">
         <div class="card-body">
           <h2 class="text-center mb-4">Log Records</h2>
+
 
           <!-- Select Date Toggle Button -->
           <button class="btn btn-outline-secondary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#selectDate-section" aria-expanded="false" aria-controls="selectDate-section">
@@ -55,7 +56,7 @@
                 <div class="row mb-3">
                   <div class="col-md-6">
                     <label for="start_date" class="form-label">Select a date</label>
-                    <input type="date" id="start_date" name="start_date" class="form-control" max="{{ current_date }}" value="{{ start_date }}">
+                    <input type="date" id="start_date" name="start_date" class="form-control" max="{{ current_date }}">
                   </div>
                 </div>
                 {% for role in selected_roles %}
@@ -67,10 +68,7 @@
                 {% if search_query %}
                   <input type="hidden" name="search" value="{{ search_query }}">
                 {% endif %}
-                <div class="d-flex flex-column flex-sm-row gap-2 mt-2">
-                  <button type="submit" class="btn btn-primary w-100 w-sm-auto">Apply Date Filter</button>
-                  <a href="{{ url_for('logging') }}" class="btn btn-outline-secondary w-100 w-sm-auto">Reset</a>
-                </div>
+                <button type="submit" class="btn btn-primary w-100">Apply Date Filter</button>
               </form>
             </div>
           </div>
@@ -104,14 +102,14 @@
 
           <!-- Filter Severity Toggle Button -->
           <button class="btn btn-outline-secondary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#filterSeverity-section" aria-expanded="false" aria-controls="filter-section">
-            Filter by Status
+            Filter by Severity
           </button>
 
           <div id="filterSeverity-section" class="collapse">
             <div class="card p-3">
               <form method="GET" action="{{ url_for('logging') }}">
                 <div class="mb-3">
-                  <h5>Log Status</h5>
+                  <h5>Log Severity</h5>
                   {% set selected_statuses = selected_statuses or [] %}
                   {% for status in ['Open', 'Closed', 'Accepted', 'Triage'] %}
                   <div class="form-check">
@@ -132,52 +130,33 @@
             </div>
           </div>
 
-          <h5>Total Logs <i class="fa-solid fa-circle-info" title="The total number of events or activities recorded in the system."></i> :  <u>{{ logs_count }}</u> </h5>
-
           <div class="table-responsive">
             <table class="table table-bordered table-hover text-center align-middle">
               <thead class="table-success">
                 <tr>
-                  <th>User ID</th>
+                  <th>ID</th>
+                  <th>Date</th>
+                  <th>Time</th>
                   <th>
-                    <a href="{{ url_for('logging', sort_by='date', sort_order='asc' if sort_order == 'desc' and sort_by == 'date' else 'desc', search=search_query, roles=selected_roles, statuses=selected_statuses) }}" class="text-decoration-none text-dark">
-                      Date
-                      <i class="fa-solid {% if sort_by == 'date' %}{% if sort_order == 'asc' %}fa-angle-down{% else %}fa-angle-up{% endif %}{% else %}fa-angle-up text-muted{% endif %} ms-1"></i>
-                    </a>
-                  </th>
-                  <th>Time <i class="fa-solid fa-circle-info" title="Time is in Singapore Standard Time (SGT),UTC +8"></i></th>
-                  <th style="width: 15%;">
-                    <a href="{{ url_for(
-                    'logging',
-                    sort_by='category',
-                    sort_order='asc' if sort_order == 'desc' and sort_by == 'category' else 'desc',
-                    search=search_query,
-                    roles=selected_roles,
-                    statuses=selected_statuses) }}"
-                    class="text-decoration-none text-dark">
-                    Severity
-                    <i class="fa-solid fa-circle-info" title="
-Info: Indicates routine operations or successful actions that require no intervention.
+                    Severity <i class="fa-solid fa-circle-info" title="
+                    Info: Indicates routine operations or successful actions that require no intervention.
 
 Warning: Flags unusual or unexpected behavior that may need monitoring.
 
 Error: Represents failures that prevent a specific task from completing.
 
 Critical: Denotes severe issues that threaten system stability or security and need immediate action."></i>
-                    <i class="fa-solid {% if sort_by == 'category' %}{% if sort_order == 'asc' %}fa-angle-up{% else %}fa-angle-down{% endif %}{% else %}fa-angle-up text-muted{% endif %} ms-1"></i>
-                  </a>
                   </th>
-                  <th style="width: 25%;">Activity <i class="fa-solid fa-circle-info" title="Describes the event or action recorded by the system"></i>
+                  <th>Activity</th>
                   <th>
                     Status <i class="fa-solid fa-circle-info" title="
                     Open: The issue or log entry has been created but not yet addressed.
 
-Closed: Also Known As Resolved. The issue has been resolved or no further action is required.
+Closed: The issue has been resolved or no further action is required.
 
 Accepted: The issue has been acknowledged and will be worked on.
 
 Triage: The issue is being reviewed and prioritized based on severity and impact."></i>
-
                   </th>
                   <th>IP Address</th>
                   <th>Actions</th>
@@ -186,22 +165,10 @@ Triage: The issue is being reviewed and prioritized based on severity and impact
               <tbody>
                 {% for log in users %}
                 <tr>
-                  <td>{{ log.user_id }}</td>
+                  <td>{{ log.id }}</td>
                   <td>{{ log.date }}</td>
                   <td>{{ log.time }}</td>
-                  <td>
-                    {% if log.category == 'Info' %}
-                      <span class="badge rounded-pill bg-success">Info</span>
-                    {% elif log.category == 'Warning' %}
-                      <span class="badge rounded-pill bg-warning text-dark">Warning</span>
-                    {% elif log.category == 'Error' %}
-                      <span class="badge rounded-pill bg-orange text-white" style="background-color: #fd7e14;">Error</span>
-                    {% elif log.category == 'Critical' %}
-                      <span class="badge rounded-pill bg-danger">Critical</span>
-                    {% else %}
-                      <span class="badge rounded-pill bg-secondary">{{ log.category }}</span>
-                    {% endif %}
-                  </td>
+                  <td>{{ log.category }}</td>
                   <td>{{ log.activity }}</td>
                   <td>{{ log.status }}</td>
                   <td>{{ log.ip_address }}</td>

@@ -90,7 +90,7 @@
               <div class="mb-3">
                 <h5>Countries</h5>
                 {% set selected_countries = (user.countries or '').split(',') %}
-                {% set country_names = {'SG': 'Singapore', 'MYS': 'Malaysia', 'JP': 'Japan', 'NL': 'Netherlands', 'US': 'United States', 'PL': 'Poland'} %}
+                {% set country_names = {'SG': 'Singapore', 'MYS': 'Malaysia', 'JP': 'Japan', 'NL': 'Netherlands', 'US': 'United States'} %}
                 {% for code, name in country_names.items() %}
                   <div class="form-check">
                     <input class="form-check-input" type="checkbox" name="allowed_countries" value="{{ code }}" id="country_{{ code }}"
