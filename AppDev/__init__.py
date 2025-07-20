@@ -1866,7 +1866,7 @@ def sms_verify_otp(id):
             otp_store.pop(id, None)
             session.pop('pending_2fa_user_id', None)
 
-            session_id = log_session_activity(user['id'], 'login')
+            session_id = log_session_activity(user['id'], user['status'], 'login')
 
             payload = {
                 'user_id': user['id'],
@@ -2019,7 +2019,7 @@ def face_id(id):
                     flash("User not found. Please try again.", "danger")
                     return redirect(url_for('login'))
 
-                session_id = log_session_activity(user['id'], 'login')
+                session_id = log_session_activity(user['id'], user['status'], 'login')
 
                 payload = {
                     'user_id': user['id'],
@@ -2619,7 +2619,7 @@ def verify_otp(id):
             session.pop('pending_2fa_user_id', None)
 
             # ✅ Only ONE call here
-            session_id = log_session_activity(user['id'], 'login')
+            session_id = log_session_activity(user['id'], user['status'], 'login')
 
             payload = {
                 'user_id': user['id'],
@@ -2674,7 +2674,7 @@ def recovery_auth(id):
                 generate_recovery_code(id)
 
                 # ✅ Only one log here
-                session_id = log_session_activity(result['id'], 'login')
+                session_id = log_session_activity(result['id'],result['status'], 'login')
 
                 payload = {
                     'user_id': result['id'],
