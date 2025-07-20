@@ -99,20 +99,20 @@ if not os.path.exists(UPLOAD_FOLDER):
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 MAIL_USE_TLS = True
-EMAIL_SENDER = "sadevdulneth6@gmail.com"
-EMAIL_PASSWORD = "isgw cesr jdbs oytx"
+EMAIL_SENDER = "cropzyssp@gmail.com"
+EMAIL_PASSWORD = "wivz gtou ftjo dokp"
 
 
 # SETUP UR DB CONFIG ACCORDINGLY
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'glen'
-app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'glen'
+# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 
 
 #BRANDON SQL DB CONFIG
@@ -133,10 +133,10 @@ app.config['MYSQL_PORT'] = 3306
 # app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
-# app.config['MYSQL_HOST'] = 'localhost'
-# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-# app.config['MYSQL_DB'] = 'sspCropzy'
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+app.config['MYSQL_DB'] = 'sspCropzy'
 #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -416,6 +416,19 @@ def create_product():
             session_id=current_user['session_id'],
             action=f"Created new product: {name} (Category: {category})"
         )
+
+        log_user_action(
+            user_id=current_user['user_id'],
+            session_id=current_user['session_id'],
+            action=f"Created new product: {name} (Category: {category})"
+        )
+
+        notify_user_action(
+            to_email=g.user['email'],
+            action_type="Created New Product",
+            item_name=name
+        )
+
         return redirect(url_for('buy_product'))
 
     return render_template('/productPage/createProduct.html', form=form)
@@ -493,6 +506,12 @@ def update_product(id):
             action=f"Updated product: {product.name} (ID: {product.id})"
         )
 
+        notify_user_action(
+            to_email=g.user['email'],
+            action_type="Updated Product",
+            item_name=product.name
+        )
+
         return redirect(url_for('manageProduct'))
 
     return render_template('/productPage/updateProduct.html', form=form, product=product)
@@ -516,6 +535,12 @@ def delete_product(id):
         session_id=g.user['session_id'],
         action=f"Deleted product: {product.name} (ID: {product.id})"
     )
+    notify_user_action(
+        to_email=g.user['email'],
+        action_type="Deleted Product",
+        item_name=product.name
+    )
+
     return redirect(url_for('manageProduct'))
 
 
@@ -815,6 +840,12 @@ def dashboard():
         action="Accessed admin dashboard"
     )
 
+    notify_user_action(
+        to_email=jwt_user['email'],
+        action_type="Accessed Admin Dashboard",
+        item_name="Dashboard View"
+    )
+
     return render_template(
         'dashboard.html',
         user=user_info,
@@ -842,8 +873,10 @@ def update_user_status(id):
 
     cursor = mysql.connection.cursor()
     # Fetch previous status before update (for user_action_log in session activity tracking)
-    cursor.execute("SELECT status FROM accounts WHERE id = %s", (id,))
-    old_status = cursor.fetchone()[0]
+    cursor.execute("SELECT email, status FROM accounts WHERE id = %s", (id,))
+    user_record = cursor.fetchone()
+    user_email = user_record[0]
+    old_status = user_record[1]
 
     cursor.execute("UPDATE accounts SET status = %s WHERE id = %s", (new_status, id))
     mysql.connection.commit()
@@ -852,6 +885,19 @@ def update_user_status(id):
         session_id=current_user['session_id'],
         action=f"Updated user ID {id}'s status from '{old_status}' to '{new_status}'"
     )
+
+    notify_user_action(
+        to_email=user_email,
+        action_type="Status Change",
+        item_name=f"Your account status has been changed from '{old_status}' to '{new_status}'."
+    )
+
+    notify_user_action(
+        to_email=current_user['email'],
+        action_type="Status Change",
+        item_name=f"You changed user ID {id}'s status from '{old_status}' to '{new_status}'."
+    )
+
     cursor.close()
 
     flash("User status updated successfully.", "success")
@@ -916,6 +962,13 @@ def createAdmin():
             session_id=current_user['session_id'],
             action=f"Created admin account for {email}"
         )
+
+        notify_user_action(
+            to_email=current_user['email'],
+            action_type="Created Admin Account",
+            item_name=f"You created an admin account for {email}."
+        )
+
         cursor.close()
 
         flash('Admin account created successfully.', 'success')
@@ -943,6 +996,12 @@ def update_log_status(id):
         action=f"Updated log status (Log ID: {id}) to '{new_status}'"
     )
 
+    notify_user_action(
+        to_email=current_user['email'],
+        action_type="Log Status Update",
+        item_name=f"You changed the status of Log ID {id} to '{new_status}'."
+    )
+
     cursor.close()
 
     flash("Log status updated successfully.", "success")
@@ -968,6 +1027,11 @@ def delete_log(id):
         action=f"Deleted log entry with ID: {id}"
     )
 
+    notify_user_action(
+        to_email=current_user['email'],
+        action_type="Deleted Log Entry",
+        item_name=f"You deleted the log entry with ID: {id}."
+    )
 
     flash("Log deleted successfully.", "success")
     return redirect(url_for('logging'))
@@ -1041,6 +1105,12 @@ def logging():
         user_id=current_user['user_id'],
         session_id=current_user['session_id'],
         action="Viewed log dashboard"
+    )
+
+    notify_user_action(
+        to_email=current_user['email'],
+        action_type="Viewed Logs",
+        item_name="You accessed the log dashboard and viewed recent activities."
     )
 
 
@@ -1526,6 +1596,12 @@ def sign_up():
         # Log registration
         admin_log_activity(mysql, "User signed up successfully", category="Critical")
 
+        notify_user_action(
+            to_email=email,
+            action_type="Sign Up Successful",
+            item_name=f"Welcome to Cropzy, {first_name}! Your account has been successfully created."
+        )
+
         mysql.connection.commit()
         cursor.close()
 
@@ -1653,6 +1729,12 @@ def login():
                         session_id=session_id,
                         action=f"Login successful (no 2FA) | IP: {ip_addr} | Agent: {user_agent}"
                     )
+                    notify_user_action(
+                        to_email=user['email'],
+                        action_type="Login Notification",
+                        item_name=f"Your Cropzy account was just logged in from IP: {ip_addr}\n\nDevice: {user_agent}"
+                    )
+
                     return response
 
             flash('Incorrect password.', 'danger')
@@ -1807,6 +1889,12 @@ def sms_verify_otp(id):
                 action=f"Login successful (via 2FA) | IP: {ip_addr} | Agent: {user_agent}"
             )
 
+            notify_user_action(
+                to_email=user['email'],
+                action_type="Login Notification (2FA)",
+                item_name=f"Your Cropzy account was just logged in via 2FA from IP: {ip_addr}\n\nDevice: {user_agent}"
+            )
+
             flash("Login successful!", "success")
             return response
         else:
@@ -1853,6 +1941,12 @@ def setup_face_id(id):
         cursor.execute("UPDATE accounts SET face = %s WHERE id = %s", (img_bytes, id))
         mysql.connection.commit()
         cursor.close()
+
+        notify_user_action(
+            to_email=g.user['email'],
+            action_type="Face ID Setup",
+            item_name="You have successfully registered a Face ID for your Cropzy account."
+        )
 
         flash("Face ID registered successfully!", "success")
         return redirect(url_for('accountInfo'))
@@ -1947,6 +2041,18 @@ def face_id(id):
                 if os.path.exists(temp_path): os.remove(temp_path)
                 if os.path.exists(registered_path): os.remove(registered_path)
 
+                log_user_action(
+                    user_id=user['id'],
+                    session_id=session_id,
+                    action="Login successful (via Face ID)"
+                )
+
+                notify_user_action(
+                    to_email=user['email'],
+                    action_type="Face ID Login",
+                    item_name="You have successfully logged in using Face ID."
+                )
+
                 flash("Face matched. Logged in successfully!", "success")
                 return response
             else:
@@ -2006,6 +2112,12 @@ def enable_two_factor(id):
             action=f"Enabled 2FA"
         )
 
+        notify_user_action(
+            to_email=g.user['email'],
+            action_type="Enabled 2FA",
+            item_name="You have successfully enabled 2FA for your account."
+        )
+
     generate_recovery_code(id)
 
     cursor.close()
@@ -2036,6 +2148,12 @@ def disable_two_factor(id):
             user_id=id,
             session_id=g.user['session_id'] if hasattr(g, 'user') and g.user.get('session_id') else None,
             action=f"Disabled 2FA"
+        )
+
+        notify_user_action(
+            to_email=g.user['email'],
+            action_type="Disabled 2FA",
+            item_name="You have successfully disabled 2FA for your account."
         )
 
     cursor.close()
@@ -2422,7 +2540,13 @@ def revoke_session(session_id):
     log_user_action(
         user_id=current_user_id,
         session_id=g.user.get('session_id'),
-        action=f"Revoked session ID {session_id} | Revoked by: {revoked_by} | IP: {ip_addr} | Agent: {user_agent}"
+        action=f"Revoked an active session | Revoked by: {revoked_by} | IP: {ip_addr} | Agent: {user_agent}"
+    )
+
+    notify_user_action(
+        to_email=g.user['email'],
+        action_type="Revoked Session",
+        item_name=f"You revoked a session from IP {ip_addr}"
     )
 
     flash("Session has been revoked successfully.", "success")
@@ -2455,21 +2579,6 @@ def check_session_validity():
         return jsonify({"valid": False})
 
     return jsonify({"valid": True})
-
-
-# A helper function to verify JWT token
-def verify_jwt_token(token):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-        return payload
-    except jwt.ExpiredSignatureError:
-        return None  # Token expired
-    except jwt.InvalidTokenError:
-        return None  # Invalid token
-
-
-
-# def send_otp_sms():
 
 @app.route('/verify-otp/<int:id>', methods=['GET', 'POST'])
 def verify_otp(id):
@@ -2535,6 +2644,12 @@ def verify_otp(id):
                 action=f"Login successful (via 2FA) | IP: {ip_addr} | Agent: {user_agent}"
             )
 
+            notify_user_action(
+                to_email=user['email'],
+                action_type="Login Success (2FA)",
+                item_name=f"You logged in via OTP from IP {ip_addr} using {user_agent}."
+            )
+
             flash("Login successful!", "success")
             return response
         else:
@@ -2586,6 +2701,12 @@ def recovery_auth(id):
                     user_id=result['id'],
                     session_id=session_id,
                     action=f"Login successful (via 2FA) | IP: {ip_addr} | Agent: {user_agent}"
+                )
+
+                notify_user_action(
+                    to_email=result['email'],
+                    action_type="Login Success (Recovery Code)",
+                    item_name=f"You logged in using a recovery code from IP {ip_addr} using {user_agent}."
                 )
 
                 flash('Recovery successful. You are now logged in.', 'success')
@@ -2679,6 +2800,12 @@ def change_dets(id):
             if 'user_id' in session:
                 log_user_action(session['user_id'], session.get('current_session_id'), "Changed account details")
 
+            notify_user_action(
+                to_email=change_dets_form.email.data,
+                action_type="Account Update",
+                item_name="Your account details were updated successfully."
+            )
+
             cursor.close()
 
             # Update session
@@ -2746,6 +2873,11 @@ def change_pswd(id):
         # ✅ Log user action
         log_user_action(user_id, session.get('current_session_id'), "Changed password")
 
+        notify_user_action(
+            to_email=user['email'],
+            action_type="Password Change",
+            item_name="Your password has been successfully changed. If this wasn't you, reset your password immediately."
+        )
         # Update session value too
         session['password'] = confirm_pswd
 
@@ -2810,212 +2942,174 @@ def create_update():
     if form.validate_on_submit():
         # reCAPTCHA validation
         recaptcha_response = request.form.get('g-recaptcha-response')
-        secret_key = os.getenv("RECAPTCHA_SECRET_KEY")
-        verify_url = "https://www.google.com/recaptcha/api/siteverify"
-        payload = {'secret': secret_key, 'response': recaptcha_response}
-        r = requests.post(verify_url, data=payload)
-        result = r.json()
+        r = requests.post("https://www.google.com/recaptcha/api/siteverify", data={
+            'secret': os.getenv("RECAPTCHA_SECRET_KEY"),
+            'response': recaptcha_response
+        })
+        if not r.json().get('success'):
+            flash("reCAPTCHA failed.", "danger")
+            return render_template('/home/update.html', form=form, site_key=site_key)
 
-        if not result.get('success'):
-            flash("reCAPTCHA verification failed. Please try again.", 'danger')
-            return render_template('/home/update.html', title='Update', form=form, site_key=site_key)
-
-        # ✅ Decode JWT token from cookie
+        # Decode JWT
         token = request.cookies.get('jwt_token')
-        if not token:
-            flash("User not authenticated. No token found.", "danger")
-            return redirect(url_for('login'))
-
         try:
             decoded = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-            user_email = decoded['email']
+            user_id, user_email = decoded['user_id'], decoded['email']
             session_id = decoded.get('session_id')
-            user_id = decoded['user_id']
-            print("[DEBUG] Decoded user:", decoded)
-        except jwt.ExpiredSignatureError:
-            flash("Session expired. Please log in again.", "danger")
-            return redirect(url_for('login'))
-        except Exception as e:
-            flash("Invalid session token. Please log in again.", "danger")
-            print(f"[ERROR] JWT decoding failed: {e}")
+        except:
+            flash("Invalid session token.", "danger")
             return redirect(url_for('login'))
 
-        # Prepare update data
+        # Save pending update
         update_data = {
             'title': form.update.data,
             'content': form.content.data,
             'date': form.date.data.strftime('%d-%m-%Y'),
-            'season': form.season.data,
+            'season': form.season.data
         }
 
-        # ✅ Send confirmation email
-        send_update_confirmation_email(
-            email=user_email,
-            user_id=user_id,
-            update_data=update_data
-        )
+        pending_id = str(uuid.uuid4())
+        with shelve.open('seasonal_updates.db', writeback=True) as db:
+            pending = db.get('pending_updates', {})
+            pending[pending_id] = {
+                'user_id': user_id,
+                'session_id': session_id,
+                'email': user_email,  # ✅ ensure this is stored
+                'update_data': update_data
+            }
+            db['pending_updates'] = pending
 
-        log_user_action(
-            user_id=user_id,
-            session_id=session_id,
-            action=f"Submitted seasonal update (title: {update_data['title']}) - Awaiting confirmation"
-        )
+        # Send verification email
+        send_create_verification_email(user_email, pending_id)
 
-        flash("A confirmation email has been sent. Please verify to complete the update.", "info")
+        flash("A verification email has been sent. Please confirm to complete your update.", "info")
         return redirect(url_for('home'))
 
-    return render_template('/home/update.html', title='Update', form=form, site_key=site_key, is_edit=False)
+    return render_template('/home/update.html', title='Create Update', form=form, site_key=site_key, is_edit=False)
 
+def send_create_verification_email(email, pending_id):
+    token = serializer.dumps({'pending_id': pending_id}, salt='create-update-verification')
+    confirm_url = url_for('finalize_create', token=token, _external=True)
 
+    msg = Message("[Cropzy] Confirm Your Seasonal Update", sender=EMAIL_SENDER, recipients=[email])
+    msg.body = f"""Hello,
 
-def send_update_confirmation_email(email, user_id, update_data):
-    token_data = {
-        'user_id': user_id,
-        'update_id': str(uuid.uuid4()),
-        'update_data': update_data,
-        'exp': datetime.utcnow() + timedelta(minutes=15)
-    }
-    token = jwt.encode(token_data, SECRET_KEY, algorithm='HS256')
+You recently attempted to create a seasonal update on Cropzy.
 
-    confirm_url = url_for('confirm_update', token=token, _external=True)
-    reject_url = url_for('reject_update', token=token, _external=True)
+Please confirm your identity by clicking the link below (valid for 5 minutes):
+{confirm_url}
 
-    html = f"""
-    <html>
-    <body>
-    <p>Hello,</p>
-    <p>You attempted to create the following seasonal update:</p>
-    <ul>
-        <li><strong>Title:</strong> {update_data['title']}</li>
-        <li><strong>Content:</strong> {update_data['content']}</li>
-        <li><strong>Date:</strong> {update_data['date']}</li>
-        <li><strong>Season:</strong> {update_data['season']}</li>
-    </ul>
-    <p>Please confirm your identity:</p>
-    <p>
-        <a href="{confirm_url}" style="padding:10px 15px;background-color:green;color:white;text-decoration:none;">Yes, this is me</a>
-        &nbsp;
-        <a href="{reject_url}" style="padding:10px 15px;background-color:red;color:white;text-decoration:none;">This is not me</a>
-    </p>
-    </body>
-    </html>
-    """
+If you did not initiate this, you can ignore this email.
+"""
+    mail.send(msg)
 
-    sender_email = "sadevdulneth6@gmail.com"
-    receiver_email = email
-    sender_password = "isgw cesr jdbs oytx"
-
-    message = MIMEMultipart("alternative")
-    message["Subject"] = "Confirm Your Seasonal Update"
-    message["From"] = sender_email
-    message["To"] = receiver_email
-
-    # ✅ Attach HTML with proper UTF-8 encoding
-    message.attach(MIMEText(html, "html", _charset="utf-8"))
-
+@app.route('/finalize_create/<token>')
+def finalize_create(token):
     try:
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, receiver_email, message.as_string())
-        server.quit()
-        print("[DEBUG] Email confirmation sent.")
+        data = serializer.loads(token, salt='create-update-verification', max_age=300)
+        pending_id = data.get('pending_id')
+
+        if not pending_id:
+            flash("Invalid or expired token.", "danger")
+            return redirect(url_for('home'))
+
+        with shelve.open('seasonal_updates.db', writeback=True) as db:
+            pending = db.get('pending_updates', {})
+            entry = pending.pop(pending_id, None)
+            db['pending_updates'] = pending
+
+            if not entry:
+                flash("This update has already been confirmed or expired.", "warning")
+                return redirect(url_for('home'))
+
+            updates = db.get('updates', [])
+            updates.append(entry['update_data'])
+            db['updates'] = updates
+
+        log_user_action(
+            user_id=entry['user_id'],
+            session_id=entry['session_id'],
+            action=f"Confirmed and created seasonal update: {entry['update_data']['title']}"
+        )
+
+        notify_user_action(
+            to_email=entry['email'],
+            action_type="Created Seasonal Update",
+            item_name=entry['update_data']['title']
+        )
+
+        return redirect(url_for('home'))
+
     except Exception as e:
-        print(f"[ERROR] Failed to send email: {e}")
-
-
-@app.route('/confirm_update/<token>')
-@jwt_required
-def confirm_update(token):
-    try:
-        # Decode the token
-        decoded = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-        update_data = decoded['update_data']
-        user_id = decoded['user_id']
-
-        # ✅ Fetch user from DB to restore session
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('SELECT * FROM accounts WHERE id = %s', (user_id,))
-        user = cursor.fetchone()
-        cursor.close()
-
-        if user:
-            # ✅ Restore session
-            session['user_id'] = user['id']
-            session['email'] = user['email']
-            session['first_name'] = user['first_name']
-            session['last_name'] = user['last_name']
-            session['gender'] = user['gender']
-            session['phone'] = user['phone_number']
-            session['status'] = user['status']
-
-            # ✅ Save the update
-            with shelve.open('seasonal_updates.db') as db:
-                updates = db.get('updates', [])
-                updates.append(update_data)
-                db['updates'] = updates
-
-            session_id = session.get('current_session_id') or session.get('session_id') or None
-
-            log_user_action(
-                user_id=user['id'],
-                session_id=session_id,
-                action=f"Confirmed and created seasonal update: {update_data['title']}"
-            )
-            flash("Seasonal update created successfully!", "success")
-        else:
-            flash("User not found. Cannot restore session.", "danger")
-
-    except jwt.ExpiredSignatureError:
-        flash("Confirmation link expired.", "danger")
-    except Exception as e:
-        flash(f"Failed to confirm update: {e}", "danger")
-
-    return redirect(url_for('home'))
-
-
-@app.route('/reject_update/<token>')
-@jwt_required
-def reject_update(token):
-    try:
-        decoded = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-        update_data = decoded['update_data']
-        user_id = decoded['user_id']
-
-        session_id = session.get('current_session_id') or session.get('session_id') or None
-        log_user_action(user_id, session_id, f"Rejected seasonal update: {update_data['title']}")
-
-        flash("Update rejected and not saved.", "info")
-    except Exception as e:
-        flash(f"Error processing rejection: {e}", "danger")
-    return redirect(url_for('home'))
-
+        flash("Something went wrong or the link has expired.", "danger")
+        return redirect(url_for('home'))
 
 
 @app.route('/delete_update/<int:index>', methods=['POST'])
 @jwt_required
 def delete_update(index):
+    # Save index in session and send email
+    session['delete_pending_index'] = index
+
+    token = serializer.dumps({
+        'user_id': g.user['user_id'],
+        'email': g.user['email']
+    }, salt='delete-update-verification')
+
+    confirm_url = url_for('finalize_delete', token=token, _external=True)
+
+    msg = Message("[Cropzy] Confirm Deletion of Update", sender=EMAIL_SENDER, recipients=[g.user['email']])
+    msg.body = f"""Hello,
+
+You requested to delete one of your seasonal updates on Cropzy.
+
+To confirm this deletion, please click the link below (valid for 5 minutes):
+{confirm_url}
+
+If you did not initiate this action, you can safely ignore this message.
+"""
+    mail.send(msg)
+
+    flash("Verification email sent. Please confirm to delete the update.", "info")
+    return redirect(url_for('home'))
+
+@app.route('/finalize_delete/<token>')
+def finalize_delete(token):
     try:
+        data = serializer.loads(token, salt='delete-update-verification', max_age=300)
+        user_id = data['user_id']
+        user_email = data['email']
+        index = session.pop('delete_pending_index', None)
+
+        if index is None:
+            flash("No pending deletion found or session expired.", "warning")
+            return redirect(url_for('home'))
+
         with shelve.open('seasonal_updates.db', writeback=True) as db:
             updates = db.get('updates', [])
             if 0 <= index < len(updates):
-                removed_update = updates.pop(index)
-                db['updates'] = updates  # Save the updated list
+                removed = updates.pop(index)
+                db['updates'] = updates
 
-                if 'user_id' in session:
-                    log_user_action(
-                        session['user_id'],
-                        session.get('current_session_id'),
-                        f'Deleted seasonal update: {removed_update.get("title", "Untitled")}'
-                    )
+                log_user_action(user_id, session.get('current_session_id'), f"Deleted seasonal update: {removed['title']}")
 
-                flash(f'Update "{removed_update.get("title", "Untitled")}" deleted successfully!', 'success')
+                # ✅ Send email notification
+                notify_user_action(
+                    to_email=user_email,
+                    action_type="Deleted Seasonal Update",
+                    item_name=removed['title']
+                )
+
+                flash(f"Update \"{removed['title']}\" deleted successfully!", "success")
             else:
-                flash('Invalid update index.', 'danger')
-    except Exception as e:
-        flash(f"An error occurred: {e}", 'danger')
+                flash("Invalid update index.", "danger")
+
+    except Exception:
+        flash("Verification link expired or invalid.", "danger")
 
     return redirect(url_for('home'))
+
+
 
 
 @app.route('/edit_update/<int:index>', methods=['GET', 'POST'])
@@ -3031,33 +3125,102 @@ def edit_update(index):
             return redirect(url_for('home'))
 
     if form.validate_on_submit():
-        # Update the selected update with form data
-        updates[index] = {
+        # Save the edit temporarily
+        edited_data = {
             'title': form.update.data,
             'content': form.content.data,
             'date': form.date.data.strftime('%d-%m-%Y'),
-            'season': form.season.data,
+            'season': form.season.data
         }
-        with shelve.open('seasonal_updates.db') as db:
-            db['updates'] = updates
 
-            if 'user_id' in session:
-                log_user_action(
-                    session['user_id'],
-                    session.get('current_session_id'),
-                    f'Edited seasonal update: {form.update.data}'
-                )
+        with shelve.open('seasonal_updates.db', writeback=True) as db:
+            db['pending_edits'] = db.get('pending_edits', {})
+            db['pending_edits'][str(index)] = {
+                'user_id': g.user['user_id'],
+                'session_id': g.user.get('session_id'),
+                'data': edited_data
+            }
 
-        flash(f'Update "{form.update.data}" updated successfully!', 'success')
+        # Send verification email
+        token = serializer.dumps({
+            'user_id': g.user['user_id'],
+            'index': index,
+            'email': g.user['email']
+        }, salt='edit-update-verification')
+
+        confirm_url = url_for('finalize_edit', token=token, _external=True)
+
+        msg = Message(
+            "[Cropzy] Confirm Edit of Seasonal Update",
+            sender=EMAIL_SENDER,
+            recipients=[g.user['email']]
+        )
+        msg.body = f"""Hello,
+
+You attempted to edit a seasonal update on Cropzy.
+
+To confirm and apply your edit, click the link below (valid for 5 minutes):
+{confirm_url}
+
+If you did not initiate this, you may ignore this message.
+"""
+        mail.send(msg)
+
+        flash("Edit submitted. Please confirm via the email sent to you.", "info")
         return redirect(url_for('home'))
 
-    # Pre-fill the form with current update data safely
+    # Pre-fill the form with current update data
     form.update.data = update.get('title', '')
     form.content.data = update.get('content', '')
     form.date.data = datetime.strptime(update.get('date', '01-01-2025'), '%d-%m-%Y')
     form.season.data = update.get('season', '')
 
     return render_template('/home/update.html', title='Edit Update', form=form, is_edit=True, index=index)
+
+@app.route('/finalize_edit/<token>')
+def finalize_edit(token):
+    try:
+        data = serializer.loads(token, salt='edit-update-verification', max_age=300)
+        user_id = data['user_id']
+        user_email = data['email']
+        index = str(data['index'])
+
+        with shelve.open('seasonal_updates.db', writeback=True) as db:
+            pending_edits = db.get('pending_edits', {})
+            updates = db.get('updates', [])
+
+            if index not in pending_edits:
+                flash("No pending edit found or already confirmed.", "warning")
+                return redirect(url_for('home'))
+
+            edit_entry = pending_edits.pop(index)
+            db['pending_edits'] = pending_edits
+
+            if 0 <= int(index) < len(updates):
+                updates[int(index)] = edit_entry['data']
+                db['updates'] = updates
+
+                log_user_action(
+                    user_id,
+                    edit_entry['session_id'],
+                    f"Edited seasonal update: {edit_entry['data']['title']}"
+                )
+
+                # ✅ Send confirmation notification
+                notify_user_action(
+                    to_email=user_email,
+                    action_type="Edited Seasonal Update",
+                    item_name=edit_entry['data']['title']
+                )
+
+                flash("Update successfully edited.", "success")
+            else:
+                flash("Invalid update index.", "danger")
+
+    except Exception:
+        flash("Verification link is invalid or expired.", "danger")
+
+    return redirect(url_for('home'))
 
 
 
@@ -3214,6 +3377,48 @@ def checkout():
 
     return render_template('/checkout/checkout.html', cart=cart, total_price=total_price)
 
+
+def notify_user_action(to_email, action_type, item_name=None, details=None):
+    """
+    Send a general-purpose email notification to the user.
+
+    Parameters:
+    - to_email: Recipient's email address.
+    - action_type: What action occurred (e.g., "Deleted Product", "Edited Update").
+    - item_name: Optional name/title of the item involved.
+    - details: Optional extra details to include in the email.
+    """
+    try:
+        subject = f"[Cropzy] {action_type}"
+        message = f"The following action was performed on your Cropzy account:\n\n"
+        message += f"Action: {action_type}\n"
+
+        if item_name:
+            message += f"Item: {item_name}\n"
+
+        if details:
+            message += f"Details: {details}\n"
+
+        message += f"\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        message += "\nIf you did not authorize this action, please contact support immediately.\n\n- Cropzy Team"
+
+        # Construct and send email
+        msg = MIMEMultipart()
+        msg['From'] = app.config['MAIL_USERNAME']
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(message, 'plain'))
+
+        server = smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'])
+        server.starttls()
+        server.login(app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
+        server.sendmail(app.config['MAIL_USERNAME'], to_email, msg.as_string())
+        server.quit()
+
+        print(f"[DEBUG] Notification sent to {to_email}")
+
+    except Exception as e:
+        print(f"[ERROR] Failed to send notification: {e}")
 
 def send_email(to_email, subject, message):
     """Send an email using SMTP."""
