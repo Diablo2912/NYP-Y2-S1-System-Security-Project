@@ -1981,7 +1981,7 @@ def send_otp_email(email, user_id, first_name, last_name):
 
 # Twilio credentials (use environment variables in production!)
 account_sid = 'AC69fe3693aeb2b86b276600293ab078d5'
-auth_token = 'c20ae4b05fd833557538dbad371acb51'
+auth_token = 'e475d20188609c83fc90575507d297b1'
 twilio_phone = '+13072882468'
 
 # Twilio client setup
@@ -2856,6 +2856,28 @@ def verify_otp(id):
             flash("Invalid OTP. Please try again.", "error")
 
     return render_template('/accountPage/two_factor.html', id=id)
+
+@app.route('/resend-otp/<int:id>', methods=['GET'])
+def resend_otp(id):
+    # Ensure only users in 2FA process can request resend
+    if 'pending_2fa_user_id' not in session or session['pending_2fa_user_id'] != id:
+        flash("Unauthorized access.", "error")
+        return redirect(url_for('login'))
+
+    # Fetch user info for email
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("SELECT id, email, first_name, last_name FROM accounts WHERE id = %s", (id,))
+    user = cursor.fetchone()
+    cursor.close()
+
+    if not user:
+        flash("User not found. Please login again.", "error")
+        return redirect(url_for('login'))
+
+    # Send new OTP
+    send_otp_email(user['email'], user['id'], user['first_name'], user['last_name'])
+    flash("A new OTP has been sent to your email.", "info")
+    return redirect(url_for('verify_otp', id=id))
 
 
 @app.route('/recovery_auth/<int:id>', methods=['GET', 'POST'])

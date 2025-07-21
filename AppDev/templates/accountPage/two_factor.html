@@ -40,7 +40,7 @@
       </div>
 
       <div class="text-center mt-2">
-        <a href="{{ url_for('verify_otp', id=id) }}" id="resendBtn" class="text-primary text-decoration-none">Resend verification code</a>
+        <a href="{{ url_for('resend_otp', id=id) }}" id="resendBtn" class="text-primary text-decoration-none">Resend verification code</a>
         <br>
         <a href="{{ url_for('more_auth', id=id) }}" id="moreBtn" class="text-primary text-decoration-none">Sign in another way</a>
       </div>
