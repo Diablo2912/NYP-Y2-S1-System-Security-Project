@@ -124,21 +124,21 @@ EMAIL_PASSWORD = "wivz gtou ftjo dokp"
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'glen'
-# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-# app.config['MYSQL_DB'] = 'ssp_db'
-# app.config['MYSQL_PORT'] = 3306
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'glen'
+app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+app.config['MYSQL_DB'] = 'ssp_db'
+app.config['MYSQL_PORT'] = 3306
 
 
 #BRANDON SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'brandon'
-app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'brandon'
+# app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
 
@@ -1573,7 +1573,7 @@ def download_pdf_report():
 ALGORITHM = "pbkdf2_sha256"
 
 
-def admin_log_activity(mysql, activity, category="Info"):
+def admin_log_activity(mysql, activity, category="Info", user_id=None, status=None):
     """
     Logs an activity to the logs table.
     If the category is 'Critical', it will send email alerts to all admin users.
@@ -1595,9 +1595,9 @@ def admin_log_activity(mysql, activity, category="Info"):
     cursor = mysql.connection.cursor()
     try:
         cursor.execute('''
-            INSERT INTO logs (date, time, category, activity, ip_address)
-            VALUES (%s, %s, %s, %s, %s)
-        ''', (date, time, category, activity, ip_addr))
+                    INSERT INTO logs (user_id, date, time, category, activity, status, ip_address)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ''', (user_id, date, time, category, activity,status, ip_addr))
         mysql.connection.commit()
     finally:
         cursor.close()
@@ -1746,12 +1746,18 @@ def sign_up():
         # ip_address = requests.get("https://api.ipify.org").text
 
         # Get country code from IP
-        user_country = get_user_country(ip_address)
+
+        if ip_address.startswith("127.") or ip_address.startswith("192.") or ip_address.startswith(
+                "10.") or ip_address.startswith("172."):
+            ip_address = get_public_ip()
+
+        current_country = get_user_country(ip_address)
+        print(f"User IP: {ip_address}, Country: {current_country}")
 
         # Insert new user with hashed password
         cursor.execute('''
-            INSERT INTO accounts (first_name, last_name, gender, phone_number, email, password, status, two_factor_status) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO accounts (first_name, last_name, gender, phone_number, email, password, status, two_factor_status, countries) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         ''', (
             first_name,
             last_name,
@@ -1761,11 +1767,13 @@ def sign_up():
             hashed_password,
             status,
             'disabled',
-            user_country  # this is the country code like 'SG', 'MY', etc.
+            current_country
         ))
 
+        user_id = cursor.lastrowid
+
         # Log registration
-        admin_log_activity(mysql, "User signed up successfully", category="Critical")
+        admin_log_activity(mysql, "User signed up successfully", category="Critical", user_id=user_id, status=status)
 
         notify_user_action(
             to_email=email,
@@ -2088,7 +2096,7 @@ def sms_verify_otp(id):
 
 
 def generate_recovery_code(id):
-    code = f"{random.randint(0, 999999):012d}"  # Generate 12-digit code
+    code = f"{random.randint(0, 999999):6d}"  # Generate 12-digit code
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 

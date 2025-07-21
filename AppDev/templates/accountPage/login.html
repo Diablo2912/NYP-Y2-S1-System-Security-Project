@@ -38,7 +38,7 @@
           </div>
         </div>
         <div id="timer-container" style="margin-bottom: 1rem;">
-    ⏳   This form will auto-destruct in <span id="countdown">60</span> seconds.
+    ⏳   This form will auto-destruct in <span id="countdown">300</span> seconds.
         </div>
 
         <input type="submit" value="Login" class="btn btn-success mt-4"/>
@@ -84,7 +84,7 @@
       console.error(error);
     });
 }
-      let secondsLeft = 60;
+      let secondsLeft = 300; //set 5 minutes
     const countdownEl = document.getElementById('countdown');
     const form = document.getElementById('autoDestructForm');
 
