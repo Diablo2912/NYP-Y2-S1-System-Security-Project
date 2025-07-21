@@ -124,12 +124,12 @@ EMAIL_PASSWORD = "wivz gtou ftjo dokp"
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'glen'
-# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-# app.config['MYSQL_DB'] = 'ssp_db'
-# app.config['MYSQL_PORT'] = 3306
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'glen'
+app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+app.config['MYSQL_DB'] = 'ssp_db'
+app.config['MYSQL_PORT'] = 3306
 
 
 #BRANDON SQL DB CONFIG
@@ -141,7 +141,6 @@ EMAIL_PASSWORD = "wivz gtou ftjo dokp"
 # app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
-
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
 # app.config['MYSQL_HOST'] = '127.0.0.1'
 # app.config['MYSQL_USER'] = 'glen'
@@ -150,10 +149,10 @@ EMAIL_PASSWORD = "wivz gtou ftjo dokp"
 # app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-app.config['MYSQL_DB'] = 'sspCropzy'
+# app.config['MYSQL_HOST'] = 'localhost'
+# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+# app.config['MYSQL_DB'] = 'sspCropzy'
 #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -1602,6 +1601,7 @@ def download_pdf_report():
 ALGORITHM = "pbkdf2_sha256"
 
 
+# Info is the default value set for logs category
 def admin_log_activity(mysql, activity, category="Info", user_id=None, status=None):
     """
     Logs an activity to the logs table.
@@ -1626,17 +1626,17 @@ def admin_log_activity(mysql, activity, category="Info", user_id=None, status=No
         cursor.execute('''
                     INSERT INTO logs (user_id, date, time, category, activity, status, ip_address)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ''', (user_id, date, time, category, activity,status, ip_addr))
+                ''', (user_id, date, time, category, activity, status, ip_addr))
         mysql.connection.commit()
     finally:
         cursor.close()
 
     # If critical, notify all admins
     if category.lower() == "critical":
-        notify_all_admins(mysql, activity)
+        notify_all_admins(mysql, activity, date, time, ip_addr, category)
 
 
-def notify_all_admins(mysql, message):
+def notify_all_admins(mysql, message, date, time, ip_addr, category):
     """
     Sends an email notification to all admin users about a critical log event.
     """
@@ -1646,19 +1646,29 @@ def notify_all_admins(mysql, message):
         admins = cursor.fetchall()
         cursor.close()
 
-        subject = "[Cropzy Alert] ⚠️ Critical System Event"
+        subject = "Subject: [ALERT] Critical Security Incident Detected"
         for admin in admins:
             alert_message = f"""
-            Dear {admin['first_name']},
+Dear {admin['first_name']},
 
-            A critical event has occurred:
+A critical security incident has been detected and requires immediate attention:
 
-            {message}
+Incident Details:
+Severity    : {category}
+Description : {message}
+Date        : {date}
+Time        : {time}
+IP Address  : {ip_addr}
 
-            Please investigate this issue as soon as possible.
+Please investigate this issue as soon as possible to ensure the security and integrity of the system.
 
-            Regards,
-            Cropzy Security System
+If you require further context or logs, contact the security team or check the system alerts.    
+
+This is an automated message. Please do not reply.  
+For assistance, contact the Cropzy Security Team directly.
+
+Regards,  
+Cropzy Security Monitoring System
             """
             send_email(admin['email'], subject, alert_message)
     except Exception as e:
