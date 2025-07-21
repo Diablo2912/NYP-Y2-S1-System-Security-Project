@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
 
+<!--Commit-->
+
 <!-- Flash Messages -->
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
@@ -216,9 +218,11 @@
 
         <!-- Logs Summary -->
         <div class="col-lg-10 col-md-9 col-sm-12 mt-4">
-          <h4>Logs Summary</h4>
-          <p><strong><i class="fa-solid fa-calendar-days" style="color: #0f60eb;"></i> Date: </strong> --- </p>
-          <p><strong><i class="fa-solid fa-chart-simple" style="color: #d91717;"></i> Summary: </strong> --- </p>
+          <h4>Logs Summary From Past 5 Days</h4>
+          <p>
+            <strong><i class="fa-solid fa-chart-simple me-1" style="color: #d91717;"></i> Summary: </strong><br>
+            <span style="white-space: pre-wrap;">{{ logs_summary or '---' }}</span>
+          </p>
         </div>
 
          <div class="d-flex justify-content-center my-3">
