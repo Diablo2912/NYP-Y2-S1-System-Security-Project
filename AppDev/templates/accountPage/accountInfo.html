@@ -106,6 +106,9 @@
                     </div>
                     <div class="modal-body text-start">
                       Are you sure you want to delete {{ user.first_name }} {{ user.last_name }}?
+
+                      <!-- reCAPTCHA widget -->
+                      <div class="g-recaptcha mt-3" data-sitekey="{{ captcha_site_key }}"></div>
                     </div>
                     <div class="modal-footer">
                       <input type="submit" value="Delete" class="btn btn-danger">
@@ -234,5 +237,7 @@
     {% endif %}
   </div>
 </div>
+
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
 
 {% endblock %}

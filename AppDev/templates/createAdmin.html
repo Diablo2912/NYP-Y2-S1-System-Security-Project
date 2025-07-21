@@ -139,6 +139,8 @@
               {% endfor %}
             </div>
 
+            <div class="g-recaptcha mb-3" data-sitekey="{{ site_key }}"></div>
+
             <div class="col-12">
               <input type="submit" value="Submit" class="btn btn-success mt-4 w-100" />
             </div>
@@ -168,5 +170,7 @@
     }
   }
 </script>
+
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
 
 {% endblock %}
