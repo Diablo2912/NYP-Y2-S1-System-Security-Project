@@ -1,124 +1,110 @@
-import tempfile
-from markupsafe import Markup
-from flask import Flask, g, Response, render_template, request, redirect, url_for, session, jsonify, flash, \
-    make_response, send_file
-from functools import wraps
-from Forms import SignUpForm, CreateAdminForm, CreateProductForm, LoginForm, ChangeDetForm, ChangePswdForm, ResetPassRequest, ResetPass
-import shelve, User
-from FeaturedArticles import get_featured_articles
-from Filter import main_blueprint
-from seasonalUpdateForm import SeasonalUpdateForm
-from flask_mail import Mail, Message
-import pandas as pd
-import matplotlib.pyplot as plt
-from io import BytesIO
-from chatbot import generate_response
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask_uploads import configure_uploads, IMAGES, UploadSet
-from modelsProduct import db, Product
-import stripe
-import uuid  # For unique transaction IDs
-import smtplib
+import User
+import base64
+from collections import Counter, defaultdict
+from datetime import date, datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-import os
-from werkzeug.utils import secure_filename
-from dotenv import load_dotenv
-import requests
-import bleach
-import MySQLdb.cursors
-from MySQLdb.cursors import DictCursor
-from flask_mysqldb import MySQL
-import base64
+from functools import wraps
 import hashlib
-import secrets
-import pyotp
-import random
-import time
-from datetime import datetime, timedelta, date
-import jwt
-import socket
-import requests
-from twilio.rest import Client
-import json
-import numpy as np
-from deepface import DeepFace
-from PIL import Image
 import io
-from scipy.spatial.distance import cosine
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.utils import ImageReader
-import io
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.units import inch
-from reportlab.lib import colors
-from itsdangerous import URLSafeTimedSerializer
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-from transformers import pipeline
-from collections import defaultdict, Counter
-from cryptography.fernet import Fernet
+from io import BytesIO
+import os
 import pathlib
-from datetime import datetime, timedelta
+import random
+import secrets
+import shelve
+import smtplib
+import socket
+import tempfile
+import time
+import uuid  # For unique transaction IDs
+
+import MySQLdb.cursors
+import bleach
 from cryptography import x509
-from cryptography.x509.oid import NameOID
+from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import NameOID
+from deepface import DeepFace
+from dotenv import load_dotenv
+from flask import Flask, Response, flash, g, jsonify, make_response, redirect, render_template, request, send_file, \
+    session, url_for
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_mail import Mail, Message
+from flask_mysqldb import MySQL
+from flask_uploads import IMAGES, UploadSet
 from flask_wtf import CSRFProtect
+from itsdangerous import URLSafeTimedSerializer
+import jwt
+from markupsafe import Markup
+import matplotlib.pyplot as plt
+import pandas as pd
+from reportlab.lib.pagesizes import A4, letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+import requests
+import stripe
+from transformers import pipeline
+from twilio.rest import Client
+from werkzeug.utils import secure_filename
 
+from FeaturedArticles import get_featured_articles
+from Filter import main_blueprint
+from Forms import ChangeDetForm, ChangePswdForm, CreateAdminForm, CreateProductForm, LoginForm, ResetPass, \
+    ResetPassRequest, SignUpForm
+from chatbot import generate_response
+from modelsProduct import Product, db
+from seasonalUpdateForm import SeasonalUpdateForm
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = '5791262abcdefg'
-UPLOAD_FOLDER = 'static/uploads/'  # Define where images are stored
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-stripe.api_key = "sk_test_51Qrle9CddzoT6fzjpqNPd1g3UV8ScbnxiiPK5uYT0clGPV82Gn7QPwcakuijNv4diGpcbDadJjzunwRcWo0eOXvb00uDZ2Gnw6"
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=90)
-serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
-
+csrf = CSRFProtect()
+mail = Mail(app)
 load_dotenv()
-print("Loaded ENV value for TEST_VAR =", os.getenv("TEST_VAR"))
+
+limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "500 per hour"])
+UPLOAD_FOLDER = 'static/uploads/'
+images = UploadSet('images', IMAGES)
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+otp_store = {}
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+ALGORITHM = 'pbkdf2_sha256'
+SECRET_KEY = 'asdsa8f7as8d67a8du289p1eu89hsad7y2189eha8'
+stripe.api_key = "sk_test_51Qrle9CddzoT6fzjpqNPd1g3UV8ScbnxiiPK5uYT0clGPV82Gn7QPwcakuijNv4diGpcbDadJjzunwRcWo0eOXvb00uDZ2Gnw6"
+serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 fernet_key = Fernet.generate_key()
 fernet = Fernet(fernet_key)
 
-images = UploadSet('images', IMAGES)
-
-#csrf (activate global CSRF protection)
-csrf = CSRFProtect()
-
-
 app.register_blueprint(main_blueprint)
+app.config['SECRET_KEY'] = '5791262abcdefg'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=90)
+
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USERNAME'] = 'cropzyssp@gmail.com'
 app.config['MAIL_PASSWORD'] = 'wivz gtou ftjo dokp'
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
-mail = Mail(app)
-
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///products.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db.init_app(app)
 app.permanent_session_lifetime = timedelta(minutes=90)
-
-UPLOAD_FOLDER = 'static/uploads'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-# Ensure Uploads Directory Exists
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+db.init_app(app)
 
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 MAIL_USE_TLS = True
 EMAIL_SENDER = "cropzyssp@gmail.com"
 EMAIL_PASSWORD = "wivz gtou ftjo dokp"
-
 
 # SETUP UR DB CONFIG ACCORDINGLY
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
@@ -131,8 +117,7 @@ app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
 app.config['MYSQL_DB'] = 'ssp_db'
 app.config['MYSQL_PORT'] = 3306
 
-
-#BRANDON SQL DB CONFIG
+# BRANDON SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
 # app.config['MYSQL_HOST'] = '127.0.0.1'
 # app.config['MYSQL_USER'] = 'brandon'
@@ -167,23 +152,10 @@ mysql = MySQL(app)
 with app.app_context():
     db.create_all()
 
-ALGORITHM = 'pbkdf2_sha256'
-
-limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "500 per hour"])
-
-# CFT on SQL#
-# SQL LOGGING
-# Info
-# Warning
-# Error
-# Critical
-
-#ssl
 
 def generate_self_signed_cert(cert_file='certs/cert.pem', key_file='certs/key.pem'):
     cert_path = pathlib.Path(cert_file)
     key_path = pathlib.Path(key_file)
-
     cert_path.parent.mkdir(parents=True, exist_ok=True)
 
     if cert_path.exists() and key_path.exists():
@@ -223,16 +195,13 @@ def generate_self_signed_cert(cert_file='certs/cert.pem', key_file='certs/key.pe
     print("✅ Certificate saved to", cert_file)
     print("✅ Private key saved to", key_file)
 
-# input sanitisation
+
 def sanitize_input(user_input):
     allowed_tags = ['a', 'b', 'i', 'em', 'strong']
     allowed_attributes = {'a': ['href']}
 
     return bleach.clean(user_input, tags=allowed_tags, attributes=allowed_attributes)
 
-@app.errorhandler(429)
-def ratelimit_handler(e):
-    return render_template("errors/429.html", error=str(e)), 429
 
 def login_required(f):
     @wraps(f)
@@ -281,6 +250,222 @@ def jwt_required(f):
     return decorated_function
 
 
+# SUMMARIZER V1
+# SHOWS DATES
+summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+
+
+#
+# def summarize_recent_logs(mysql):
+#     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+#
+#     today = datetime.now().date()
+#     five_days_ago = today - timedelta(days=5)
+#
+#     cursor.execute('''
+#         SELECT date, activity
+#         FROM logs
+#         WHERE DATE(date) BETWEEN %s AND %s
+#         ORDER BY date DESC
+#     ''', (five_days_ago, today))
+#     logs = cursor.fetchall()
+#
+#     daily_activities = defaultdict(Counter)
+#     for log in logs:
+#         date_obj = log['date']
+#         if isinstance(date_obj, str):
+#             date_obj = datetime.strptime(date_obj.strip(), '%Y-%m-%d').date()
+#         date_str = date_obj.strftime('%Y-%m-%d')
+#         daily_activities[date_str][log['activity']] += 1
+#
+#     summary_lines = []
+#     for date, activities in sorted(daily_activities.items(), key=lambda x: x[0], reverse=True):
+#         summary_lines.append(f"{date}:")
+#         for activity, count in activities.items():
+#             summary_lines.append(f"- {activity} (x{count})" if count > 1 else f"- {activity}")
+#         summary_lines.append("")  # blank line between dates
+#
+#     return "\n".join(summary_lines) if summary_lines else "No significant activities in the past 5 days."
+
+# SUMMARIZER V2
+# SHOWS NO DATES
+#
+def summarize_recent_logs(mysql):
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    today = datetime.now().date()
+    five_days_ago = today - timedelta(days=5)
+
+    # Strict date filtering
+    cursor.execute('''
+        SELECT date, activity
+        FROM logs
+        WHERE DATE(date) BETWEEN %s AND %s
+        ORDER BY date DESC
+    ''', (five_days_ago, today))
+    logs = cursor.fetchall()
+
+    # Group logs by date (clean formatting)
+    daily_activities = defaultdict(Counter)
+    for log in logs:
+        try:
+            date_obj = log['date']
+            if isinstance(date_obj, str):
+                date_obj = datetime.strptime(date_obj.strip(), '%Y-%m-%d').date()
+            date_str = date_obj.strftime('%Y-%m-%d')
+            daily_activities[date_str][log['activity']] += 1
+        except Exception as e:
+            print(f"Skipping log due to date parsing error: {e}, log: {log}")
+            continue
+
+    # Prepare summary input string
+    summary_lines = []
+    for date, activities in sorted(daily_activities.items(), key=lambda x: datetime.strptime(x[0], '%Y-%m-%d'),
+                                   reverse=True):
+        summary_lines.append(f"{date}:")
+        for activity, count in activities.items():
+            summary_lines.append(f"- {activity} (x{count})" if count > 1 else f"- {activity}")
+        summary_lines.append("")
+
+    summary_input = "\n".join(summary_lines)
+
+    if summary_input.strip():
+        # Just get all activities into one string (no dates)
+        activities_text = ". ".join([
+            f"{act} (x{cnt})"
+            for day in daily_activities.values()
+            for act, cnt in day.items()
+        ]) + "."
+
+        summary = summarizer(activities_text, max_length=150, min_length=30, do_sample=False)[0]['summary_text']
+    else:
+        summary = "No significant activities in the past 5 days."
+
+    return summary
+
+
+def generate_log_report_pdf(filename, login_activity, category_summary, trend_data, trend_dates):
+    c = canvas.Canvas(filename, pagesize=A4)
+    width, height = A4
+
+    def draw_chart(fig, x, y, scale=0.4):
+        img_io = io.BytesIO()
+        fig.savefig(img_io, format='PNG', bbox_inches='tight')
+        img_io.seek(0)
+        image = ImageReader(img_io)
+        c.drawImage(image, x, y, width=fig.get_figwidth() * 72 * scale, preserveAspectRatio=True, mask='auto')
+        plt.close(fig)
+
+    # Title
+    c.setFont("Helvetica-Bold", 18)
+    c.drawString(50, height - 50, "System Logging Analytics Report")
+    c.setFont("Helvetica", 12)
+    c.drawString(50, height - 70, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+    # Chart positions
+    login_x, login_y = 40, height - 300
+    pie_x, pie_y = width / 2 + 20, height - 300
+    bar_x, bar_y = 40, height - 540
+    trend_x, trend_y = 40, height - 760
+
+    # --- Log Category card counter  ---
+    c.drawString(50, 780, "Info:")
+
+    # --- Login Activity Line Chart ---
+    fig, ax = plt.subplots(figsize=(5, 3))
+    hours = [f"{i:02d}:00" for i in range(24)]
+    for role in ['user', 'manager', 'admin']:
+        role_data = [login_activity.get(h, {}).get(role, 0) for h in hours]
+        ax.plot(hours, role_data, label=role.capitalize())
+    ax.set_title('Login Activity')
+    ax.set_xlabel('Hour')
+    ax.set_ylabel('Logins')
+    ax.legend()
+    ax.grid(True)
+    draw_chart(fig, x=login_x, y=login_y)
+
+    # --- Pie Chart ---
+    fig, ax = plt.subplots(figsize=(4, 3))
+    labels = list(category_summary.keys())
+    values = [category_summary[k] for k in labels]
+    ax.pie(values, labels=labels, autopct='%1.1f%%', startangle=140)
+    ax.set_title("Log Category Distribution")
+    draw_chart(fig, x=pie_x, y=pie_y)
+
+    # --- Bar Chart ---
+    fig, ax = plt.subplots(figsize=(5, 2.5))
+    ax.bar(labels, values, color=['green', 'orange', 'orangered', 'red'])
+    ax.set_title("Log Category Distribution (Bar)")
+    ax.set_ylabel("Count")
+    draw_chart(fig, x=bar_x, y=bar_y)
+
+    # --- Trend Line Chart ---
+    fig, ax = plt.subplots(figsize=(7, 2.5))
+    for category, counts in trend_data.items():
+        ax.plot(trend_dates, counts, label=category)
+    ax.set_title("Log Trend Over Time")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Logs")
+    ax.legend()
+    ax.grid(True)
+    draw_chart(fig, x=trend_x, y=trend_y)
+
+    c.save()
+    return filename
+
+
+def hash_password(password, salt=None, iterations=260000):
+    if salt is None:
+        salt = secrets.token_hex(16)
+    assert salt and isinstance(salt, str) and "$" not in salt
+    assert isinstance(password, str)
+    pw_hash = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations
+    )
+    b64_hash = base64.b64encode(pw_hash).decode("ascii").strip()
+    return "{}${}${}${}".format(ALGORITHM, iterations, salt, b64_hash)
+
+
+def verify_password(password, password_hash):
+    if (password_hash or "").count("$") != 3:
+        return False
+    algorithm, iterations, salt, b64_hash = password_hash.split("$", 3)
+    iterations = int(iterations)
+    assert algorithm == ALGORITHM
+    compare_hash = hash_password(password, salt, iterations)
+    return secrets.compare_digest(password_hash, compare_hash)
+
+
+def get_user_country(ip_address):
+    try:
+        res = requests.get(f"https://ipwho.is/{ip_address}")
+        data = res.json()
+        if data.get('success', False):
+            return data.get('country_code', 'Unknown')
+        return "Unknown"
+    except Exception as e:
+        print("GeoIP Error:", e)
+        return "Unknown"
+
+
+def get_public_ip():
+    try:
+        return requests.get("https://api.ipify.org").text
+    except Exception as e:
+        print("IP fetch error:", e)
+        return "127.0.0.1"
+
+
+def verify_jwt_token(token):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+        return payload
+    except jwt.ExpiredSignatureError:
+        return None  # Token expired
+    except jwt.InvalidTokenError:
+        return None  # Invalid token
+
+
 @app.route('/add_sample_products/')
 def add_sample_products():
     sample_products = [
@@ -311,11 +496,6 @@ def add_sample_products():
     db.session.add_all(sample_products)
     db.session.commit()
     return "Sample sustainable agricultural products added!"
-
-
-@app.route('/404_NOT_FOUND')
-def notfound():
-    return render_template('404.html')
 
 
 @app.route('/')
@@ -1216,7 +1396,6 @@ def logging():
         item_name="You accessed the log dashboard and viewed recent activities."
     )
 
-
     return render_template(
         'logging.html',
         user=user_info,
@@ -1353,164 +1532,6 @@ def logging_analytics():
         summary_date=today,
     )
 
-# SUMMARIZER V1
-# SHOWS DATES
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-#
-# def summarize_recent_logs(mysql):
-#     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-#
-#     today = datetime.now().date()
-#     five_days_ago = today - timedelta(days=5)
-#
-#     cursor.execute('''
-#         SELECT date, activity
-#         FROM logs
-#         WHERE DATE(date) BETWEEN %s AND %s
-#         ORDER BY date DESC
-#     ''', (five_days_ago, today))
-#     logs = cursor.fetchall()
-#
-#     daily_activities = defaultdict(Counter)
-#     for log in logs:
-#         date_obj = log['date']
-#         if isinstance(date_obj, str):
-#             date_obj = datetime.strptime(date_obj.strip(), '%Y-%m-%d').date()
-#         date_str = date_obj.strftime('%Y-%m-%d')
-#         daily_activities[date_str][log['activity']] += 1
-#
-#     summary_lines = []
-#     for date, activities in sorted(daily_activities.items(), key=lambda x: x[0], reverse=True):
-#         summary_lines.append(f"{date}:")
-#         for activity, count in activities.items():
-#             summary_lines.append(f"- {activity} (x{count})" if count > 1 else f"- {activity}")
-#         summary_lines.append("")  # blank line between dates
-#
-#     return "\n".join(summary_lines) if summary_lines else "No significant activities in the past 5 days."
-
-# SUMMARIZER V2
-# SHOWS NO DATES
-#
-def summarize_recent_logs(mysql):
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-
-    today = datetime.now().date()
-    five_days_ago = today - timedelta(days=5)
-
-    # Strict date filtering
-    cursor.execute('''
-        SELECT date, activity
-        FROM logs
-        WHERE DATE(date) BETWEEN %s AND %s
-        ORDER BY date DESC
-    ''', (five_days_ago, today))
-    logs = cursor.fetchall()
-
-    # Group logs by date (clean formatting)
-    daily_activities = defaultdict(Counter)
-    for log in logs:
-        try:
-            date_obj = log['date']
-            if isinstance(date_obj, str):
-                date_obj = datetime.strptime(date_obj.strip(), '%Y-%m-%d').date()
-            date_str = date_obj.strftime('%Y-%m-%d')
-            daily_activities[date_str][log['activity']] += 1
-        except Exception as e:
-            print(f"Skipping log due to date parsing error: {e}, log: {log}")
-            continue
-
-    # Prepare summary input string
-    summary_lines = []
-    for date, activities in sorted(daily_activities.items(), key=lambda x: datetime.strptime(x[0], '%Y-%m-%d'), reverse=True):
-        summary_lines.append(f"{date}:")
-        for activity, count in activities.items():
-            summary_lines.append(f"- {activity} (x{count})" if count > 1 else f"- {activity}")
-        summary_lines.append("")
-
-    summary_input = "\n".join(summary_lines)
-
-    if summary_input.strip():
-        # Just get all activities into one string (no dates)
-        activities_text = ". ".join([
-            f"{act} (x{cnt})"
-            for day in daily_activities.values()
-            for act, cnt in day.items()
-        ]) + "."
-
-        summary = summarizer(activities_text, max_length=150, min_length=30, do_sample=False)[0]['summary_text']
-    else:
-        summary = "No significant activities in the past 5 days."
-
-    return summary
-
-def generate_log_report_pdf(filename, login_activity, category_summary, trend_data, trend_dates):
-    c = canvas.Canvas(filename, pagesize=A4)
-    width, height = A4
-
-    def draw_chart(fig, x, y, scale=0.4):
-        img_io = io.BytesIO()
-        fig.savefig(img_io, format='PNG', bbox_inches='tight')
-        img_io.seek(0)
-        image = ImageReader(img_io)
-        c.drawImage(image, x, y, width=fig.get_figwidth() * 72 * scale, preserveAspectRatio=True, mask='auto')
-        plt.close(fig)
-
-    # Title
-    c.setFont("Helvetica-Bold", 18)
-    c.drawString(50, height - 50, "System Logging Analytics Report")
-    c.setFont("Helvetica", 12)
-    c.drawString(50, height - 70, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
-    # Chart positions
-    login_x, login_y = 40, height - 300
-    pie_x, pie_y = width / 2 + 20, height - 300
-    bar_x, bar_y = 40, height - 540
-    trend_x, trend_y = 40, height - 760
-
-    # --- Log Category card counter  ---
-    c.drawString(50, 780, "Info:")
-
-    # --- Login Activity Line Chart ---
-    fig, ax = plt.subplots(figsize=(5, 3))
-    hours = [f"{i:02d}:00" for i in range(24)]
-    for role in ['user', 'manager', 'admin']:
-        role_data = [login_activity.get(h, {}).get(role, 0) for h in hours]
-        ax.plot(hours, role_data, label=role.capitalize())
-    ax.set_title('Login Activity')
-    ax.set_xlabel('Hour')
-    ax.set_ylabel('Logins')
-    ax.legend()
-    ax.grid(True)
-    draw_chart(fig, x=login_x, y=login_y)
-
-    # --- Pie Chart ---
-    fig, ax = plt.subplots(figsize=(4, 3))
-    labels = list(category_summary.keys())
-    values = [category_summary[k] for k in labels]
-    ax.pie(values, labels=labels, autopct='%1.1f%%', startangle=140)
-    ax.set_title("Log Category Distribution")
-    draw_chart(fig, x=pie_x, y=pie_y)
-
-    # --- Bar Chart ---
-    fig, ax = plt.subplots(figsize=(5, 2.5))
-    ax.bar(labels, values, color=['green', 'orange', 'orangered', 'red'])
-    ax.set_title("Log Category Distribution (Bar)")
-    ax.set_ylabel("Count")
-    draw_chart(fig, x=bar_x, y=bar_y)
-
-    # --- Trend Line Chart ---
-    fig, ax = plt.subplots(figsize=(7, 2.5))
-    for category, counts in trend_data.items():
-        ax.plot(trend_dates, counts, label=category)
-    ax.set_title("Log Trend Over Time")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Logs")
-    ax.legend()
-    ax.grid(True)
-    draw_chart(fig, x=trend_x, y=trend_y)
-
-    c.save()
-    return filename
 
 @app.route("/generate_pdf_report")
 @jwt_required
@@ -1596,9 +1617,6 @@ def download_pdf_report():
     generate_log_report_pdf(filepath, login_activity, category_summary, trend_data, trend_dates)
 
     return send_file(filepath, as_attachment=True, download_name="Log_Report.pdf", mimetype='application/pdf')
-
-
-ALGORITHM = "pbkdf2_sha256"
 
 
 # Info is the default value set for logs category
@@ -1720,31 +1738,6 @@ def roleManagement():
     )
 
 
-ALGORITHM = "pbkdf2_sha256"
-
-
-def hash_password(password, salt=None, iterations=260000):
-    if salt is None:
-        salt = secrets.token_hex(16)
-    assert salt and isinstance(salt, str) and "$" not in salt
-    assert isinstance(password, str)
-    pw_hash = hashlib.pbkdf2_hmac(
-        "sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations
-    )
-    b64_hash = base64.b64encode(pw_hash).decode("ascii").strip()
-    return "{}${}${}${}".format(ALGORITHM, iterations, salt, b64_hash)
-
-
-def verify_password(password, password_hash):
-    if (password_hash or "").count("$") != 3:
-        return False
-    algorithm, iterations, salt, b64_hash = password_hash.split("$", 3)
-    iterations = int(iterations)
-    assert algorithm == ALGORITHM
-    compare_hash = hash_password(password, salt, iterations)
-    return secrets.compare_digest(password_hash, compare_hash)
-
-
 @app.route('/signUp', methods=['GET', 'POST'])
 @limiter.limit("500 per 1 minutes")
 def sign_up():
@@ -1766,7 +1759,7 @@ def sign_up():
         if sign_up_form.validate():
             cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
-        # Check if email or phone number already exists
+            # Check if email or phone number already exists
             cursor.execute("SELECT * FROM accounts WHERE email = %s OR phone_number = %s",
                            (sign_up_form.email.data, sign_up_form.number.data))
             existing_user = cursor.fetchone()
@@ -1825,7 +1818,8 @@ def sign_up():
             user_id = cursor.lastrowid
 
             # Log registration
-            admin_log_activity(mysql, "User signed up successfully", category="Critical", user_id=user_id, status=status)
+            admin_log_activity(mysql, "User signed up successfully", category="Critical", user_id=user_id,
+                               status=status)
 
             notify_user_action(
                 to_email=email,
@@ -1841,37 +1835,11 @@ def sign_up():
     return render_template('/accountPage/signUp.html', form=sign_up_form, site_key=site_key)
 
 
-SECRET_KEY = 'asdsa8f7as8d67a8du289p1eu89hsad7y2189eha8'  # You can change this to a more secure value
-
-
 @app.context_processor
 def inject_user():
     token = request.cookies.get('jwt_token')
     user = verify_jwt_token(token) if token else None
     return dict(current_user=user)
-
-
-def get_user_country(ip_address):
-    try:
-        res = requests.get(f"https://ipwho.is/{ip_address}")
-        data = res.json()
-        if data.get('success', False):
-            return data.get('country_code', 'Unknown')
-        return "Unknown"
-    except Exception as e:
-        print("GeoIP Error:", e)
-        return "Unknown"
-
-
-def get_public_ip():
-    try:
-        return requests.get("https://api.ipify.org").text
-    except Exception as e:
-        print("IP fetch error:", e)
-        return "127.0.0.1"
-
-
-SECRET_KEY = 'asdsa8f7as8d67a8du289p1eu89hsad7y2189eha8'  # You can change this to a more secure value
 
 
 @app.context_processor
@@ -1886,7 +1854,7 @@ def inject_user():
 def login():
     login_form = LoginForm(request.form)
     site_key = os.getenv("RECAPTCHA_SITE_KEY")
-    #redirect
+    # redirect
     if 'jwt_token' in request.cookies:
         return redirect(url_for('home'))
 
@@ -1996,25 +1964,17 @@ def login():
             flash('Incorrect password.', 'danger')
         else:
             flash('Email not found. Please sign up.', 'danger')
-      #no cache
+    # no cache
     response = make_response(render_template('/accountPage/login.html', form=login_form, site_key=site_key))
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     return response
 
 
-# A helper function to verify JWT token
-def verify_jwt_token(token):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-        return payload
-    except jwt.ExpiredSignatureError:
-        return None  # Token expired
-    except jwt.InvalidTokenError:
-        return None  # Invalid token
-
-
-otp_store = {}
+account_sid = 'AC69fe3693aeb2b86b276600293ab078d5'
+auth_token = 'e475d20188609c83fc90575507d297b1'
+twilio_phone = '+13072882468'
+client = Client(account_sid, auth_token)
 
 
 def send_otp_email(email, user_id, first_name, last_name):
@@ -2044,15 +2004,6 @@ def send_otp_email(email, user_id, first_name, last_name):
 
     # Call existing email sending function
     send_email(email, subject, message)
-
-
-# Twilio credentials (use environment variables in production!)
-account_sid = 'AC69fe3693aeb2b86b276600293ab078d5'
-auth_token = 'e475d20188609c83fc90575507d297b1'
-twilio_phone = '+13072882468'
-
-# Twilio client setup
-client = Client(account_sid, auth_token)
 
 
 def send_otp_sms(phone_number, user_id, first_name, last_name):
@@ -2183,6 +2134,7 @@ def generate_recovery_code(id):
     cursor.close()
 
     return code
+
 
 @app.route('/setup_face_id/<int:id>', methods=['GET', 'POST'])
 @jwt_required
@@ -2345,8 +2297,6 @@ def more_auth(id):
     return render_template('/accountPage/more_auth.html', id=id, user=user)
 
 
-
-
 @app.route('/2FA/<int:id>', methods=['POST'])
 @jwt_required
 def enable_two_factor(id):
@@ -2471,7 +2421,6 @@ def log_session_activity(user_id, status, action):
         return None
 
 
-
 def log_user_action(user_id, session_id, action):
     if not user_id or not session_id:
         print("[WARN] Missing user_id or session_id, skipping action log")
@@ -2488,6 +2437,7 @@ def log_user_action(user_id, session_id, action):
         print(f"[DEBUG] Action logged: {action} at {timestamp}")
     except Exception as e:
         print("[ERROR] Action log failed:", e)
+
 
 @app.route('/export_activity_pdf')
 @jwt_required
@@ -2523,7 +2473,8 @@ def export_activity_pdf():
 
     if session_ids:
         format_strings = ','.join(['%s'] * len(session_ids))
-        cursor.execute(f"SELECT * FROM user_actions_log WHERE session_id IN ({format_strings}) ORDER BY timestamp", tuple(session_ids))
+        cursor.execute(f"SELECT * FROM user_actions_log WHERE session_id IN ({format_strings}) ORDER BY timestamp",
+                       tuple(session_ids))
         actions = cursor.fetchall()
         for action in actions:
             actions_by_session[action['session_id']].append(action)
@@ -2577,6 +2528,7 @@ def export_activity_pdf():
 
     return send_file(buffer, as_attachment=True, download_name='session_activity.pdf', mimetype='application/pdf')
 
+
 @app.route('/send_activity_email_token/<int:id>')
 @jwt_required
 def send_activity_email_token(id):
@@ -2624,9 +2576,11 @@ def confirm_activity_access(token):
         flash("Verification link expired or invalid.", "danger")
         return redirect(url_for('verify_before_activity'))
 
+
 @app.route('/verification_success_message/<token>')
 def verification_success_message(token):
     return render_template("accountPage/verification_success.html", token=token)
+
 
 @app.route('/face_verify_activity/<int:id>', methods=['GET', 'POST'])
 @jwt_required
@@ -2684,7 +2638,6 @@ def face_verify_activity(id):
     return render_template("accountPage/face_id_activity.html", id=id)
 
 
-
 @app.route('/verify_before_activity')
 @jwt_required
 def verify_before_activity():
@@ -2694,7 +2647,6 @@ def verify_before_activity():
     user = cursor.fetchone()
     cursor.close()
     return render_template('accountPage/verify_activity_choice.html', id=g.user['user_id'], user=user)
-
 
 
 @app.route('/activity_history')
@@ -2762,8 +2714,6 @@ def activity_history():
                            time_left=time_left)
 
 
-
-
 @app.route('/revoke_session/<session_id>', methods=['POST'])
 @jwt_required
 def revoke_session(session_id):
@@ -2820,7 +2770,6 @@ def revoke_session(session_id):
     return redirect(url_for('activity_history'))
 
 
-
 @app.route('/check_session_validity')
 def check_session_validity():
     token = request.cookies.get('jwt_token')
@@ -2846,6 +2795,7 @@ def check_session_validity():
         return jsonify({"valid": False})
 
     return jsonify({"valid": True})
+
 
 @app.route('/verify-otp/<int:id>', methods=['GET', 'POST'])
 def verify_otp(id):
@@ -2924,6 +2874,7 @@ def verify_otp(id):
 
     return render_template('/accountPage/two_factor.html', id=id)
 
+
 @app.route('/resend-otp/<int:id>', methods=['GET'])
 def resend_otp(id):
     # Ensure only users in 2FA process can request resend
@@ -2964,7 +2915,7 @@ def recovery_auth(id):
                 generate_recovery_code(id)
 
                 # ✅ Only one log here
-                session_id = log_session_activity(result['id'],result['status'], 'login')
+                session_id = log_session_activity(result['id'], result['status'], 'login')
 
                 payload = {
                     'user_id': result['id'],
@@ -3293,6 +3244,7 @@ def create_update():
 
     return render_template('/home/update.html', title='Create Update', form=form, site_key=site_key, is_edit=False)
 
+
 def send_create_verification_email(email, pending_id):
     token = serializer.dumps({'pending_id': pending_id}, salt='create-update-verification')
     confirm_url = url_for('finalize_create', token=token, _external=True)
@@ -3308,6 +3260,7 @@ Please confirm your identity by clicking the link below (valid for 5 minutes):
 If you did not initiate this, you can ignore this email.
 """
     mail.send(msg)
+
 
 @app.route('/finalize_create/<token>')
 def finalize_create(token):
@@ -3379,6 +3332,7 @@ If you did not initiate this action, you can safely ignore this message.
     flash("Verification email sent. Please confirm to delete the update.", "info")
     return redirect(url_for('home'))
 
+
 @app.route('/finalize_delete/<token>')
 def finalize_delete(token):
     try:
@@ -3397,7 +3351,8 @@ def finalize_delete(token):
                 removed = updates.pop(index)
                 db['updates'] = updates
 
-                log_user_action(user_id, session.get('current_session_id'), f"Deleted seasonal update: {removed['title']}")
+                log_user_action(user_id, session.get('current_session_id'),
+                                f"Deleted seasonal update: {removed['title']}")
 
                 # ✅ Send email notification
                 notify_user_action(
@@ -3414,6 +3369,7 @@ def finalize_delete(token):
         flash("Verification link expired or invalid.", "danger")
 
     return redirect(url_for('home'))
+
 
 @app.route('/edit_update/<int:index>', methods=['GET', 'POST'])
 @jwt_required
@@ -3480,6 +3436,7 @@ If you did not initiate this, you may ignore this message.
 
     return render_template('/home/update.html', title='Edit Update', form=form, is_edit=True, index=index)
 
+
 @app.route('/finalize_edit/<token>')
 def finalize_edit(token):
     try:
@@ -3526,7 +3483,6 @@ def finalize_edit(token):
     return redirect(url_for('home'))
 
 
-
 @app.route('/request_delete/<int:index>', methods=['GET'])
 @jwt_required
 def request_delete(index):
@@ -3546,6 +3502,7 @@ def request_delete(index):
         else:
             flash('Invalid update index.', 'danger')
             return redirect(url_for('home'))
+
 
 @app.route('/update_cart', methods=['POST'])
 def update_cart():
@@ -3721,6 +3678,7 @@ def notify_user_action(to_email, action_type, item_name=None, details=None):
     except Exception as e:
         print(f"[ERROR] Failed to send notification: {e}")
 
+
 def send_email(to_email, subject, message):
     """Send an email using SMTP."""
     try:
@@ -3840,6 +3798,7 @@ def chat():
     bot_response = generate_response(user_message)
     return jsonify({'response': bot_response})
 
+
 def send_reset_pass(email, user_id):
     try:
         token = secrets.token_urlsafe(32)
@@ -3868,6 +3827,7 @@ def send_reset_pass(email, user_id):
     except Exception as e:
         print(f"[ERROR] Failed to send reset password email: {e}")
 
+
 @app.route('/reset_password_request', methods=['GET', 'POST'])
 def reset_password_request():
     form = ResetPassRequest(request.form)
@@ -3885,8 +3845,8 @@ def reset_password_request():
         # Always show same message regardless
         flash("If an account with that email exists, a reset link has been sent.", "info")
 
-
     return render_template("accountPage/reset_pass_request.html", form=form)
+
 
 @app.route('/reset_password/<token>', methods=['GET', 'POST'])
 def reset_password(token):
@@ -3911,7 +3871,7 @@ def reset_password(token):
 
         if new_password != confirm_password:
             flash("Passwords do not match.", "danger")
-            return redirect(url_for('reset_password', token=token,_external=True))
+            return redirect(url_for('reset_password', token=token, _external=True))
         else:
             hashed_pw = hash_password(new_password)
             cursor.execute("UPDATE accounts SET password = %s WHERE email = %s", (hashed_pw, email))
@@ -3925,11 +3885,13 @@ def reset_password(token):
     cursor.close()
     return render_template("accountPage/reset_pass.html", form=form)
 
+
 @app.after_request
 def set_clickjacking_protection(response):
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['Content-Security-Policy'] = "frame-ancestors 'none';"
     return response
+
 
 @app.route('/freeze_account/<int:user_id>', methods=['POST'])
 def freeze_account(user_id):
@@ -3951,12 +3913,14 @@ def freeze_account(user_id):
 
 def is_account_frozen(user_id):
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cursor.execute("SELECT is_frozen FROM frozen_account WHERE user_id = %s ORDER BY frozen_at DESC LIMIT 1", (user_id,))
+    cursor.execute("SELECT is_frozen FROM frozen_account WHERE user_id = %s ORDER BY frozen_at DESC LIMIT 1",
+                   (user_id,))
     freeze_entry = cursor.fetchone()
     cursor.close()
 
     # Return True if most recent freeze entry exists and is active
     return freeze_entry and freeze_entry['is_frozen'] == True
+
 
 # Helper: Send Unfreeze Email
 def send_unfreeze_email(user_id, email):
@@ -4029,6 +3993,13 @@ def ajax_send_unfreeze_email():
     return jsonify({'status': 'success', 'message': 'Unfreeze email sent.'})
 
 
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return render_template("errors/429.html", error=str(e)), 429
+
+@app.route('/404_NOT_FOUND')
+def notfound():
+    return render_template('404.html')
 
 if __name__ == "__main__":
     generate_self_signed_cert()
