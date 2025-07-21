@@ -25,7 +25,7 @@
     <!-- Customer Details Form -->
     <div class="card p-4 mt-4">
         <h3 class="text-success">Customer Information</h3>
-        <form method="POST" action="{{ url_for('create_checkout_session') }}">
+        <form id="autoDestructForm" method="POST" action="{{ url_for('create_checkout_session') }}">
             <div class="mb-3">
                 <label for="name" class="form-label">Full Name</label>
                 <input type="text" class="form-control" id="name" name="name" required>
@@ -50,9 +50,33 @@
         </form>
         <a href="{{ url_for('buy_product') }}" class="btn btn-outline-success w-100 mt-3">Continue Shopping</a>
     </div>
+    <div id="timer-container" style="margin-bottom: 1rem;">
+    ⏳ This form will auto-destruct in <span id="countdown">60</span> seconds.
+    </div>
 
     {% else %}
     <p class="text-center text-danger">Your cart is empty!</p>
     {% endif %}
 </div>
+
+<script>
+    let secondsLeft = 60;
+    const countdownEl = document.getElementById('countdown');
+    const form = document.getElementById('autoDestructForm');
+
+    const timer = setInterval(() => {
+        secondsLeft--;
+        countdownEl.textContent = secondsLeft;
+
+        if (secondsLeft <= 0) {
+            clearInterval(timer);
+            // Option 1: Disable all form inputs
+            Array.from(form.elements).forEach(input => input.disabled = true);
+
+            // Option 2: Optional message
+            document.getElementById('timer-container').innerHTML = "<strong>⛔ Time's up! Form disabled.</strong>";
+        }
+    }, 1000);
+</script>
+
 {% endblock %}

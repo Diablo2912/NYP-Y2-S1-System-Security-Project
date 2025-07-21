@@ -1,5 +1,5 @@
 import tempfile
-
+from markupsafe import Markup
 from flask import Flask, g, Response, render_template, request, redirect, url_for, session, jsonify, flash, \
     make_response, send_file
 from functools import wraps
@@ -60,6 +60,15 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from transformers import pipeline
 from collections import defaultdict, Counter
+from cryptography.fernet import Fernet
+import pathlib
+from datetime import datetime, timedelta
+from cryptography import x509
+from cryptography.x509.oid import NameOID
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from flask_wtf import CSRFProtect
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '5791262abcdefg'
@@ -71,8 +80,14 @@ serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 
 load_dotenv()
 print("Loaded ENV value for TEST_VAR =", os.getenv("TEST_VAR"))
+fernet_key = Fernet.generate_key()
+fernet = Fernet(fernet_key)
 
 images = UploadSet('images', IMAGES)
+
+#csrf (activate global CSRF protection)
+csrf = CSRFProtect()
+
 
 app.register_blueprint(main_blueprint)
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -109,21 +124,21 @@ EMAIL_PASSWORD = "wivz gtou ftjo dokp"
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'glen'
-app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'glen'
+# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 
 
 #BRANDON SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'brandon'
-# app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
-# app.config['MYSQL_DB'] = 'ssp_db'
-# app.config['MYSQL_PORT'] = 3306
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'brandon'
+app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+app.config['MYSQL_DB'] = 'ssp_db'
+app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
 
@@ -143,8 +158,8 @@ app.config['MYSQL_PORT'] = 3306
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
 # app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'glen'
-# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+# app.config['MYSQL_USER'] = 'root'
+# app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
 # app.config['MYSQL_DB'] = 'ssp_db'
 # app.config['MYSQL_PORT'] = 3306
 
@@ -155,7 +170,7 @@ with app.app_context():
 
 ALGORITHM = 'pbkdf2_sha256'
 
-limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
+limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "500 per hour"])
 
 # CFT on SQL#
 # SQL LOGGING
@@ -163,6 +178,51 @@ limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "5
 # Warning
 # Error
 # Critical
+
+#ssl
+
+def generate_self_signed_cert(cert_file='certs/cert.pem', key_file='certs/key.pem'):
+    cert_path = pathlib.Path(cert_file)
+    key_path = pathlib.Path(key_file)
+
+    cert_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if cert_path.exists() and key_path.exists():
+        print("✅ SSL certs already exist. Skipping generation.")
+        return
+
+    print("🔐 Generating self-signed SSL certificate...")
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = x509.Name([
+        x509.NameAttribute(NameOID.COUNTRY_NAME, u"SG"),
+        x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, u"Singapore"),
+        x509.NameAttribute(NameOID.LOCALITY_NAME, u"Singapore"),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"FlaskApp"),
+        x509.NameAttribute(NameOID.COMMON_NAME, u"localhost"),
+    ])
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.utcnow())
+        .not_valid_after(datetime.utcnow() + timedelta(days=365))
+        .sign(key, hashes.SHA256())
+    )
+
+    with open(key_file, "wb") as f:
+        f.write(key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.TraditionalOpenSSL,
+            serialization.NoEncryption()
+        ))
+
+    with open(cert_file, "wb") as f:
+        f.write(cert.public_bytes(serialization.Encoding.PEM))
+
+    print("✅ Certificate saved to", cert_file)
+    print("✅ Private key saved to", key_file)
 
 # input sanitisation
 def sanitize_input(user_input):
@@ -720,6 +780,19 @@ def accountInfo():
     cursor.execute("SELECT * FROM accounts WHERE id = %s", (user_id,))
     user = cursor.fetchone()
     cursor.close()
+
+    # 🛠 Fix: MySQL stores BLOBs or bytes — decode to string first
+    if user and user.get('recovery_code'):
+        try:
+            encrypted = user['recovery_code']
+            if isinstance(encrypted, bytearray):  # MySQL may return bytearray
+                encrypted = bytes(encrypted)
+            decrypted_code = fernet.decrypt(encrypted).decode()
+            user['recovery_code'] = decrypted_code
+        except Exception as e:
+            print(f"[Decryption Error] {e}")
+            user['recovery_code'] = "[Decryption Failed]"
+
     return render_template('/accountPage/accountInfo.html', user=user)
 
 
@@ -1634,7 +1707,7 @@ def verify_password(password, password_hash):
 
 
 @app.route('/signUp', methods=['GET', 'POST'])
-@limiter.limit("50 per 1 minutes")
+@limiter.limit("500 per 1 minutes")
 def sign_up():
     sign_up_form = SignUpForm(request.form)
 
@@ -1749,9 +1822,12 @@ def inject_user():
 
 
 @app.route('/login', methods=['GET', 'POST'])
-@limiter.limit("50 per 1 minutes")
+@limiter.limit("500 per 1 minutes")
 def login():
     login_form = LoginForm(request.form)
+    #redirect
+    if 'jwt_token' in request.cookies:
+        return redirect(url_for('home'))
 
     if request.method == 'POST' and login_form.validate():
         email = sanitize_input(login_form.email.data.lower())
@@ -1790,6 +1866,13 @@ def login():
                     session_id=None,
                     action=f"Login blocked - Disallowed region ({current_country}) | IP: {ip_address} | Agent: {user_agent}"
                 )
+                return redirect(url_for('login'))
+
+            if is_account_frozen(user['id']):
+                unfreeze_link = url_for('ajax_send_unfreeze_email', user_id=user['id'])
+                message = Markup(
+                    f"Account has been frozen. Send unfreeze email <a href='#' class='alert-link' onclick=\"sendUnfreezeRequest('{unfreeze_link}')\">here</a>.")
+                flash(message, "danger")
                 return redirect(url_for('login'))
 
             # Password validation
@@ -1838,8 +1921,11 @@ def login():
             flash('Incorrect password.', 'danger')
         else:
             flash('Email not found. Please sign up.', 'danger')
-
-    return render_template('/accountPage/login.html', form=login_form)
+      #no cache
+    response = make_response(render_template('/accountPage/login.html', form=login_form))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    return response
 
 
 # A helper function to verify JWT token
@@ -2015,7 +2101,9 @@ def generate_recovery_code(id):
         return False  # User not found
 
     # Update recovery code
-    cursor.execute("UPDATE accounts SET recovery_code = %s WHERE id = %s", (code, id))
+    encrypted_code = fernet.encrypt(code.encode())
+    cursor.execute("UPDATE accounts SET recovery_code = %s WHERE id = %s", (encrypted_code, id))
+
     mysql.connection.commit()
     cursor.close()
 
@@ -3206,9 +3294,6 @@ def finalize_delete(token):
 
     return redirect(url_for('home'))
 
-
-
-
 @app.route('/edit_update/<int:index>', methods=['GET', 'POST'])
 @jwt_required
 def edit_update(index):
@@ -3340,8 +3425,6 @@ def request_delete(index):
         else:
             flash('Invalid update index.', 'danger')
             return redirect(url_for('home'))
-
-
 
 @app.route('/update_cart', methods=['POST'])
 def update_cart():
@@ -3640,14 +3723,13 @@ def send_reset_pass(email, user_id):
     try:
         token = secrets.token_urlsafe(32)
         sg_time = datetime.utcnow() + timedelta(hours=8)
-        expires_at = sg_time + timedelta(minutes=5)
+        expires_at = sg_time + timedelta(minutes=1)
 
         # Store token in DB
         cursor = mysql.connection.cursor()
         cursor.execute(
             "INSERT INTO password_resets (email, token, expires_at) VALUES (%s, %s, %s)",
-            (email, token, expires_at)
-        )
+            (email, token, expires_at))
         mysql.connection.commit()
         cursor.close()
 
@@ -3722,5 +3804,112 @@ def reset_password(token):
     cursor.close()
     return render_template("accountPage/reset_pass.html", form=form)
 
-if __name__ == '__main__':
-    app.run(debug=True)
+@app.after_request
+def set_clickjacking_protection(response):
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Content-Security-Policy'] = "frame-ancestors 'none';"
+    return response
+
+@app.route('/freeze_account/<int:user_id>', methods=['POST'])
+def freeze_account(user_id):
+    cursor = mysql.connection.cursor()
+
+    cursor.execute(
+        "INSERT INTO frozen_account (user_id, reason, frozen_at, is_frozen) VALUES (%s, %s, NOW(), TRUE)",
+        (user_id, 'Manual freeze by user'))
+
+    mysql.connection.commit()
+    cursor.close()
+    session.clear()
+    response = make_response(redirect(url_for('login')))
+    response.delete_cookie('jwt_token')
+    flash("Account has been frozen.", "danger")
+
+    return response  # Or wherever you're managing users
+
+
+def is_account_frozen(user_id):
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("SELECT is_frozen FROM frozen_account WHERE user_id = %s ORDER BY frozen_at DESC LIMIT 1", (user_id,))
+    freeze_entry = cursor.fetchone()
+    cursor.close()
+
+    # Return True if most recent freeze entry exists and is active
+    return freeze_entry and freeze_entry['is_frozen'] == True
+
+# Helper: Send Unfreeze Email
+def send_unfreeze_email(user_id, email):
+    try:
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(minutes=1)
+
+        cursor = mysql.connection.cursor()
+        cursor.execute("""
+            INSERT INTO unfreeze_requests (user_id, token, expires_at)
+            VALUES (%s, %s, %s)
+        """, (user_id, token, expires_at))
+        mysql.connection.commit()
+
+        unfreeze_url = url_for('unfreeze_account', token=token, _external=True)
+        subject = "[Cropzy] Unfreeze Your Account"
+        message = (
+            f"Hi,\n\n"
+            f"Your account was frozen. To unfreeze it, please click the link below:\n\n"
+            f"{unfreeze_url}\n\n"
+            f"This link will expire in 10 minutes.\n\n"
+            f"Best,\nCropzy Support"
+        )
+        send_email(email, subject, message)
+
+    except Exception as e:
+        print(f"[ERROR] Failed to send unfreeze email: {e}")
+
+
+@app.route('/unfreeze/<token>')
+def unfreeze_account(token):
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("SELECT * FROM unfreeze_requests WHERE token = %s", (token,))
+    request_row = cursor.fetchone()
+
+    if not request_row:
+        flash("Invalid or expired unfreeze link.", "danger")
+        return redirect(url_for('login'))
+
+    if datetime.utcnow() > request_row['expires_at']:
+        flash("This unfreeze link has expired.", "danger")
+        return redirect(url_for('login'))
+
+    user_id = request_row['user_id']
+    cursor.execute("UPDATE frozen_account SET is_frozen = FALSE WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM unfreeze_requests WHERE token = %s", (token,))
+    mysql.connection.commit()
+    cursor.close()
+
+    flash("Your account has been unfrozen. You can now log in.", "success")
+    return redirect(url_for('login'))
+
+
+@app.route('/send_unfreeze_email', methods=['POST'])
+def ajax_send_unfreeze_email():
+    user_id = request.args.get('user_id')  # or from request.json
+
+    if not user_id:
+        return jsonify({'status': 'error', 'message': 'User not logged in.'}), 403
+
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("SELECT email FROM accounts WHERE id = %s", (user_id,))
+    user = cursor.fetchone()
+    cursor.close()
+
+    if not user:
+        return jsonify({'status': 'error', 'message': 'User not found.'}), 404
+
+    send_unfreeze_email(user_id, user['email'])
+    return jsonify({'status': 'success', 'message': 'Unfreeze email sent.'})
+
+
+
+if __name__ == "__main__":
+    generate_self_signed_cert()
+
+    app.run(ssl_context=("certs/cert.pem", "certs/key.pem"), host="127.0.0.1", port=443, debug=True)

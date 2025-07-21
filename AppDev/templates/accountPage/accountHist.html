@@ -48,6 +48,12 @@
                 <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
                 <span class="badge bg-success p-2 fs-5 align-middle shadow">Purchase History</span></a>
             </li>
+              <li class="list-group-item">
+              <a href="{{ url_for('activity_history') }}" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Session Activity</span>
+              </a>
+            </li>
           </ul>
 
         </div>

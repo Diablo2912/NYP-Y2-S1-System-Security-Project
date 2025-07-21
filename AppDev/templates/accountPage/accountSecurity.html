@@ -48,6 +48,12 @@
                 <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
                 <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Purchase History</span></a>
             </li>
+            <li class="list-group-item">
+              <a href="{{ url_for('activity_history') }}" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Session Activity</span>
+              </a>
+            </li>
           </ul>
         </div>
       </div>
@@ -57,7 +63,35 @@
     <div class="col-lg-8 p-3">
       <div class="card d-flex mb-3 m-3 bg-success-subtle">
         <div class="card-body">
-          <h1 class="card-title">Security Info</h1>
+          <div class="container">
+            <div class="row">
+              <div class="d-flex">
+                <h1 class="card-title col-8">Security Info</h1>
+                <form class="col-4" method="POST" action="{{ url_for('freeze_account', user_id=user.id) }}">
+                  <button type='button' class="btn btn-outline-danger fs-4 fw-bold" data-bs-toggle="modal" data-bs-target="#freezeConfirmModal">
+                    Freeze Account
+                  </button>
+                  <div class="modal" id="freezeConfirmModal">
+                    <div class="modal-dialog">
+                      <div class="modal-content">
+                        <div class="modal-header">
+                          <h5 class="modal-title">Account Freeze Confirmation</h5>
+                          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                          <p>Are you sure you want to freeze this account?</p>
+                        </div>
+                        <div class="modal-footer">
+                          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                          <button type="submit" class="btn btn-success">Confirm</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
           <div>
             <ul class="list-group list-group-flush">
               <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
@@ -115,6 +149,7 @@
     </div>
     {% endif %}
   </div>
+</div>
 </div>
 
 <script>
