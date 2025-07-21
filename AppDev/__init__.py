@@ -2096,7 +2096,7 @@ def sms_verify_otp(id):
 
 
 def generate_recovery_code(id):
-    code = f"{random.randint(0, 999999):6d}"  # Generate 12-digit code
+    code = f"{random.randint(0, 999999):06d}"  # Generate 12-digit code
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
