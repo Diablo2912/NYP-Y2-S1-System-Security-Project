@@ -1138,6 +1138,8 @@ def logging_analytics():
     if current_user['status'] != 'admin':
         return render_template('404.html')
 
+    today = datetime.now().date()
+
     summary = summarize_recent_logs(mysql)
 
     today_str = datetime.today().strftime("%Y-%m-%d")
@@ -1247,43 +1249,98 @@ def logging_analytics():
         logs_count=logs_count,
         num_days=num_days,
         logs_summary=summary,
-        summary_date=today
+        summary_date=today,
     )
 
+# SUMMARIZER V1
+# SHOWS DATES
+# summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+#
+# def summarize_recent_logs(mysql):
+#     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+#
+#     today = datetime.now().date()
+#     five_days_ago = today - timedelta(days=5)
+#
+#     cursor.execute('''
+#         SELECT date, activity
+#         FROM logs
+#         WHERE DATE(date) BETWEEN %s AND %s
+#         ORDER BY date DESC
+#     ''', (five_days_ago, today))
+#     logs = cursor.fetchall()
+#
+#     daily_activities = defaultdict(Counter)
+#     for log in logs:
+#         date_obj = log['date']
+#         if isinstance(date_obj, str):
+#             date_obj = datetime.strptime(date_obj.strip(), '%Y-%m-%d').date()
+#         date_str = date_obj.strftime('%Y-%m-%d')
+#         daily_activities[date_str][log['activity']] += 1
+#
+#     summary_lines = []
+#     for date, activities in sorted(daily_activities.items(), key=lambda x: x[0], reverse=True):
+#         summary_lines.append(f"{date}:")
+#         for activity, count in activities.items():
+#             summary_lines.append(f"- {activity} (x{count})" if count > 1 else f"- {activity}")
+#         summary_lines.append("")  # blank line between dates
+#
+#     return "\n".join(summary_lines) if summary_lines else "No significant activities in the past 5 days."
 
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-
-
+# SUMMARIZER V2
+# SHOWS NO DATES
+#
 def summarize_recent_logs(mysql):
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     today = datetime.now().date()
     five_days_ago = today - timedelta(days=5)
 
+    # Strict date filtering
     cursor.execute('''
-        SELECT date, activity 
-        FROM logs 
+        SELECT date, activity
+        FROM logs
         WHERE DATE(date) BETWEEN %s AND %s
         ORDER BY date DESC
     ''', (five_days_ago, today))
     logs = cursor.fetchall()
 
+    # Group logs by date (clean formatting)
     daily_activities = defaultdict(Counter)
     for log in logs:
-        date_obj = log['date']
-        if isinstance(date_obj, str):
-            date_obj = datetime.strptime(date_obj.strip(), '%Y-%m-%d').date()
-        date_str = date_obj.strftime('%Y-%m-%d')
-        daily_activities[date_str][log['activity']] += 1
+        try:
+            date_obj = log['date']
+            if isinstance(date_obj, str):
+                date_obj = datetime.strptime(date_obj.strip(), '%Y-%m-%d').date()
+            date_str = date_obj.strftime('%Y-%m-%d')
+            daily_activities[date_str][log['activity']] += 1
+        except Exception as e:
+            print(f"Skipping log due to date parsing error: {e}, log: {log}")
+            continue
 
+    # Prepare summary input string
     summary_lines = []
-    for date, activities in sorted(daily_activities.items(), key=lambda x: x[0], reverse=True):
+    for date, activities in sorted(daily_activities.items(), key=lambda x: datetime.strptime(x[0], '%Y-%m-%d'), reverse=True):
         summary_lines.append(f"{date}:")
         for activity, count in activities.items():
             summary_lines.append(f"- {activity} (x{count})" if count > 1 else f"- {activity}")
-        summary_lines.append("")  # blank line between dates
+        summary_lines.append("")
 
-    return "\n".join(summary_lines) if summary_lines else "No significant activities in the past 5 days."
+    summary_input = "\n".join(summary_lines)
+
+    if summary_input.strip():
+        # Just get all activities into one string (no dates)
+        activities_text = ". ".join([
+            f"{act} (x{cnt})"
+            for day in daily_activities.values()
+            for act, cnt in day.items()
+        ]) + "."
+
+        summary = summarizer(activities_text, max_length=150, min_length=30, do_sample=False)[0]['summary_text']
+    else:
+        summary = "No significant activities in the past 5 days."
+
+    return summary
 
 def generate_log_report_pdf(filename, login_activity, category_summary, trend_data, trend_dates):
     c = canvas.Canvas(filename, pagesize=A4)
