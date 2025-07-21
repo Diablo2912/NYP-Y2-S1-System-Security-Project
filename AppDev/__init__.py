@@ -78,7 +78,6 @@ if not os.path.exists(UPLOAD_FOLDER):
 ALGORITHM = 'pbkdf2_sha256'
 SECRET_KEY = 'asdsa8f7as8d67a8du289p1eu89hsad7y2189eha8'
 stripe.api_key = "sk_test_51Qrle9CddzoT6fzjpqNPd1g3UV8ScbnxiiPK5uYT0clGPV82Gn7QPwcakuijNv4diGpcbDadJjzunwRcWo0eOXvb00uDZ2Gnw6"
-serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 fernet_key = Fernet.generate_key()
 fernet = Fernet(fernet_key)
 
@@ -152,6 +151,7 @@ mysql = MySQL(app)
 with app.app_context():
     db.create_all()
 
+serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 
 def generate_self_signed_cert(cert_file='certs/cert.pem', key_file='certs/key.pem'):
     cert_path = pathlib.Path(cert_file)
