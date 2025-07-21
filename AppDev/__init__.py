@@ -1254,7 +1254,7 @@ def logging_analytics():
 
 # SUMMARIZER V1
 # SHOWS DATES
-# summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 #
 # def summarize_recent_logs(mysql):
 #     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
