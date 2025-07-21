@@ -1,12 +1,14 @@
 import google.generativeai as ai
 from flask import url_for, current_app
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 # Your Google Gemini API key
-API_KEY = 'AIzaSyCTx6rJdEAbA0nd-3jnb8ri_0AsLK2VEx4'
-
+api_key = os.getenv("GOOGLE_API_KEY")
 # Configure the Google Gemini API
-ai.configure(api_key=API_KEY)
-model = ai.GenerativeModel("gemini-2.0-flash")
+ai.configure(api_key=api_key)
+model = ai.GenerativeModel("gemini-2.5-flash")
 chat = model.start_chat()
 
 def generate_response(message):
@@ -43,6 +45,8 @@ def generate_response(message):
     keyword_mapping = {
         "agriculture": "agriculture",
         "farm": "agriculture",
+        "grow": "agriculture",
+        "plant": "agriculture",
         "tools": "agriculture",
         "products": "products",
         "sell" : "products",
@@ -57,7 +61,6 @@ def generate_response(message):
     }
 
     matched_links = []
-
     # Check if any keyword is found in the message
     for keyword, category in keyword_mapping.items():
         if keyword in message:
@@ -75,20 +78,28 @@ def generate_response(message):
             "How can I assist you today?"
         )
 
+    topic_prompt = (
+        f"Classify this message into either 'agriculture' or 'non-agriculture'. "
+        f"If the question is about farming, crops, tools, carbon in farming, or growing food, classify as 'agriculture'. "
+        f"Message: \"{message}\"\nAnswer with only one word: 'agriculture' or 'non-agriculture'."
+    )
+    topic_response = chat.send_message(topic_prompt).text.strip().lower()
+
     # If relevant links are found, generate response
-    if matched_links:
+    if topic_response == "agriculture":
         prompt = (
             f"As Cropzy, a forward-thinking agricultural enterprise in Singapore, "
             f"respond in a warm, knowledgeable, and professional manner. "
             f"Emphasize sustainability, innovation, and premium agricultural solutions. "
-            f"Now, provide a short and concise answer for this user query: {message}"
+            f"Now, provide a short and concise answer of no more than 60 words for this user query: {message}"
         )
         response = chat.send_message(prompt)
         bot_response = response.text
 
         # Append resource links
-        bot_response += "<br>Find out more:<br>" + "<br>".join(matched_links)
+        if matched_links:
+            bot_response += "<br>Find out more:<br>" + "<br>".join(set(matched_links))
         return bot_response
 
     # Default response for unrelated topics
-    return ("Sorr I don't understand as I am only able to help with all things agriculture!")
+    return ("Sorry I don't understand as I am only able to help with all things agriculture!")
