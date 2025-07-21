@@ -41,6 +41,10 @@
     ⏳   This form will auto-destruct in <span id="countdown">300</span> seconds.
         </div>
 
+        <div class="form-group col-md-12">
+          <div class="g-recaptcha" data-sitekey="{{ site_key }}"></div>
+        </div>
+
         <input type="submit" value="Login" class="btn btn-success mt-4"/>
         <div class="form-group col-md-12">
           <p class="text-center mb-0">Forgot your password? Reset <a href="{{ url_for('reset_password_request') }}">here</a></p>
@@ -102,6 +106,8 @@
         }
     }, 1000);
 </script>
+
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
 
 <!-- Add FontAwesome for the eye icon -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">

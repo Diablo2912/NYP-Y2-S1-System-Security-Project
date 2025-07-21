@@ -79,6 +79,9 @@
               <label for="addInfo" class="form-label">Additional Information</label>
               <textarea class="form-control" id="addInfo" rows="4"></textarea>
             </div>
+
+            <div class="g-recaptcha mb-3" data-sitekey="{{ site_key }}"></div>
+
             <div class="col-12 text-end">
               <button type="submit" class="btn btn-success">Submit Form</button>
             </div>
@@ -88,5 +91,7 @@
     </div>
   </div>
 </div>
+
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
 
 {% endblock %}

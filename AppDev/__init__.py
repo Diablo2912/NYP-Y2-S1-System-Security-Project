@@ -124,12 +124,12 @@ EMAIL_PASSWORD = "wivz gtou ftjo dokp"
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'glen'
-app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'glen'
+# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 
 
 #BRANDON SQL DB CONFIG
@@ -150,10 +150,10 @@ app.config['MYSQL_PORT'] = 3306
 # app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
-# app.config['MYSQL_HOST'] = 'localhost'
-# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-# app.config['MYSQL_DB'] = 'sspCropzy'
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+app.config['MYSQL_DB'] = 'sspCropzy'
 #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -438,6 +438,7 @@ def buy_product():
 @jwt_required
 def create_product():
     form = CreateProductForm()
+    site_key = os.getenv("RECAPTCHA_SITE_KEY")
 
     new_status = request.form.get('status')
     current_user = g.user
@@ -451,13 +452,24 @@ def create_product():
 
     form.category.choices = [('', 'Select Category')] + category_choices
 
-    if request.method == 'POST' and form.validate_on_submit():
-        name = form.product_name.data
-        quantity = int(form.quantity.data)
-        category = form.category.data
-        price = float(form.price.data)
-        co2 = float(form.co2.data)
-        description = form.product_description.data
+    if request.method == 'POST':
+        # reacptcha validation
+        recaptcha_response = request.form.get('g-recaptcha-response')
+        r = requests.post("https://www.google.com/recaptcha/api/siteverify", data={
+            'secret': os.getenv("RECAPTCHA_SECRET_KEY"),
+            'response': recaptcha_response
+        })
+        if not r.json().get('success'):
+            flash("reCAPTCHA verification failed. Please try again.", "danger")
+            return render_template('/productPage/createProduct.html', form=form, site_key=site_key)
+
+        if form.validate_on_submit():
+            name = form.product_name.data
+            quantity = int(form.quantity.data)
+            category = form.category.data
+            price = float(form.price.data)
+            co2 = float(form.co2.data)
+            description = form.product_description.data
 
         # image upload
         image_file = form.product_image.data
@@ -479,12 +491,6 @@ def create_product():
             action=f"Created new product: {name} (Category: {category})"
         )
 
-        log_user_action(
-            user_id=current_user['user_id'],
-            session_id=current_user['session_id'],
-            action=f"Created new product: {name} (Category: {category})"
-        )
-
         notify_user_action(
             to_email=g.user['email'],
             action_type="Created New Product",
@@ -493,7 +499,7 @@ def create_product():
 
         return redirect(url_for('buy_product'))
 
-    return render_template('/productPage/createProduct.html', form=form)
+    return render_template('/productPage/createProduct.html', form=form, site_key=site_key)
 
 
 @app.route('/manageProduct')
@@ -758,7 +764,17 @@ def aboutUs():
 
 @app.route('/contactUs', methods=['GET', 'POST'])
 def contactUs():
+    site_key = os.getenv("RECAPTCHA_SITE_KEY")
     if request.method == 'POST':
+        recaptcha_response = request.form.get('g-recaptcha-response')
+        r = requests.post("https://www.google.com/recaptcha/api/siteverify", data={
+            'secret': os.getenv("RECAPTCHA_SECRET_KEY"),
+            'response': recaptcha_response
+        })
+
+        if not r.json().get('success'):
+            flash("reCAPTCHA verification failed. Please try again.", "danger")
+            return render_template('contactUs.html', site_key=site_key)
         # first_name = request.form.get('inputFirstname')
         # last_name = request.form.get('inputLastname')
         # email = request.form.get('inputEmail')
@@ -769,7 +785,7 @@ def contactUs():
         flash('Your form has been submitted successfully!', 'success')
         return redirect(url_for('home'))  # Redirect to clear form
 
-    return render_template('contactUs.html')
+    return render_template('contactUs.html', site_key=site_key)
 
 
 @app.route('/accountInfo')
@@ -793,7 +809,7 @@ def accountInfo():
             print(f"[Decryption Error] {e}")
             user['recovery_code'] = "[Decryption Failed]"
 
-    return render_template('/accountPage/accountInfo.html', user=user)
+    return render_template('/accountPage/accountInfo.html', user=user, captcha_site_key=os.getenv("RECAPTCHA_SITE_KEY"))
 
 
 @app.route('/accountSecurity', methods=['GET', 'POST'])
@@ -984,72 +1000,85 @@ def update_user_status(id):
 def createAdmin():
     new_status = request.form.get('status')
     current_user = g.user
+    site_key = os.getenv("RECAPTCHA_SITE_KEY")
 
     if current_user['status'] not in ['admin']:
         return render_template('404.html')
 
     create_admin_form = CreateAdminForm(request.form)
 
-    if request.method == 'POST' and create_admin_form.validate():
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    if request.method == 'POST':
+        # ✅ reCAPTCHA validation
+        recaptcha_response = request.form.get('g-recaptcha-response')
+        r = requests.post("https://www.google.com/recaptcha/api/siteverify", data={
+            'secret': os.getenv("RECAPTCHA_SECRET_KEY"),
+            'response': recaptcha_response
+        })
 
-        # Step 1: Check for duplicate email or phone number (unsanitized for accurate lookup)
-        cursor.execute("SELECT * FROM accounts WHERE email = %s OR phone_number = %s",
-                       (create_admin_form.email.data.lower(), create_admin_form.number.data))
-        existing_user = cursor.fetchone()
+        if not r.json().get('success'):
+            flash("reCAPTCHA verification failed. Please try again.", "danger")
+            return render_template('createAdmin.html', form=create_admin_form, site_key=site_key)
 
-        if existing_user:
-            if existing_user['email'] == create_admin_form.email.data:
-                flash('Email is already registered. Please use a different email.', 'danger')
-            elif existing_user['phone_number'] == create_admin_form.number.data:
-                flash('Phone number is already registered. Please use a different number.', 'danger')
+        if create_admin_form.validate():
+            cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+            # Step 1: Check for duplicate email or phone number
+            cursor.execute("SELECT * FROM accounts WHERE email = %s OR phone_number = %s",
+                           (create_admin_form.email.data.lower(), create_admin_form.number.data))
+            existing_user = cursor.fetchone()
+
+            if existing_user:
+                if existing_user['email'] == create_admin_form.email.data:
+                    flash('Email is already registered. Please use a different email.', 'danger')
+                elif existing_user['phone_number'] == create_admin_form.number.data:
+                    flash('Phone number is already registered. Please use a different number.', 'danger')
+                cursor.close()
+                return redirect(url_for('createAdmin'))
+
+            # Step 2: Sanitize all inputs after duplicate check
+            first_name = sanitize_input(create_admin_form.first_name.data)
+            last_name = sanitize_input(create_admin_form.last_name.data)
+            gender = sanitize_input(create_admin_form.gender.data)
+            status = sanitize_input(create_admin_form.status.data)
+            phone_number = sanitize_input(create_admin_form.number.data)
+            email = sanitize_input(create_admin_form.email.data.lower())
+
+            # Step 4: Hash password and insert user
+            hashed_password = hash_password(create_admin_form.pswd.data)
+
+            cursor.execute('''
+                INSERT INTO accounts (first_name, last_name, gender, phone_number, email, password, status, two_factor_status) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ''', (
+                first_name,
+                last_name,
+                gender,
+                phone_number,
+                email,
+                hashed_password,
+                status,
+                'disabled'
+            ))
+
+            mysql.connection.commit()
+            log_user_action(
+                user_id=current_user['user_id'],
+                session_id=current_user['session_id'],
+                action=f"Created admin account for {email}"
+            )
+
+            notify_user_action(
+                to_email=current_user['email'],
+                action_type="Created Admin Account",
+                item_name=f"You created an admin account for {email}."
+            )
+
             cursor.close()
+
+            flash('Admin account created successfully.', 'success')
             return redirect(url_for('createAdmin'))
 
-        # Step 2: Sanitize all inputs after duplicate check
-        first_name = sanitize_input(create_admin_form.first_name.data)
-        last_name = sanitize_input(create_admin_form.last_name.data)
-        gender = sanitize_input(create_admin_form.gender.data)
-        status = sanitize_input(create_admin_form.status.data)
-        phone_number = sanitize_input(create_admin_form.number.data)
-        email = sanitize_input(create_admin_form.email.data.lower())
-
-        # Step 4: Hash password and insert user
-        hashed_password = hash_password(create_admin_form.pswd.data)
-
-        cursor.execute('''
-            INSERT INTO accounts (first_name, last_name, gender, phone_number, email, password, status, two_factor_status) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        ''', (
-            first_name,
-            last_name,
-            gender,
-            phone_number,
-            email,
-            hashed_password,
-            status,
-            'disabled'
-        ))
-
-        mysql.connection.commit()
-        log_user_action(
-            user_id=current_user['user_id'],
-            session_id=current_user['session_id'],
-            action=f"Created admin account for {email}"
-        )
-
-        notify_user_action(
-            to_email=current_user['email'],
-            action_type="Created Admin Account",
-            item_name=f"You created an admin account for {email}."
-        )
-
-        cursor.close()
-
-        flash('Admin account created successfully.', 'success')
-        return redirect(url_for('createAdmin'))
-
-    return render_template('createAdmin.html', form=create_admin_form)
+    return render_template('createAdmin.html', form=create_admin_form, site_key=site_key)
 
 
 @app.route('/updateLogStatus/<int:id>', methods=['POST'])
@@ -1710,83 +1739,96 @@ def verify_password(password, password_hash):
 @limiter.limit("500 per 1 minutes")
 def sign_up():
     sign_up_form = SignUpForm(request.form)
+    site_key = os.getenv("RECAPTCHA_SITE_KEY")
 
-    if request.method == 'POST' and sign_up_form.validate():
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    if request.method == 'POST':
+        # recaptcha verification
+        recaptcha_response = request.form.get('g-recaptcha-response')
+        r = requests.post("https://www.google.com/recaptcha/api/siteverify", data={
+            'secret': os.getenv("RECAPTCHA_SECRET_KEY"),
+            'response': recaptcha_response
+        })
+
+        if not r.json().get('success'):
+            flash("reCAPTCHA verification failed. Please try again.", "danger")
+            return render_template('/accountPage/signUp.html', form=sign_up_form, site_key=site_key)
+
+        if sign_up_form.validate():
+            cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
         # Check if email or phone number already exists
-        cursor.execute("SELECT * FROM accounts WHERE email = %s OR phone_number = %s",
-                       (sign_up_form.email.data, sign_up_form.number.data))
-        existing_user = cursor.fetchone()
+            cursor.execute("SELECT * FROM accounts WHERE email = %s OR phone_number = %s",
+                           (sign_up_form.email.data, sign_up_form.number.data))
+            existing_user = cursor.fetchone()
 
-        first_name = sanitize_input(sign_up_form.first_name.data)
-        last_name = sanitize_input(sign_up_form.last_name.data)
-        gender = sanitize_input(sign_up_form.gender.data)
-        phone_number = sanitize_input(sign_up_form.number.data)
-        email = sanitize_input(sign_up_form.email.data.lower())
+            first_name = sanitize_input(sign_up_form.first_name.data)
+            last_name = sanitize_input(sign_up_form.last_name.data)
+            gender = sanitize_input(sign_up_form.gender.data)
+            phone_number = sanitize_input(sign_up_form.number.data)
+            email = sanitize_input(sign_up_form.email.data.lower())
 
-        if existing_user:
-            if existing_user['email'] == sign_up_form.email.data:
-                flash('Email is already registered. Please use a different email.', 'danger')
-            elif existing_user['phone_number'] == sign_up_form.number.data:
-                flash('Phone number is already registered. Please use a different number.', 'danger')
+            if existing_user:
+                if existing_user['email'] == sign_up_form.email.data:
+                    flash('Email is already registered. Please use a different email.', 'danger')
+                elif existing_user['phone_number'] == sign_up_form.number.data:
+                    flash('Phone number is already registered. Please use a different number.', 'danger')
+                cursor.close()
+                return redirect(url_for('sign_up'))
+
+            # Determine status based on email domain
+            email = sign_up_form.email.data
+            status = 'admin' if email.endswith('@cropzy.com') else 'user'
+
+            # Hash the password before storing
+            hashed_password = hash_password(sign_up_form.pswd.data)
+
+            # Get user IP (use real IP for deployment)
+            ip_address = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+            # If testing locally, uncomment this line:
+            # ip_address = requests.get("https://api.ipify.org").text
+
+            # Get country code from IP
+
+            if ip_address.startswith("127.") or ip_address.startswith("192.") or ip_address.startswith(
+                    "10.") or ip_address.startswith("172."):
+                ip_address = get_public_ip()
+
+            current_country = get_user_country(ip_address)
+            print(f"User IP: {ip_address}, Country: {current_country}")
+
+            # Insert new user with hashed password
+            cursor.execute('''
+                INSERT INTO accounts (first_name, last_name, gender, phone_number, email, password, status, two_factor_status, countries) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ''', (
+                first_name,
+                last_name,
+                gender,
+                '+65' + str(phone_number),
+                email,
+                hashed_password,
+                status,
+                'disabled',
+                current_country
+            ))
+
+            user_id = cursor.lastrowid
+
+            # Log registration
+            admin_log_activity(mysql, "User signed up successfully", category="Critical", user_id=user_id, status=status)
+
+            notify_user_action(
+                to_email=email,
+                action_type="Sign Up Successful",
+                item_name=f"Welcome to Cropzy, {first_name}! Your account has been successfully created."
+            )
+
+            mysql.connection.commit()
             cursor.close()
-            return redirect(url_for('sign_up'))
 
-        # Determine status based on email domain
-        email = sign_up_form.email.data
-        status = 'admin' if email.endswith('@cropzy.com') else 'user'
-
-        # Hash the password before storing
-        hashed_password = hash_password(sign_up_form.pswd.data)
-
-        # Get user IP (use real IP for deployment)
-        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
-        # If testing locally, uncomment this line:
-        # ip_address = requests.get("https://api.ipify.org").text
-
-        # Get country code from IP
-
-        if ip_address.startswith("127.") or ip_address.startswith("192.") or ip_address.startswith(
-                "10.") or ip_address.startswith("172."):
-            ip_address = get_public_ip()
-
-        current_country = get_user_country(ip_address)
-        print(f"User IP: {ip_address}, Country: {current_country}")
-
-        # Insert new user with hashed password
-        cursor.execute('''
-            INSERT INTO accounts (first_name, last_name, gender, phone_number, email, password, status, two_factor_status, countries) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ''', (
-            first_name,
-            last_name,
-            gender,
-            '+65' + str(phone_number),
-            email,
-            hashed_password,
-            status,
-            'disabled',
-            current_country
-        ))
-
-        user_id = cursor.lastrowid
-
-        # Log registration
-        admin_log_activity(mysql, "User signed up successfully", category="Critical", user_id=user_id, status=status)
-
-        notify_user_action(
-            to_email=email,
-            action_type="Sign Up Successful",
-            item_name=f"Welcome to Cropzy, {first_name}! Your account has been successfully created."
-        )
-
-        mysql.connection.commit()
-        cursor.close()
-
-        flash('Sign up successful! Please log in.', 'info')
-        return redirect(url_for('complete_signUp'))
-    return render_template('/accountPage/signUp.html', form=sign_up_form)
+            flash('Sign up successful! Please log in.', 'info')
+            return redirect(url_for('complete_signUp'))
+    return render_template('/accountPage/signUp.html', form=sign_up_form, site_key=site_key)
 
 
 SECRET_KEY = 'asdsa8f7as8d67a8du289p1eu89hsad7y2189eha8'  # You can change this to a more secure value
@@ -1833,9 +1875,24 @@ def inject_user():
 @limiter.limit("500 per 1 minutes")
 def login():
     login_form = LoginForm(request.form)
+    site_key = os.getenv("RECAPTCHA_SITE_KEY")
     #redirect
     if 'jwt_token' in request.cookies:
         return redirect(url_for('home'))
+
+    if request.method == 'POST':
+        # captcha validation
+        recaptcha_response = request.form.get('g-recaptcha-response')
+        r = requests.post("https://www.google.com/recaptcha/api/siteverify", data={
+            'secret': os.getenv("RECAPTCHA_SECRET_KEY"),
+            'response': recaptcha_response
+        })
+        if not r.json().get('success'):
+            flash("reCAPTCHA verification failed. Please try again.", "danger")
+            response = make_response(render_template('/accountPage/login.html', form=login_form, site_key=site_key))
+            response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            response.headers['Pragma'] = 'no-cache'
+            return response
 
     if request.method == 'POST' and login_form.validate():
         email = sanitize_input(login_form.email.data.lower())
@@ -1930,7 +1987,7 @@ def login():
         else:
             flash('Email not found. Please sign up.', 'danger')
       #no cache
-    response = make_response(render_template('/accountPage/login.html', form=login_form))
+    response = make_response(render_template('/accountPage/login.html', form=login_form, site_key=site_key))
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     return response
@@ -3113,6 +3170,23 @@ def change_pswd(id):
 @jwt_required
 def delete_user(id):
     current_user = g.user  # Extract from JWT
+
+    recaptcha_response = request.form.get('g-recaptcha-response')
+    if not recaptcha_response:
+        flash("Please complete the CAPTCHA.", "danger")
+        return redirect(url_for('accountInfo'))
+
+    verify_url = 'https://www.google.com/recaptcha/api/siteverify'
+    payload = {
+        'secret': os.getenv("RECAPTCHA_SECRET_KEY"),
+        'response': recaptcha_response
+    }
+    recaptcha_verify = requests.post(verify_url, data=payload)
+    result = recaptcha_verify.json()
+
+    if not result.get('success'):
+        flash("CAPTCHA verification failed. Please try again.", "danger")
+        return redirect(url_for('accountInfo'))
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
