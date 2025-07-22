@@ -63,7 +63,7 @@ from seasonalUpdateForm import SeasonalUpdateForm
 
 app = Flask(__name__)
 csrf = CSRFProtect()
-mail = Mail(app)
+
 load_dotenv()
 
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "500 per hour"])
@@ -104,17 +104,17 @@ SMTP_PORT = 587
 MAIL_USE_TLS = True
 EMAIL_SENDER = "cropzyssp@gmail.com"
 EMAIL_PASSWORD = "wivz gtou ftjo dokp"
-
+mail = Mail(app)
 # SETUP UR DB CONFIG ACCORDINGLY
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'glen'
-app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'glen'
+# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 
 # BRANDON SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -133,10 +133,10 @@ app.config['MYSQL_PORT'] = 3306
 # app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
-# app.config['MYSQL_HOST'] = 'localhost'
-# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-# app.config['MYSQL_DB'] = 'sspCropzy'
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+app.config['MYSQL_DB'] = 'sspCropzy'
 #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -1644,7 +1644,7 @@ def admin_log_activity(mysql, activity, category="Info", user_id=None, status=No
         cursor.execute('''
                     INSERT INTO logs (user_id, date, time, category, activity, status, ip_address)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ''', (user_id, date, time, category, activity, status, ip_addr))
+                ''', (user_id, date, time, category, activity, 'Open', ip_addr))
         mysql.connection.commit()
     finally:
         cursor.close()
