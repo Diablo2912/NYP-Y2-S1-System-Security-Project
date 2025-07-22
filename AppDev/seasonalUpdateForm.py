@@ -4,6 +4,7 @@ from wtforms import StringField, DateField, SelectField, SubmitField
 from wtforms.validators import DataRequired, Length, Regexp, ValidationError
 from spacy.matcher import PhraseMatcher
 from fuzzywuzzy import process
+from datetime import date as dt_date
 
 nlp = spacy.load('en_core_web_sm')
 
@@ -25,6 +26,10 @@ ALL_AGRICULTURE_TERMS = AGRICULTURE_KEYWORDS + AGRICULTURE_ACTION_PHRASES
 matcher = PhraseMatcher(nlp.vocab)
 patterns = [nlp.make_doc(term) for term in ALL_AGRICULTURE_TERMS]
 matcher.add("AGRICULTURE_TERMS", patterns)
+
+def validate_not_past(form, field):
+    if field.data < dt_date.today():
+        raise ValidationError("The date cannot be in the past.")
 
 
 def get_fuzzy_suggestions(input_text):
@@ -71,9 +76,13 @@ class SeasonalUpdateForm(FlaskForm):
     date = DateField(
         'Date',
         format='%Y-%m-%d',
-        validators=[DataRequired(message="Please select a date.")],
+        validators=[
+            DataRequired(message="Please select a date."),
+            validate_not_past
+        ],
         render_kw={"placeholder": "YYYY-MM-DD"}
     )
+
     season = SelectField(
         'Choose the season:',
         choices=[
