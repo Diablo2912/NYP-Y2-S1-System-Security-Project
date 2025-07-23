@@ -52,6 +52,8 @@ import stripe
 from transformers import pipeline
 from twilio.rest import Client
 from werkzeug.utils import secure_filename
+import google.generativeai as genai
+
 
 from FeaturedArticles import get_featured_articles
 from Filter import main_blueprint
@@ -105,6 +107,8 @@ MAIL_USE_TLS = True
 EMAIL_SENDER = "cropzyssp@gmail.com"
 EMAIL_PASSWORD = "wivz gtou ftjo dokp"
 mail = Mail(app)
+
+
 # SETUP UR DB CONFIG ACCORDINGLY
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
@@ -249,99 +253,52 @@ def jwt_required(f):
 
     return decorated_function
 
+# Configure Gemini API
+genai.configure(api_key="AIzaSyD2fWMVBdWusPXpUhRlOfwOb5SwiZVMmyA")
+model = genai.GenerativeModel("gemini-1.5-flash")
 
-# SUMMARIZER V1
-# SHOWS DATES
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+def generate_logs_summary(mysql):
+    try:
+        cursor = mysql.connection.cursor()
+        today = datetime.now().date()
+        ten_days_ago = today - timedelta(days=10)
 
+        cursor.execute('''
+            SELECT date, activity
+            FROM logs
+            WHERE DATE(date) BETWEEN %s AND %s
+            ORDER BY date DESC
+        ''', (ten_days_ago, today))
+        logs = cursor.fetchall()
 
-#
-# def summarize_recent_logs(mysql):
-#     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-#
-#     today = datetime.now().date()
-#     five_days_ago = today - timedelta(days=5)
-#
-#     cursor.execute('''
-#         SELECT date, activity
-#         FROM logs
-#         WHERE DATE(date) BETWEEN %s AND %s
-#         ORDER BY date DESC
-#     ''', (five_days_ago, today))
-#     logs = cursor.fetchall()
-#
-#     daily_activities = defaultdict(Counter)
-#     for log in logs:
-#         date_obj = log['date']
-#         if isinstance(date_obj, str):
-#             date_obj = datetime.strptime(date_obj.strip(), '%Y-%m-%d').date()
-#         date_str = date_obj.strftime('%Y-%m-%d')
-#         daily_activities[date_str][log['activity']] += 1
-#
-#     summary_lines = []
-#     for date, activities in sorted(daily_activities.items(), key=lambda x: x[0], reverse=True):
-#         summary_lines.append(f"{date}:")
-#         for activity, count in activities.items():
-#             summary_lines.append(f"- {activity} (x{count})" if count > 1 else f"- {activity}")
-#         summary_lines.append("")  # blank line between dates
-#
-#     return "\n".join(summary_lines) if summary_lines else "No significant activities in the past 5 days."
+        # Group logs
+        daily_activities = defaultdict(Counter)
+        for date, activity in logs:
+            if isinstance(date, str):
+                date = datetime.strptime(date.strip(), '%Y-%m-%d').date()
+            date_str = date.strftime('%Y-%m-%d')
+            daily_activities[date_str][activity] += 1
 
-# SUMMARIZER V2
-# SHOWS NO DATES
-#
-def summarize_recent_logs(mysql):
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        # Format for prompt
+        prompt = "Below are system logs for the past 10 days:\n\n"
+        for date in sorted(daily_activities.keys(), reverse=True):
+            prompt += f"{date}:\n"
+            for activity, count in daily_activities[date].items():
+                prompt += f" - {activity} (x{count})\n"
+            prompt += "\n"
 
-    today = datetime.now().date()
-    five_days_ago = today - timedelta(days=5)
+        # Summarize using Gemini
+        response = model.generate_content(f"""
+        Summarize the following system activity logs grouped by date.
+        Focus on highlighting key events and general patterns (e.g., issues, normal activity, spikes, etc).
 
-    # Strict date filtering
-    cursor.execute('''
-        SELECT date, activity
-        FROM logs
-        WHERE DATE(date) BETWEEN %s AND %s
-        ORDER BY date DESC
-    ''', (five_days_ago, today))
-    logs = cursor.fetchall()
+        {prompt}
+        """)
+        return response.text
+    except Exception as e:
+        print(f"[Error] Failed to summarize logs: {e}")
+        return "Error: Could not summarize logs."
 
-    # Group logs by date (clean formatting)
-    daily_activities = defaultdict(Counter)
-    for log in logs:
-        try:
-            date_obj = log['date']
-            if isinstance(date_obj, str):
-                date_obj = datetime.strptime(date_obj.strip(), '%Y-%m-%d').date()
-            date_str = date_obj.strftime('%Y-%m-%d')
-            daily_activities[date_str][log['activity']] += 1
-        except Exception as e:
-            print(f"Skipping log due to date parsing error: {e}, log: {log}")
-            continue
-
-    # Prepare summary input string
-    summary_lines = []
-    for date, activities in sorted(daily_activities.items(), key=lambda x: datetime.strptime(x[0], '%Y-%m-%d'),
-                                   reverse=True):
-        summary_lines.append(f"{date}:")
-        for activity, count in activities.items():
-            summary_lines.append(f"- {activity} (x{count})" if count > 1 else f"- {activity}")
-        summary_lines.append("")
-
-    summary_input = "\n".join(summary_lines)
-
-    if summary_input.strip():
-        # Just get all activities into one string (no dates)
-        activities_text = ". ".join([
-            f"{act} (x{cnt})"
-            for day in daily_activities.values()
-            for act, cnt in day.items()
-        ]) + "."
-
-        summary = summarizer(activities_text, max_length=150, min_length=30, do_sample=False)[0]['summary_text']
-    else:
-        summary = "No significant activities in the past 5 days."
-
-    return summary
 
 
 def generate_log_report_pdf(filename, login_activity, category_summary, trend_data, trend_dates):
@@ -1420,7 +1377,7 @@ def logging_analytics():
 
     today = datetime.now().date()
 
-    summary = summarize_recent_logs(mysql)
+    logs_summary = generate_logs_summary(mysql)
 
     today_str = datetime.today().strftime("%Y-%m-%d")
     start_date = request.args.get('start_date')
@@ -1528,7 +1485,7 @@ def logging_analytics():
         closed_count=closed_count,
         logs_count=logs_count,
         num_days=num_days,
-        logs_summary=summary,
+        logs_summary=logs_summary,
         summary_date=today,
     )
 
