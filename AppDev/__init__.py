@@ -109,12 +109,12 @@ mail = Mail(app)
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'glen'
-# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-# app.config['MYSQL_DB'] = 'ssp_db'
-# app.config['MYSQL_PORT'] = 3306
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'glen'
+app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+app.config['MYSQL_DB'] = 'ssp_db'
+app.config['MYSQL_PORT'] = 3306
 
 # BRANDON SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -133,10 +133,10 @@ mail = Mail(app)
 # app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-app.config['MYSQL_DB'] = 'sspCropzy'
+# app.config['MYSQL_HOST'] = 'localhost'
+# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+# app.config['MYSQL_DB'] = 'sspCropzy'
 #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -3127,10 +3127,14 @@ def change_pswd(id):
     return render_template('/accountPage/changePswd.html', form=change_pswd_form)
 
 
-@app.route('/deleteUser/<int:id>', methods=['POST'])
+@app.route('/deleteMyAccount/<int:id>', methods=['POST'])
 @jwt_required
 def delete_user(id):
-    current_user = g.user  # Extract from JWT
+    current_user = g.user
+
+    if current_user['user_id'] != id:
+        flash("You are not authorized to delete this account.", "danger")
+        return redirect(url_for('accountInfo'))
 
     recaptcha_response = request.form.get('g-recaptcha-response')
     if not recaptcha_response:
@@ -3142,11 +3146,30 @@ def delete_user(id):
         'secret': os.getenv("RECAPTCHA_SECRET_KEY"),
         'response': recaptcha_response
     }
-    recaptcha_verify = requests.post(verify_url, data=payload)
-    result = recaptcha_verify.json()
-
-    if not result.get('success'):
+    response = requests.post(verify_url, data=payload).json()
+    if not response.get('success'):
         flash("CAPTCHA verification failed. Please try again.", "danger")
+        return redirect(url_for('accountInfo'))
+
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("DELETE FROM accounts WHERE id = %s", (id,))
+    mysql.connection.commit()
+    cursor.close()
+
+    log_user_action(
+        user_id=current_user['user_id'],
+        session_id=current_user['session_id'],
+        action=f"User deleted own account (ID: {id})"
+    )
+    flash("Your account has been deleted successfully!", "success")
+    return redirect(url_for('logout'))
+
+@app.route('/deleteUser/<int:id>', methods=['POST'])
+@jwt_required
+def admin_delete_user(id):
+    current_user = g.user
+    if current_user['status'] != 'admin':
+        flash("You are not authorized to delete this account.", "danger")
         return redirect(url_for('accountInfo'))
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -3158,37 +3181,17 @@ def delete_user(id):
         flash("User not found.", "danger")
         return redirect(url_for('dashboard'))
 
-    # Case 1: Deleting own account
-    if current_user['user_id'] == id:
-        cursor.execute("DELETE FROM accounts WHERE id = %s", (id,))
-        mysql.connection.commit()
-        cursor.close()
-        log_user_action(
-            user_id=current_user['user_id'],
-            session_id=current_user['session_id'],
-            action=f"User deleted own account (ID: {id})"
-        )
-        flash("Your account has been deleted successfully!", "success")
-        return redirect(url_for('logout'))  # Or home, depending on your flow
-
-    # Case 2: Admin deleting another account
-    if current_user['status'] == 'admin':
-        cursor.execute("DELETE FROM accounts WHERE id = %s", (id,))
-        mysql.connection.commit()
-        cursor.close()
-        log_user_action(
-            user_id=current_user['user_id'],
-            session_id=current_user['session_id'],
-            action=f"Admin deleted user account (ID: {id})"
-        )
-        flash("User account deleted successfully.", "success")
-        return redirect(url_for('dashboard'))
-
-    # Unauthorized access
+    cursor.execute("DELETE FROM accounts WHERE id = %s", (id,))
+    mysql.connection.commit()
     cursor.close()
-    flash("You are not authorized to delete this account.", "danger")
-    return redirect(url_for('accountInfo'))
 
+    log_user_action(
+        user_id=current_user['user_id'],
+        session_id=current_user['session_id'],
+        action=f"Admin deleted user account (ID: {id})"
+    )
+    flash("User account deleted successfully.", "success")
+    return redirect(url_for('dashboard'))
 
 @app.route("/create_update", methods=['GET', 'POST'])
 @jwt_required
