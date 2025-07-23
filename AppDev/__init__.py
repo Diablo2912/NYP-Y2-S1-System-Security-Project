@@ -18,6 +18,7 @@ import socket
 import tempfile
 import time
 import uuid  # For unique transaction IDs
+import re
 
 import MySQLdb.cursors
 import bleach
@@ -113,12 +114,12 @@ mail = Mail(app)
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'glen'
-# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-# app.config['MYSQL_DB'] = 'ssp_db'
-# app.config['MYSQL_PORT'] = 3306
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'glen'
+app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+app.config['MYSQL_DB'] = 'ssp_db'
+app.config['MYSQL_PORT'] = 3306
 
 # BRANDON SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -137,10 +138,10 @@ mail = Mail(app)
 # app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-app.config['MYSQL_DB'] = 'sspCropzy'
+# app.config['MYSQL_HOST'] = 'localhost'
+# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+# app.config['MYSQL_DB'] = 'sspCropzy'
 #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -271,7 +272,6 @@ def generate_logs_summary(mysql):
         ''', (ten_days_ago, today))
         logs = cursor.fetchall()
 
-        # Group logs
         daily_activities = defaultdict(Counter)
         for date, activity in logs:
             if isinstance(date, str):
@@ -279,7 +279,7 @@ def generate_logs_summary(mysql):
             date_str = date.strftime('%Y-%m-%d')
             daily_activities[date_str][activity] += 1
 
-        # Format for prompt
+        # Build prompt
         prompt = "Below are system logs for the past 10 days:\n\n"
         for date in sorted(daily_activities.keys(), reverse=True):
             prompt += f"{date}:\n"
@@ -287,14 +287,18 @@ def generate_logs_summary(mysql):
                 prompt += f" - {activity} (x{count})\n"
             prompt += "\n"
 
-        # Summarize using Gemini
+        # Generate summary
         response = model.generate_content(f"""
         Summarize the following system activity logs grouped by date.
         Focus on highlighting key events and general patterns (e.g., issues, normal activity, spikes, etc).
 
         {prompt}
         """)
-        return response.text
+
+        # Remove **bold markdown** from Gemini's summary
+        cleaned_text = re.sub(r'\*\*(.*?)\*\*', r'\1', response.text)
+        return cleaned_text
+
     except Exception as e:
         print(f"[Error] Failed to summarize logs: {e}")
         return "Error: Could not summarize logs."
