@@ -217,14 +217,21 @@
        </div>
 
         <!-- Logs Summary -->
-        <div class="col-lg-10 col-md-9 col-sm-12 mt-4">
-          <h4>Logs Summary From Past 5 Days</h4>
-          <p>
-            <strong><i class="fa-solid fa-chart-simple me-1" style="color: #d91717;"></i> Summary: </strong><br>
-            <span style="white-space: pre-wrap;">{{ logs_summary or '---' }}</span>
-          </p>
-        </div>
-
+        <div class="container mt-5">
+          <div class="row">
+              <div class="col-lg-10 col-md-9 col-sm-12">
+                  <h4 class="mb-3">
+                      <i class="fa-solid fa-clock-rotate-left me-2" style="color: #d91717;"></i>
+                      Logs Summary from Past 10 Days
+                  </h4>
+                  <p>
+                      <i class="fa-solid fa-chart-simple me-1" style="color: #d91717;"></i> Summary:<br>
+                      <span style="white-space: pre-wrap;">{{ logs_summary or '---' }}</span>
+                  </p>
+              </div>
+          </div>
+      </div>
+         <!-- Generate Report Button -->
          <div class="d-flex justify-content-center my-3">
             <button id="generateReportBtn" class="btn btn-primary px-3 py-2">Generate Report</button>
          </div>
