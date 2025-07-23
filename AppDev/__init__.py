@@ -18,6 +18,7 @@ import socket
 import tempfile
 import time
 import uuid  # For unique transaction IDs
+import re
 
 import MySQLdb.cursors
 import bleach
@@ -52,6 +53,7 @@ import stripe
 from transformers import pipeline
 from twilio.rest import Client
 from werkzeug.utils import secure_filename
+import google.generativeai as genai
 
 from FeaturedArticles import get_featured_articles
 from Filter import main_blueprint
@@ -250,98 +252,55 @@ def jwt_required(f):
     return decorated_function
 
 
-# SUMMARIZER V1
-# SHOWS DATES
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+# SUMMARIZER
+# Configure Gemini API
+genai.configure(api_key="AIzaSyD2fWMVBdWusPXpUhRlOfwOb5SwiZVMmyA")
+model = genai.GenerativeModel("gemini-1.5-flash")
 
+def generate_logs_summary(mysql):
+    try:
+        cursor = mysql.connection.cursor()
+        today = datetime.now().date()
+        ten_days_ago = today - timedelta(days=10)
 
-#
-# def summarize_recent_logs(mysql):
-#     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-#
-#     today = datetime.now().date()
-#     five_days_ago = today - timedelta(days=5)
-#
-#     cursor.execute('''
-#         SELECT date, activity
-#         FROM logs
-#         WHERE DATE(date) BETWEEN %s AND %s
-#         ORDER BY date DESC
-#     ''', (five_days_ago, today))
-#     logs = cursor.fetchall()
-#
-#     daily_activities = defaultdict(Counter)
-#     for log in logs:
-#         date_obj = log['date']
-#         if isinstance(date_obj, str):
-#             date_obj = datetime.strptime(date_obj.strip(), '%Y-%m-%d').date()
-#         date_str = date_obj.strftime('%Y-%m-%d')
-#         daily_activities[date_str][log['activity']] += 1
-#
-#     summary_lines = []
-#     for date, activities in sorted(daily_activities.items(), key=lambda x: x[0], reverse=True):
-#         summary_lines.append(f"{date}:")
-#         for activity, count in activities.items():
-#             summary_lines.append(f"- {activity} (x{count})" if count > 1 else f"- {activity}")
-#         summary_lines.append("")  # blank line between dates
-#
-#     return "\n".join(summary_lines) if summary_lines else "No significant activities in the past 5 days."
+        cursor.execute('''
+            SELECT date, activity
+            FROM logs
+            WHERE DATE(date) BETWEEN %s AND %s
+            ORDER BY date DESC
+        ''', (ten_days_ago, today))
+        logs = cursor.fetchall()
 
-# SUMMARIZER V2
-# SHOWS NO DATES
-#
-def summarize_recent_logs(mysql):
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        daily_activities = defaultdict(Counter)
+        for date, activity in logs:
+            if isinstance(date, str):
+                date = datetime.strptime(date.strip(), '%Y-%m-%d').date()
+            date_str = date.strftime('%Y-%m-%d')
+            daily_activities[date_str][activity] += 1
 
-    today = datetime.now().date()
-    five_days_ago = today - timedelta(days=5)
+        # Build prompt
+        prompt = "Below are system logs for the past 10 days:\n\n"
+        for date in sorted(daily_activities.keys(), reverse=True):
+            prompt += f"{date}:\n"
+            for activity, count in daily_activities[date].items():
+                prompt += f" - {activity} (x{count})\n"
+            prompt += "\n"
 
-    # Strict date filtering
-    cursor.execute('''
-        SELECT date, activity
-        FROM logs
-        WHERE DATE(date) BETWEEN %s AND %s
-        ORDER BY date DESC
-    ''', (five_days_ago, today))
-    logs = cursor.fetchall()
+        # Generate summary
+        response = model.generate_content(f"""
+        Summarize the following system activity logs grouped by date.
+        Focus on highlighting key events and general patterns (e.g., issues, normal activity, spikes, etc).
 
-    # Group logs by date (clean formatting)
-    daily_activities = defaultdict(Counter)
-    for log in logs:
-        try:
-            date_obj = log['date']
-            if isinstance(date_obj, str):
-                date_obj = datetime.strptime(date_obj.strip(), '%Y-%m-%d').date()
-            date_str = date_obj.strftime('%Y-%m-%d')
-            daily_activities[date_str][log['activity']] += 1
-        except Exception as e:
-            print(f"Skipping log due to date parsing error: {e}, log: {log}")
-            continue
+        {prompt}
+        """)
 
-    # Prepare summary input string
-    summary_lines = []
-    for date, activities in sorted(daily_activities.items(), key=lambda x: datetime.strptime(x[0], '%Y-%m-%d'),
-                                   reverse=True):
-        summary_lines.append(f"{date}:")
-        for activity, count in activities.items():
-            summary_lines.append(f"- {activity} (x{count})" if count > 1 else f"- {activity}")
-        summary_lines.append("")
+        # Remove **bold markdown** from Gemini's summary
+        cleaned_text = re.sub(r'\*\*(.*?)\*\*', r'\1', response.text)
+        return cleaned_text
 
-    summary_input = "\n".join(summary_lines)
-
-    if summary_input.strip():
-        # Just get all activities into one string (no dates)
-        activities_text = ". ".join([
-            f"{act} (x{cnt})"
-            for day in daily_activities.values()
-            for act, cnt in day.items()
-        ]) + "."
-
-        summary = summarizer(activities_text, max_length=150, min_length=30, do_sample=False)[0]['summary_text']
-    else:
-        summary = "No significant activities in the past 5 days."
-
-    return summary
+    except Exception as e:
+        print(f"[Error] Failed to summarize logs: {e}")
+        return "Error: Could not summarize logs."
 
 
 def generate_log_report_pdf(filename, login_activity, category_summary, trend_data, trend_dates):
@@ -1420,7 +1379,7 @@ def logging_analytics():
 
     today = datetime.now().date()
 
-    summary = summarize_recent_logs(mysql)
+    logs_summary = generate_logs_summary(mysql)
 
     today_str = datetime.today().strftime("%Y-%m-%d")
     start_date = request.args.get('start_date')
@@ -1528,10 +1487,9 @@ def logging_analytics():
         closed_count=closed_count,
         logs_count=logs_count,
         num_days=num_days,
-        logs_summary=summary,
+        logs_summary=logs_summary,
         summary_date=today,
     )
-
 
 @app.route("/generate_pdf_report")
 @jwt_required
