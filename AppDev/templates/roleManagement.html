@@ -1,6 +1,20 @@
 {% extends "base.html" %}
 {% block content %}
 
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="container">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
 <div class="container">
   <div class="row">
     <!-- Left Container (Admin Dashboard Links) -->
@@ -89,7 +103,7 @@
               <thead class="table-success">
                 <tr>
                   <th>ID</th>
-                  <th>First Name</th>
+                  <th style="width: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">First Name</th>
                   <th>Last Name</th>
                   <th>Email</th>
                   <th>Role</th>
@@ -100,7 +114,7 @@
                 {% for user in users %}
                 <tr>
                   <td>{{ user.id }}</td>
-                  <td>{{ user.first_name }}</td>
+                  <td style="width: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ user.first_name }}</td>
                   <td>{{ user.last_name }}</td>
                   <td>{{ user.email }}</td>
                   <td>{{ user.status }}</td>
@@ -147,7 +161,7 @@
                     <div class="modal fade" id="deleteUserModal_{{ user.id }}" tabindex="-1" aria-hidden="true">
                       <div class="modal-dialog">
                         <div class="modal-content">
-                          <form action="{{ url_for('delete_user', id=user.id) }}" method="POST">
+                          <form action="{{ url_for('admin_delete_user', id=user.id) }}" method="POST">
                             <div class="modal-header">
                               <h5 class="modal-title">Confirm Deletion</h5>
                               <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

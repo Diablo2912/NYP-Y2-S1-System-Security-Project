@@ -160,7 +160,7 @@
                 <div class="modal fade" id="deleteUserModal_{{ user.id }}" tabindex="-1" aria-hidden="true">
                   <div class="modal-dialog">
                     <div class="modal-content">
-                      <form action="{{ url_for('delete_user', id=user.id) }}" method="POST">
+                      <form action="{{ url_for('admin_delete_user', id=user.id) }}" method="POST">
                         <div class="modal-header">
                           <h5 class="modal-title">Confirm Deletion</h5>
                           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
