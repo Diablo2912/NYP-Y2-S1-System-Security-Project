@@ -45,6 +45,7 @@ import pandas as pd
 from reportlab.lib.pagesizes import A4, letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
+from reportlab.lib.pdfencrypt import StandardEncryption
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
@@ -303,74 +304,215 @@ def generate_logs_summary(mysql):
         return "Error: Could not summarize logs."
 
 
-def generate_log_report_pdf(filename, login_activity, category_summary, trend_data, trend_dates):
-    c = canvas.Canvas(filename, pagesize=A4)
-    width, height = A4
+def generate_log_report_pdf(filename, login_activity, category_summary, trend_data, trend_dates, pdf_encrypt=None, mysql=None):
+    import io
+    from datetime import datetime
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.utils import ImageReader
+    from reportlab.lib import colors
+    from reportlab.platypus import Paragraph, Frame, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet
 
-    def draw_chart(fig, x, y, scale=0.4):
+    c = canvas.Canvas(filename, pagesize=A4, encrypt=pdf_encrypt)
+    page_w, page_h = A4
+
+    # ---------- Drawing helper: fit figure into a target box ----------
+    def draw_chart(fig, x, y, target_w, target_h):
         img_io = io.BytesIO()
-        fig.savefig(img_io, format='PNG', bbox_inches='tight')
+        fig.savefig(img_io, format='PNG', bbox_inches='tight', dpi=150)
         img_io.seek(0)
         image = ImageReader(img_io)
-        c.drawImage(image, x, y, width=fig.get_figwidth() * 72 * scale, preserveAspectRatio=True, mask='auto')
+
+        fig_w_pt = fig.get_figwidth() * 72
+        fig_h_pt = fig.get_figheight() * 72
+        scale = min(target_w / fig_w_pt, target_h / fig_h_pt)
+        w_pt = fig_w_pt * scale
+        h_pt = fig_h_pt * scale
+
+        x_draw = x + (target_w - w_pt) / 2
+        y_draw = y + (target_h - h_pt) / 2
+
+        c.drawImage(image, x_draw, y_draw, width=w_pt, height=h_pt, preserveAspectRatio=True, mask='auto')
         plt.close(fig)
 
-    # Title
+    # Robust hour-bucket getter (supports dicts keyed by 0..23 or "HH:00")
+    def get_hour_bucket(hour_str):
+        # try "HH:00" key
+        bucket = login_activity.get(hour_str)
+        if bucket is not None:
+            return bucket
+        # try int key (00:00 -> 0, 13:00 -> 13)
+        try:
+            h_int = int(hour_str.split(":")[0])
+            return login_activity.get(h_int, {})
+        except Exception:
+            return {}
+
+    # ---------- Title (Page 1) ----------
     c.setFont("Helvetica-Bold", 18)
-    c.drawString(50, height - 50, "System Logging Analytics Report")
+    c.drawString(50, page_h - 50, "Cropzy System Logging Analytics Report")
     c.setFont("Helvetica", 12)
-    c.drawString(50, height - 70, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    c.drawString(50, page_h - 70, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    # Chart positions
-    login_x, login_y = 40, height - 300
-    pie_x, pie_y = width / 2 + 20, height - 300
-    bar_x, bar_y = 40, height - 540
-    trend_x, trend_y = 40, height - 760
+    # ---------- Layout constants ----------
+    MARGIN_L = 40
+    MARGIN_R = 40
+    MARGIN_T = 90
+    MARGIN_B = 40
+    GUTTER   = 24
+    ROW_SPACING = 20
 
-    # --- Log Category card counter  ---
-    c.drawString(50, 780, "Info:")
+    FULL_L = 20
+    FULL_R = 20
+    FULL2_L = 10
+    FULL2_R = 10
 
-    # --- Login Activity Line Chart ---
+    col_w = (page_w - MARGIN_L - MARGIN_R - GUTTER) / 2
+    left_x  = MARGIN_L
+    right_x = MARGIN_L + col_w + GUTTER
+
+    TREND_H  = 230
+    MIDDLE_H = 260
+    LOGIN_H  = 260
+
+    # ---------- Prepare data (sanitization) ----------
+    clean_labels, clean_values = [], []
+    for k, v in (category_summary or {}).items():
+        try:
+            vv = 0 if v is None else float(v)
+        except (TypeError, ValueError):
+            vv = 0.0
+        if np.isfinite(vv) and vv > 0:
+            clean_labels.append(str(k))
+            clean_values.append(int(vv))
+    total = sum(clean_values)
+
+    # =======================
+    # PAGE 1
+    # =======================
+    y_cursor = page_h - MARGIN_T  # start below title block
+
+    # --- Category table at top of Page 1 ---
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(MARGIN_L, y_cursor - 10, "Category Count")
+    y_cursor -= 28
+
+    table_width = page_w - MARGIN_L - MARGIN_R
+    all_cats = ["Info", "Warning", "Error", "Critical"]
+    table_data = [["Category", "Count"]]
+    for cat in all_cats:
+        table_data.append([cat, int(category_summary.get(cat, 0))])
+
+    tbl = Table(table_data, colWidths=[table_width * 0.6, table_width * 0.4])
+    tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f0f0f0")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+        ("ALIGN", (1, 1), (1, -1), "RIGHT"),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+        ("TOPPADDING", (0, 1), (-1, -1), 6),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+    ]))
+    tw, th = tbl.wrapOn(c, table_width, page_h)
+    tbl.drawOn(c, MARGIN_L, y_cursor - th)
+    y_cursor = y_cursor - th - ROW_SPACING
+
+    # --- Trend (full width) under the table ---
+    c.setFont("Helvetica-Bold", 12)
+    label_trend_y = y_cursor - 14
+    c.drawString(MARGIN_L, label_trend_y, "Logs Trend Over Time:")
+    y_cursor = label_trend_y - 6  # small padding below label
+
+    fig, ax = plt.subplots(figsize=(12, 3.2))
+    safe_dates = list(trend_dates or [])
+    for category, counts in (trend_data or {}).items():
+        series = list(counts or [])
+        n = min(len(safe_dates), len(series))
+        if n:
+            ax.plot(safe_dates[:n], series[:n], label=str(category))
+    ax.set_title("Logs Trend Over Time")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Logs")
+    ax.legend()
+    ax.grid(True)
+    trend_y = y_cursor - TREND_H
+    draw_chart(fig, FULL_L, trend_y, page_w - FULL_L - FULL_R, TREND_H)
+
+    # --- Middle row: Bar (left) + Pie (right) ---
+    c.setFont("Helvetica-Bold", 12)
+    label_mid_y = trend_y - ROW_SPACING - 14
+    c.drawString(MARGIN_L, label_mid_y, "Logs Category Distribution:")
+    middle_y = label_mid_y - 6 - MIDDLE_H
+
     fig, ax = plt.subplots(figsize=(5, 3))
+    if clean_labels:
+        ax.bar(clean_labels, clean_values)
+        ax.set_ylabel("Count")
+    else:
+        ax.axis('off')
+        ax.text(0.5, 0.5, "No category data", ha='center', va='center', fontsize=12)
+    ax.set_title("Log Category Distribution (Bar)")
+    draw_chart(fig, left_x, middle_y, col_w, MIDDLE_H)
+
+    fig, ax = plt.subplots(figsize=(5, 3))
+    if total > 0:
+        ax.pie(clean_values, labels=clean_labels, autopct='%1.1f%%', startangle=140)
+    else:
+        ax.axis('off')
+        ax.text(0.5, 0.5, "No category data", ha='center', va='center', fontsize=12)
+    ax.set_title("Log Category Distribution")
+    draw_chart(fig, right_x, middle_y, col_w, MIDDLE_H)
+
+    # =======================
+    # PAGE 2: Login (super wide) + AI Summary
+    # =======================
+    c.showPage()
+
+    # Header
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(MARGIN_L, page_h - 70, "Login Activity:")
+
+    # --- Login Activity (super wide) ---
+    fig, ax = plt.subplots(figsize=(13, 3.6))
     hours = [f"{i:02d}:00" for i in range(24)]
     for role in ['user', 'manager', 'admin']:
-        role_data = [login_activity.get(h, {}).get(role, 0) for h in hours]
+        role_data = [int((get_hour_bucket(h) or {}).get(role, 0) or 0) for h in hours]
         ax.plot(hours, role_data, label=role.capitalize())
     ax.set_title('Login Activity')
     ax.set_xlabel('Hour')
     ax.set_ylabel('Logins')
     ax.legend()
     ax.grid(True)
-    draw_chart(fig, x=login_x, y=login_y)
+    login_chart_top = page_h - 80
+    login_chart_y = login_chart_top - LOGIN_H
+    draw_chart(fig, FULL2_L, login_chart_y, page_w - FULL2_L - FULL2_R, LOGIN_H)
 
-    # --- Pie Chart ---
-    fig, ax = plt.subplots(figsize=(4, 3))
-    labels = list(category_summary.keys())
-    values = [category_summary[k] for k in labels]
-    ax.pie(values, labels=labels, autopct='%1.1f%%', startangle=140)
-    ax.set_title("Log Category Distribution")
-    draw_chart(fig, x=pie_x, y=pie_y)
+    # --- AI Logs Summary below login chart ---
+    styles = getSampleStyleSheet()
+    styleN = styles["Normal"]
+    styleN.fontSize = 10
+    styleN.leading = 12
 
-    # --- Bar Chart ---
-    fig, ax = plt.subplots(figsize=(5, 2.5))
-    ax.bar(labels, values, color=['green', 'orange', 'orangered', 'red'])
-    ax.set_title("Log Category Distribution (Bar)")
-    ax.set_ylabel("Count")
-    draw_chart(fig, x=bar_x, y=bar_y)
+    ai_summary_text = generate_logs_summary(mysql) if mysql else "No AI summary available."
 
-    # --- Trend Line Chart ---
-    fig, ax = plt.subplots(figsize=(7, 2.5))
-    for category, counts in trend_data.items():
-        ax.plot(trend_dates, counts, label=category)
-    ax.set_title("Log Trend Over Time")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Logs")
-    ax.legend()
-    ax.grid(True)
-    draw_chart(fig, x=trend_x, y=trend_y)
+    c.setFont("Helvetica-Bold", 12)
+    after_login_y = login_chart_y - 16
+    c.drawString(MARGIN_L, after_login_y, "AI Logs Summary:")
 
+    available_h = after_login_y - 12 - MARGIN_B
+    paragraph = Paragraph(ai_summary_text, styleN)
+    frame = Frame(MARGIN_L, MARGIN_B, page_w - MARGIN_L - MARGIN_R, available_h, showBoundary=0)
+    frame.addFromList([paragraph], c)
+
+    # Save PDF
     c.save()
     return filename
+
 
 
 def hash_password(password, salt=None, iterations=260000):
@@ -1498,6 +1640,43 @@ def download_pdf_report():
     if current_user['status'] != 'admin':
         return render_template('404.html')
 
+    flash("PDF password: First Name + Phone Number (no spaces, case-sensitive)", "info")
+
+    # --- Build password: firstname + phone digits ---
+    # Try a few common keys for first name and phone
+    first_name = (
+        (current_user.get('first_name')
+         or current_user.get('firstname')
+         or (current_user.get('name') or '').split(' ')[0]  # fallback: first token of full name
+         or '').strip()
+    )
+    phone_raw = (
+        current_user.get('phone')
+        or current_user.get('phone_number')
+        or current_user.get('mobile')
+        or ''
+    )
+    phone_digits = re.sub(r'\D+', '', str(phone_raw))
+
+    # Remove leading "65" if present
+    if phone_digits.startswith("65"):
+        phone_digits = phone_digits[2:]
+
+    if not first_name or not phone_digits:
+        return ("Missing first name or phone number for PDF password. "
+                "Ensure the user profile has both.", 400)
+
+    user_password = f"{first_name}{phone_digits}"
+    # You can use the same value for ownerPassword, or keep a separate admin password if you want.
+    enc = StandardEncryption(
+        userPassword=user_password,
+        ownerPassword=user_password,
+        canPrint=1,    # allow printing
+        canModify=0,   # disallow modifications
+        canCopy=0      # disallow copying
+    )
+
+    # --- your existing date handling & queries (unchanged) ---
     today_str = datetime.today().strftime("%Y-%m-%d")
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
@@ -1505,7 +1684,6 @@ def download_pdf_report():
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
-    # Determine date range
     if start_date and end_date:
         cursor.execute("""
             SELECT DATE(date) AS date, category, COUNT(*) AS count
@@ -1514,7 +1692,6 @@ def download_pdf_report():
             GROUP BY DATE(date), category
             ORDER BY date
         """, (start_date, end_date))
-
         date_range = pd.date_range(start=start_date, end=end_date)
         dates_iso = [d.date().isoformat() for d in date_range]
     else:
@@ -1532,7 +1709,6 @@ def download_pdf_report():
     log_data = cursor.fetchall()
     categories = ['Info', 'Warning', 'Error', 'Critical']
 
-    # Prepare trend data and category summary
     chart_data = {date: {cat: 0 for cat in categories} for date in dates_iso}
     category_summary = {cat: 0 for cat in categories}
 
@@ -1547,7 +1723,6 @@ def download_pdf_report():
     trend_dates = dates_iso
     trend_data = {cat: [chart_data[date][cat] for date in trend_dates] for cat in categories}
 
-    # Determine login activity date
     login_date = request.args.get('login_date') or request.args.get('start_date') or today_str
     cursor.execute("""
         SELECT HOUR(login_time) AS login_hour, status, COUNT(*) AS count
@@ -1558,22 +1733,31 @@ def download_pdf_report():
     """, (login_date,))
     login_activity_rows = cursor.fetchall()
 
-    # Build login activity per hour
     login_activity = {f"{h:02d}:00": {'admin': 0, 'manager': 0, 'user': 0} for h in range(24)}
     for row in login_activity_rows:
         hour = int(row['login_hour'])
-        status = row['status'].lower()
+        status = str(row['status']).lower()
         count = row['count']
         if status in login_activity[f"{hour:02d}:00"]:
             login_activity[f"{hour:02d}:00"][status] = count
 
     cursor.close()
 
-    # Generate PDF
+    # --- Generate encrypted PDF ---
+    import tempfile
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     filepath = temp_file.name
-    generate_log_report_pdf(filepath, login_activity, category_summary, trend_data, trend_dates)
+    generate_log_report_pdf(
+        filepath,
+        login_activity,
+        category_summary,
+        trend_data,
+        trend_dates,
+        mysql=mysql,
+        pdf_encrypt=enc  # <- pass encryption
+    )
 
+    # The user password is first name + phone (digits). You can show a hint if desired.
     return send_file(filepath, as_attachment=True, download_name="Log_Report.pdf", mimetype='application/pdf')
 
 
@@ -1882,6 +2066,7 @@ def login():
                 if user.get('two_factor_status') == 'enabled':
                     send_otp_email(user['email'], user['id'], user['first_name'], user['last_name'])
                     session['pending_2fa_user_id'] = user['id']
+                    session['pending_2fa_started_at'] = time.time()
                     log_user_action(
                         user_id=user['id'],
                         session_id=None,
@@ -2766,6 +2951,17 @@ def verify_otp(id):
         flash("Unauthorized access.", "error")
         return redirect(url_for('login'))
 
+    # >>> ADD THIS BLOCK (session lifetime for the 2FA page)
+    started_at = session.get('pending_2fa_started_at')
+    if not started_at or (time.time() - started_at) > 120:  # 2 minutes
+        # Clean up any pending OTP/session state
+        otp_store.pop(id, None)
+        session.pop('pending_2fa_user_id', None)
+        session.pop('pending_2fa_started_at', None)
+        flash("Your verification session expired. Please login again.", "error")
+        return redirect(url_for('login'))
+    # <<<
+
     if request.method == 'POST':
         entered_otp = request.form.get('otp')
         record = otp_store.get(id)
@@ -2774,14 +2970,15 @@ def verify_otp(id):
             flash("No OTP found. Please login again.", "error")
             return redirect(url_for('login'))
 
+        # (Keep your separate OTP expiry check)
         if time.time() > record['expires']:
             flash("OTP expired. Please login again.", "error")
             otp_store.pop(id, None)
             session.pop('pending_2fa_user_id', None)
+            session.pop('pending_2fa_started_at', None)   # also clear this
             return redirect(url_for('login'))
 
         if entered_otp == record['otp']:
-            # Fetch the user BEFORE using it
             cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
             cursor.execute('SELECT * FROM accounts WHERE id = %s', (id,))
             user = cursor.fetchone()
@@ -2791,10 +2988,11 @@ def verify_otp(id):
                 flash("User not found. Please login again.", "error")
                 return redirect(url_for('login'))
 
+            # Success: clear 2FA session markers
             otp_store.pop(id, None)
             session.pop('pending_2fa_user_id', None)
+            session.pop('pending_2fa_started_at', None)
 
-            # ✅ Only ONE call here
             session_id = log_session_activity(user['id'], user['status'], 'login')
 
             payload = {
@@ -2831,6 +3029,7 @@ def verify_otp(id):
             flash("Invalid OTP. Please try again.", "error")
 
     return render_template('/accountPage/two_factor.html', id=id)
+
 
 
 @app.route('/resend-otp/<int:id>', methods=['GET'])
