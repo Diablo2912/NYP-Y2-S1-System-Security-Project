@@ -17,6 +17,24 @@
         </a>
     </div>
 
+    {% if security_banner %}
+    <div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+      <div>
+        <strong>We have recorded your report.</strong>
+        If you did not authorize changes from the flagged session
+        , you can take action now.
+      </div>
+      <div class="d-flex gap-2">
+        <a class="btn btn-sm btn-outline-dark"
+           href="{{ url_for('reset_password_request') }}">
+          Reset Password
+        </a>
+        <a class="btn btn-sm btn-danger" href="{{ url_for('security_actions', session_id=security_banner.session_id) }}">Freeze Account</a>
+      </div>
+    </div>
+    {% endif %}
+
+
     <form method="GET" action="{{ url_for('activity_history') }}" class="text-center mb-4">
         <label for="filter" class="me-2 fw-bold">Filter:</label>
         <select name="filter" id="filter" onchange="this.form.submit()" class="form-select d-inline w-auto">

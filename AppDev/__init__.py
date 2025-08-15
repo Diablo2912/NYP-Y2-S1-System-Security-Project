@@ -68,6 +68,7 @@ from modelsProduct import Product, db
 from seasonalUpdateForm import SeasonalUpdateForm
 import re
 import unicodedata
+from urllib.parse import urljoin
 
 app = Flask(__name__)
 csrf = CSRFProtect()
@@ -3045,6 +3046,7 @@ def activity_history():
 
     # Modal payload (if we queued it after flagging)
     review_changes = session.pop('review_changes', None)
+    security_banner =session.pop('show_security_banner', None)
 
     return render_template(
         "accountPage/activity.html",
@@ -3052,6 +3054,7 @@ def activity_history():
         selected_filter=filter_type,
         time_left=time_left,
         review_changes=review_changes,
+        security_banner=security_banner,
         flagged_session_ids=flagged_session_ids,  # <-- pass to template
     )
 
@@ -3172,6 +3175,10 @@ def flag_session(session_id):
     """, (session_id,))
     actions = [r['action'] for r in cursor.fetchall()]
     cursor.close()
+    session['show_security_banner'] = {
+        'session_id': session_id,
+        'flagged_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    }
 
     findings = detect_sensitive_changes(actions)
     if findings:
@@ -3491,6 +3498,10 @@ def admin_notify_flagger(flag_id):
 
     return redirect(url_for('view_session_flags'))
 
+@app.route('/security_actions')
+def security_actions():
+    jwt_user = getattr(g, 'user', None)  # may be None if not logged in
+    return render_template('security_actions.html', jwt_user=jwt_user)
 
 
 
@@ -4390,21 +4401,60 @@ def notify_user_action(to_email, action_type, item_name=None, details=None):
     - item_name: Optional name/title of the item involved.
     - details: Optional extra details to include in the email.
     """
+    # Local imports keep this function self-contained
+    from flask import request, url_for
+    from urllib.parse import urljoin
+    import unicodedata
+
+    # ASCII sanitizer to avoid MIMEText default (US-ASCII) crashes on smart quotes/em dashes
+    SMART_MAP = str.maketrans({
+        "\u2019": "'",  # ’
+        "\u2018": "'",  # ‘
+        "\u201c": '"',  # “
+        "\u201d": '"',  # ”
+        "\u2014": "-",  # —
+        "\u2013": "-",  # –
+    })
+    def ascii_clean(s: str) -> str:
+        if not s:
+            return ""
+        return unicodedata.normalize("NFKD", s.translate(SMART_MAP)).encode("ascii", "ignore").decode("ascii")
+
     try:
+        # Build absolute link to the Security Actions page (works in or out of a request context)
+        try:
+            base_url = request.url_root  # e.g., http://localhost:5000/
+        except Exception:
+            base_url = app.config.get('PUBLIC_BASE_URL') or ''  # set this in config for background jobs
+
+        try:
+            path = url_for('security_actions')  # relative path
+        except Exception:
+            path = '/security_actions'
+
+        security_url = urljoin(base_url, path) if base_url else path
+
+        # Compose subject/body
         subject = f"[Cropzy] {action_type}"
-        message = f"The following action was performed on your Cropzy account:\n\n"
-        message += f"Action: {action_type}\n"
-
+        lines = []
+        lines.append("The following action was performed on your Cropzy account:\n")
+        lines.append(f"Action: {action_type}")
         if item_name:
-            message += f"Item: {item_name}\n"
-
+            lines.append(f"Item: {item_name}")
         if details:
-            message += f"Details: {details}\n"
+            lines.append(f"Details: {details}")
+        lines.append(f"\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        lines.append("\nIf you did not authorize this action, you can reset your password or freeze your account here:")
+        lines.append(security_url)
+        lines.append("\n- Cropzy Team")
 
-        message += f"\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        message += "\nIf you did not authorize this action, please contact support immediately.\n\n- Cropzy Team"
+        message = "\n".join(lines)
 
-        # Construct and send email
+        # Sanitize to ASCII to avoid encoding errors in MIMEText(..., 'plain')
+        subject = ascii_clean(subject)
+        message = ascii_clean(message)
+
+        # Construct and send email (unchanged transport)
         msg = MIMEMultipart()
         msg['From'] = app.config['MAIL_USERNAME']
         msg['To'] = to_email
@@ -4421,6 +4471,7 @@ def notify_user_action(to_email, action_type, item_name=None, details=None):
 
     except Exception as e:
         print(f"[ERROR] Failed to send notification: {e}")
+
 
 
 def send_email(to_email, subject, message):
