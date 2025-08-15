@@ -3159,6 +3159,51 @@ def flag_session(session_id):
     flash("Thanks—We’ve recorded your report for this session.", "success")
     return redirect(request.referrer or url_for('accountHist'))
 
+@app.route('/admin/session_flags')
+@jwt_required
+def view_session_flags():
+    jwt_user = g.user
+    if jwt_user['status'] not in ['admin']:
+        return render_template('404glen.html')
+
+    user_id = jwt_user['user_id']
+    session_id = jwt_user['session_id']
+
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cur.execute("""
+        SELECT
+            sf.id,
+            sf.session_id,
+            sf.user_id              AS flagged_user_id,
+            sf.created_at           AS flagged_at,
+            sf.details,             -- category: unknown_login / suspicious_activity / unrecognized_actions / other
+            sf.reason,              -- free text
+            a.first_name,
+            a.last_name,
+            a.email
+        FROM session_flags sf
+        JOIN accounts a ON a.id = sf.user_id
+        ORDER BY sf.created_at DESC
+    """)
+    flags = cur.fetchall()
+    cur.close()
+
+    log_user_action(
+        user_id=user_id,
+        session_id=session_id,
+        action="Viewed session flags"
+    )
+
+    notify_user_action(
+        to_email=jwt_user['email'],
+        action_type="Viewed Session Flags",
+        item_name="Admin Session Flags Page"
+    )
+
+    return render_template( "/accountPage/admin_session_flags.html", flags=flags)
+
+
 
 
 @app.route('/verify-otp/<int:id>', methods=['GET', 'POST'])

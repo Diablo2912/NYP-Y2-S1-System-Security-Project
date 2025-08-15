@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4 text-center">🚩 Session Flags</h2>
+
+  {% if flags %}
+  <div class="table-responsive">
+    <table class="table table-bordered table-striped text-center align-middle">
+      <thead class="table-primary">
+        <tr>
+          <th>Flagged At (UTC)</th>
+          <th>Session ID</th>
+          <th>Flagged By</th>
+          <th>Details</th>
+          <th>Reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for flag in flags %}
+        <tr>
+          <td><small class="text-muted">{{ flag.flagged_at }}</small></td>
+          <td>{{ flag.session_id }}</td>
+          <td>
+            <div class="fw-bold">{{ flag.first_name }} {{ flag.last_name }}</div>
+            <div class="text-muted small">{{ flag.email }}</div>
+            <div class="text-muted small">(User ID: {{ flag.flagged_user_id }})</div>
+          </td>
+          <td>
+            {% if flag.details == "unknown_login" %}
+              <span class="badge bg-danger">Unknown Login</span>
+            {% elif flag.details == "suspicious_activity" %}
+              <span class="badge bg-warning text-dark">Suspicious Activity</span>
+            {% elif flag.details == "unrecognized_actions" %}
+              <span class="badge bg-primary">Unrecognized Actions</span>
+            {% elif flag.details == "other" %}
+              <span class="badge bg-secondary">Other</span>
+            {% else %}
+              <span class="badge bg-light text-dark">{{ flag.details or '-' }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if flag.reason %}
+              <button class="btn btn-warning btn-sm"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#reason{{ loop.index }}"
+                      aria-expanded="false">
+                View Reason
+              </button>
+              <div class="collapse mt-2" id="reason{{ loop.index }}">
+                <div class="card card-body text-start bg-light border">
+                  {{ flag.reason }}
+                </div>
+              </div>
+            {% else %}
+              <span class="text-muted">No reason provided</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="alert alert-warning text-center">No session flags found.</div>
+  {% endif %}
+
+  <div class="text-center mt-4">
+    <a href="{{ url_for('activity_history') }}" class="btn btn-secondary">Back to Session History</a>
+  </div>
+</div>
+{% endblock %}
