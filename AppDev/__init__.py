@@ -2245,6 +2245,7 @@ def login():
                     send_otp_email(user['email'], user['id'], user['first_name'], user['last_name'])
                     session['pending_2fa_user_id'] = user['id']
                     session['pending_2fa_started_at'] = time.time()
+                    session['pending_2fa_attempts'] = 0  # NEW
                     log_user_action(
                         user_id=user['id'],
                         session_id=None,
@@ -3125,20 +3126,24 @@ def verify_otp(id):
     user_agent = request.headers.get('User-Agent')
 
     print(f"[DEBUG] OTP form submitted for user_id={id} at {datetime.now()}")
+
+    # Ensure correct session state for 2FA
     if 'pending_2fa_user_id' not in session or session['pending_2fa_user_id'] != id:
         flash("Unauthorized access.", "error")
         return redirect(url_for('login'))
 
-    # >>> ADD THIS BLOCK (session lifetime for the 2FA page)
+    # ---- Session lifetime check (2 minutes max on 2FA page) ----
     started_at = session.get('pending_2fa_started_at')
-    if not started_at or (time.time() - started_at) > 120:  # 2 minutes
-        # Clean up any pending OTP/session state
+    if not started_at or (time.time() - started_at) > 120:
         otp_store.pop(id, None)
         session.pop('pending_2fa_user_id', None)
         session.pop('pending_2fa_started_at', None)
+        session.pop('pending_2fa_attempts', None)
         flash("Your verification session expired. Please login again.", "error")
         return redirect(url_for('login'))
-    # <<<
+
+    # Calculate remaining seconds for the UI timer
+    remaining_seconds = max(0, 120 - int(time.time() - started_at))
 
     if request.method == 'POST':
         entered_otp = request.form.get('otp')
@@ -3148,15 +3153,26 @@ def verify_otp(id):
             flash("No OTP found. Please login again.", "error")
             return redirect(url_for('login'))
 
-        # (Keep your separate OTP expiry check)
+        # OTP expiration (separate from session lifetime)
         if time.time() > record['expires']:
             flash("OTP expired. Please login again.", "error")
             otp_store.pop(id, None)
             session.pop('pending_2fa_user_id', None)
-            session.pop('pending_2fa_started_at', None)   # also clear this
+            session.pop('pending_2fa_started_at', None)
+            session.pop('pending_2fa_attempts', None)
             return redirect(url_for('login'))
 
+        # ---- Track failed attempts ----
+        attempts = session.get('pending_2fa_attempts', 0)
+
         if entered_otp == record['otp']:
+            # Success: clear OTP/session markers
+            otp_store.pop(id, None)
+            session.pop('pending_2fa_user_id', None)
+            session.pop('pending_2fa_started_at', None)
+            session.pop('pending_2fa_attempts', None)
+
+            # Fetch user details
             cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
             cursor.execute('SELECT * FROM accounts WHERE id = %s', (id,))
             user = cursor.fetchone()
@@ -3165,11 +3181,6 @@ def verify_otp(id):
             if not user:
                 flash("User not found. Please login again.", "error")
                 return redirect(url_for('login'))
-
-            # Success: clear 2FA session markers
-            otp_store.pop(id, None)
-            session.pop('pending_2fa_user_id', None)
-            session.pop('pending_2fa_started_at', None)
 
             session_id = log_session_activity(user['id'], user['status'], 'login')
 
@@ -3203,11 +3214,24 @@ def verify_otp(id):
 
             flash("Login successful!", "success")
             return response
+
         else:
-            flash("Invalid OTP. Please try again.", "error")
+            # Wrong OTP
+            attempts += 1
+            session['pending_2fa_attempts'] = attempts
 
-    return render_template('/accountPage/two_factor.html', id=id)
+            if attempts >= 3:
+                flash("Too many incorrect OTP attempts. Please login again.", "error")
+                otp_store.pop(id, None)
+                session.pop('pending_2fa_user_id', None)
+                session.pop('pending_2fa_started_at', None)
+                session.pop('pending_2fa_attempts', None)
+                return redirect(url_for('login'))
 
+            flash(f"Invalid OTP. Attempt {attempts}/3.", "error")
+
+    # On GET or after wrong OTP, render page with timer info
+    return render_template('/accountPage/two_factor.html', id=id, remaining_seconds=remaining_seconds)
 
 
 @app.route('/resend-otp/<int:id>', methods=['GET'])
@@ -3229,6 +3253,8 @@ def resend_otp(id):
 
     # Send new OTP
     send_otp_email(user['email'], user['id'], user['first_name'], user['last_name'])
+    session['pending_2fa_started_at'] = time.time()  # NEW
+    session['pending_2fa_attempts'] = 0  # NEW
     flash("A new OTP has been sent to your email.", "info")
     return redirect(url_for('verify_otp', id=id))
 
