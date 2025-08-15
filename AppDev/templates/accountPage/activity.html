@@ -43,6 +43,7 @@
             </thead>
             <tbody>
                 {% for session in sessions %}
+                {% set is_flagged = flagged_session_ids and (session.id in flagged_session_ids) %}
                 <tr>
                     <td>{{ session.login_time or 'N/A' }}</td>
                     <td>
@@ -71,17 +72,32 @@
                     </td>
                     <td>
                         {% if not session.logout_time %}
-                        <form method="POST" action="{{ url_for('revoke_session', session_id=session.id) }}" style="display:inline-block;">
-                            <button type="submit" class="btn btn-danger btn-sm">Revoke</button>
+                        <!-- Revoke button now opens a confirmation modal -->
+                        <form id="revokeForm{{ session.id }}" method="POST" action="{{ url_for('revoke_session', session_id=session.id) }}" style="display:inline-block;">
+                            <button type="button"
+                                    class="btn btn-danger btn-sm"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#confirmRevokeModal"
+                                    data-form-id="revokeForm{{ session.id }}"
+                                    data-session-info="Login: {{ session.login_time }} • IP: {{ session.ip_address }}">
+                                Revoke
+                            </button>
                         </form>
                         {% else %}
                         <button class="btn btn-secondary btn-sm" disabled>Revoked</button>
                         {% endif %}
 
-                        <!-- Flag button -->
-                        <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#flagModal{{ session.id }}">
-                            🚩 Flag
-                        </button>
+                        <!-- Flag button / state -->
+                        {% if is_flagged %}
+                            <span class="badge bg-warning text-dark ms-1">Flagged</span>
+                            <button type="button" class="btn btn-outline-warning btn-sm ms-1" disabled title="This session has already been flagged.">
+                                🚩 Flagged
+                            </button>
+                        {% else %}
+                            <button type="button" class="btn btn-warning btn-sm ms-1" data-bs-toggle="modal" data-bs-target="#flagModal{{ session.id }}">
+                                🚩 Flag
+                            </button>
+                        {% endif %}
                     </td>
                 </tr>
                 <tr>
@@ -197,6 +213,26 @@
 </div>
 {% endfor %}
 
+<!-- Revoke confirmation modal (single, reused by all Revoke buttons) -->
+<div class="modal fade" id="confirmRevokeModal" tabindex="-1" aria-labelledby="confirmRevokeLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger-subtle">
+        <h5 class="modal-title" id="confirmRevokeLabel">Revoke session?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        Are you sure you want to revoke this session?
+        <div class="text-muted small mt-2" id="revokeSessionInfo"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+        <button type="button" class="btn btn-danger" id="confirmRevokeBtn">Yes, revoke</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% if time_left %}
 <script>
     let countdown = {{ time_left }};
@@ -223,6 +259,29 @@ document.querySelectorAll('.reason-input').forEach(function(textarea) {
         countEl.textContent = textarea.value.length;
     });
 });
+</script>
+
+<!-- Revoke modal wiring -->
+<script>
+(function () {
+  let targetFormId = null;
+  const modalEl = document.getElementById('confirmRevokeModal');
+  const infoEl  = document.getElementById('revokeSessionInfo');
+  const confirmBtn = document.getElementById('confirmRevokeBtn');
+
+  modalEl.addEventListener('show.bs.modal', function (event) {
+    const triggerBtn = event.relatedTarget;
+    targetFormId = triggerBtn?.getAttribute('data-form-id');
+    const info = triggerBtn?.getAttribute('data-session-info') || '';
+    if (infoEl) infoEl.textContent = info;
+  });
+
+  confirmBtn.addEventListener('click', function () {
+    if (!targetFormId) return;
+    const form = document.getElementById(targetFormId);
+    if (form) form.submit();
+  });
+})();
 </script>
 
 {% if review_changes %}
