@@ -23,6 +23,13 @@
     <form id="form" class="bg-white rounded shadow p-4" method="POST" action="{{ url_for('verify_otp', id=id) }}">
       <h1 class="text-center mb-4 fs-4 text-uppercase">Two-Factor Authentication</h1>
 
+      <!-- 2FA Session Timer (2 minutes max on page) -->
+      <div class="alert alert-warning" role="alert" style="display:flex;justify-content:space-between;align-items:center;">
+        <span><strong>2FA verification in progress.</strong> For security, this page expires in
+          <span id="countdown">--:--</span>.
+        </span>
+      </div>
+
       <div class="mb-3 text-center">
         <label class="form-label mb-2">Enter the 6-digit code sent to your email</label>
         <div class="d-flex justify-content-between">
@@ -49,6 +56,37 @@
 </div>
 
 <script>
+    (function () {
+    // Server-synced remaining seconds (falls back to 120 if not provided)
+    var remaining = {{ remaining_seconds|default(120) }};
+    var total = Math.max(remaining, 0);
+
+    var cd = document.getElementById('countdown');
+    var bar = document.getElementById('countdown-bar');
+
+    function fmt(sec) {
+      var m = Math.floor(sec / 60);
+      var s = sec % 60;
+      return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+
+    function tick() {
+      cd.textContent = fmt(remaining);
+      if (bar) {
+        var pct = total > 0 ? (remaining / total) * 100 : 0;
+        bar.style.width = pct + '%';
+      }
+      if (remaining <= 0) {
+        // Hard redirect to login
+        window.location.replace("{{ url_for('login') }}");
+        return;
+      }
+      remaining -= 1;
+      setTimeout(tick, 1000);
+    }
+    tick();
+  })();
+
   const inputs = document.querySelectorAll('.pincode-input');
   const hiddenOtpInput = document.getElementById('otpHidden');
   const continueBtn = document.getElementById('continueBtn');
