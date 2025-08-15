@@ -118,12 +118,12 @@ mail = Mail(app)
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'glen'
-app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'glen'
+# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 
 # BRANDON SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -142,10 +142,10 @@ app.config['MYSQL_PORT'] = 3306
 # app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
-# app.config['MYSQL_HOST'] = 'localhost'
-# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-# app.config['MYSQL_DB'] = 'sspCropzy'
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+app.config['MYSQL_DB'] = 'sspCropzy'
 #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -3118,6 +3118,48 @@ def check_session_validity():
 
     return jsonify({"valid": True})
 
+@app.route('/flag_session/<int:session_id>', methods=['POST'])
+@jwt_required
+def flag_session(session_id):
+    user_id = g.user['user_id']
+
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("""
+        SELECT id, user_id
+        FROM user_session_activity
+        WHERE id=%s
+    """, (session_id,))
+    s = cursor.fetchone()
+    if not s or s['user_id'] != user_id:
+        cursor.close()
+        flash("Session not found.", "danger")
+        return redirect(request.referrer or url_for('accountHist'))
+
+    reason = request.form.get('reason', 'OTHER')
+    details = (request.form.get('details') or '').strip()
+
+    cursor2 = mysql.connection.cursor()
+    cursor2.execute("""
+        INSERT INTO session_flags (session_id, user_id, reason, details)
+        VALUES (%s,%s,%s,%s)
+    """, (session_id, user_id, reason, details))
+    mysql.connection.commit()
+    cursor2.close()
+    cursor.close()
+
+    try:
+        log_user_action(
+            user_id=user_id,
+            session_id=g.user.get('session_id'),
+            action=f"Flagged a session  | Reason={reason}"
+        )
+    except Exception:
+        pass
+
+    flash("Thanks—We’ve recorded your report for this session.", "success")
+    return redirect(request.referrer or url_for('accountHist'))
+
+
 
 @app.route('/verify-otp/<int:id>', methods=['GET', 'POST'])
 def verify_otp(id):
@@ -3595,7 +3637,7 @@ def create_update():
             pending[pending_id] = {
                 'user_id': user_id,
                 'session_id': session_id,
-                'email': user_email,  # ✅ ensure this is stored
+                'email': user_email,  # ensure this is stored
                 'update_data': update_data
             }
             db['pending_updates'] = pending
