@@ -66,6 +66,7 @@ from Forms import ChangeDetForm, ChangePswdForm, CreateAdminForm, CreateProductF
 from chatbot import generate_response
 from modelsProduct import Product, db
 from seasonalUpdateForm import SeasonalUpdateForm
+import re
 
 app = Flask(__name__)
 csrf = CSRFProtect()
@@ -397,8 +398,6 @@ def ip_heatmap():
         folium.Marker([p["lat"], p["lon"]], tooltip=p["ip"], popup=folium.Popup(popup_html, max_width=250)).add_to(m)
 
     return m._repr_html_()
-
-
 
 
 @app.route("/block_ip", methods=["POST"])
@@ -3030,10 +3029,13 @@ def activity_history():
         s['actions'] = action_cursor.fetchall()
         action_cursor.close()
 
+    review_changes = session.pop('review_changes', None)
+
     return render_template("accountPage/activity.html",
                            sessions=sessions,
                            selected_filter=filter_type,
-                           time_left=time_left)
+                           time_left=time_left,
+                           review_changes=review_changes)
 
 
 @app.route('/revoke_session/<session_id>', methods=['POST'])
@@ -3124,11 +3126,7 @@ def flag_session(session_id):
     user_id = g.user['user_id']
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cursor.execute("""
-        SELECT id, user_id
-        FROM user_session_activity
-        WHERE id=%s
-    """, (session_id,))
+    cursor.execute("SELECT id, user_id FROM user_session_activity WHERE id=%s", (session_id,))
     s = cursor.fetchone()
     if not s or s['user_id'] != user_id:
         cursor.close()
@@ -3145,19 +3143,29 @@ def flag_session(session_id):
     """, (session_id, user_id, reason, details))
     mysql.connection.commit()
     cursor2.close()
+
+    # fetch actions and detect
+    cursor.execute("""
+        SELECT action
+        FROM user_actions_log
+        WHERE session_id = %s
+        ORDER BY timestamp DESC
+    """, (session_id,))
+    actions = [r['action'] for r in cursor.fetchall()]
     cursor.close()
 
-    try:
-        log_user_action(
-            user_id=user_id,
-            session_id=g.user.get('session_id'),
-            action=f"Flagged a session  | Reason={reason}"
-        )
-    except Exception:
-        pass
+    findings = detect_sensitive_changes(actions)
+    if findings:
+        session['review_changes'] = findings
+        flash("We noticed important account changes in this session. Please review.", "warning")
+        # IMPORTANT: go to the page that renders the modal
+        return redirect(url_for('activity_history'))
+    else:
+        flash("Thanks—We’ve recorded your report for this session.", "success")
+        # you can still go back to activity_history for consistency
+        return redirect(url_for('activity_history'))
 
-    flash("Thanks—We’ve recorded your report for this session.", "success")
-    return redirect(request.referrer or url_for('accountHist'))
+
 
 @app.route('/admin/session_flags')
 @jwt_required
@@ -3202,6 +3210,60 @@ def view_session_flags():
     )
 
     return render_template( "/accountPage/admin_session_flags.html", flags=flags)
+
+CHANGE_VERBS = [
+    "change", "changed", "update", "updated", "set", "modified", "modify",
+    "enable", "enabled", "disable", "disabled", "turn on", "turn off",
+    "toggle", "reset", "register", "registered", "enroll", "enrolled",
+    "save", "saved", "edit", "edited", "configure", "configured", "setup", "set up"
+]
+
+# verbs that imply no change (view-only)
+VIEW_VERBS = ["view", "viewed", "access", "accessed", "open", "opened", "visit", "visited", "display", "displayed"]
+
+# subjects we care about -> (keywords, label, endpoint)
+SUBJECTS = [
+    # Security
+    (("2fa", "two factor", "two-factor"),         "2FA status changed",           "accountInfo"),
+    (("password",),                                "Password changed",             "accountSecurity"),
+    (("face id", "faceid", "biometric"),           "Face ID settings changed",     "accountInfo"),
+    # Profile
+    (("email",),                                   "Email changed",                "accountInfo"),
+    (("phone", "phone number"),                    "Phone number changed",         "accountInfo"),
+    (("first name", "last name", "full name", "name"), "Name changed",            "accountInfo"),
+    (("gender",),                                  "Gender changed",               "accountInfo"),
+    # Broad phrasing that your app might log
+    (("profile", "account details", "account info"), "Profile details changed",    "accountInfo"),
+]
+
+def _contains_any(text, words):
+    return any(w in text for w in words)
+
+def detect_sensitive_changes(action_rows):
+    """
+    action_rows: list[str] of user_actions_log.action for a single session.
+    Returns: list[{label, category?, endpoint}]  (category is derived from endpoint)
+    """
+    found = {}
+
+    for raw in action_rows:
+        line = (raw or "").lower()
+
+        # quick skip for pure view lines
+        if _contains_any(line, VIEW_VERBS) and not _contains_any(line, CHANGE_VERBS):
+            continue
+
+        # only consider lines with some change verb
+        if not _contains_any(line, CHANGE_VERBS):
+            continue
+
+        for keys, label, endpoint in SUBJECTS:
+            if _contains_any(line, keys):
+                category = "Security" if endpoint == "accountSecurity" else "Profile"
+                found[label] = {"label": label, "category": category, "endpoint": endpoint}
+
+    return list(found.values())
+
 
 @app.route('/verify-otp/<int:id>', methods=['GET', 'POST'])
 def verify_otp(id):

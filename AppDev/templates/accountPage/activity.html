@@ -165,7 +165,7 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="details{{ session.id }}" class="form-label">Select a reason type:</label>
-                        <select name="details" class="form-select mb-2">
+                        <select name="details" id="details{{ session.id }}" class="form-select mb-2">
                             <option value="unknown_login">Unknown Login</option>
                             <option value="suspicious_activity">Suspicious Activity</option>
                             <option value="unrecognized_actions">Actions Not Recognized</option>
@@ -224,4 +224,58 @@ document.querySelectorAll('.reason-input').forEach(function(textarea) {
     });
 });
 </script>
+
+{% if review_changes %}
+<!-- Review Changes Modal -->
+<div class="modal fade" id="reviewChangesModal" tabindex="-1" aria-labelledby="reviewChangesModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-warning-subtle">
+        <h5 class="modal-title" id="reviewChangesModalLabel">Heads up: important changes in this session</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <p class="mb-3">
+          We found the following sensitive changes made during the flagged session.
+          Would you like to review them now?
+        </p>
+
+        <ul class="list-group">
+          {% for item in review_changes %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              {% if item.category == 'Security' %}
+                <span class="badge bg-warning text-dark me-2">Security</span>
+              {% else %}
+                <span class="badge bg-info text-dark me-2">Profile</span>
+              {% endif %}
+              {{ item.label }}
+            </div>
+            <a href="{{ url_for(item.endpoint) }}" class="btn btn-sm btn-outline-dark">Review</a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <a href="{{ url_for('accountInfo') }}" class="btn btn-outline-dark">Go to Profile</a>
+        <a href="{{ url_for('accountSecurity') }}" class="btn btn-outline-dark">Go to Security</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Auto-open the review modal after redirect from flagging
+  document.addEventListener('DOMContentLoaded', function () {
+    var el = document.getElementById('reviewChangesModal');
+    if (el && typeof bootstrap !== 'undefined') {
+      new bootstrap.Modal(el).show();
+    }
+  });
+</script>
+{% endif %}
+
 {% endblock %}
