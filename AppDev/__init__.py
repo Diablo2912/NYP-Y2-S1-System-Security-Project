@@ -3203,9 +3203,6 @@ def view_session_flags():
 
     return render_template( "/accountPage/admin_session_flags.html", flags=flags)
 
-
-
-
 @app.route('/verify-otp/<int:id>', methods=['GET', 'POST'])
 def verify_otp(id):
     hostname = socket.gethostname()
