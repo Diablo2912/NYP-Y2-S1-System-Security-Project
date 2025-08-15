@@ -43,6 +43,7 @@
             </thead>
             <tbody>
                 {% for session in sessions %}
+                {% set is_flagged = flagged_session_ids and (session.id in flagged_session_ids) %}
                 <tr>
                     <td>{{ session.login_time or 'N/A' }}</td>
                     <td>
@@ -71,11 +72,31 @@
                     </td>
                     <td>
                         {% if not session.logout_time %}
-                        <form method="POST" action="{{ url_for('revoke_session', session_id=session.id) }}">
-                            <button type="submit" class="btn btn-danger btn-sm">Revoke</button>
+                        <!-- Revoke button now opens a confirmation modal -->
+                        <form id="revokeForm{{ session.id }}" method="POST" action="{{ url_for('revoke_session', session_id=session.id) }}" style="display:inline-block;">
+                            <button type="button"
+                                    class="btn btn-danger btn-sm"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#confirmRevokeModal"
+                                    data-form-id="revokeForm{{ session.id }}"
+                                    data-session-info="Login: {{ session.login_time }} • IP: {{ session.ip_address }}">
+                                Revoke
+                            </button>
                         </form>
                         {% else %}
                         <button class="btn btn-secondary btn-sm" disabled>Revoked</button>
+                        {% endif %}
+
+                        <!-- Flag button / state -->
+                        {% if is_flagged %}
+                            <span class="badge bg-warning text-dark ms-1">Flagged</span>
+                            <button type="button" class="btn btn-outline-warning btn-sm ms-1" disabled title="This session has already been flagged.">
+                                🚩 Flagged
+                            </button>
+                        {% else %}
+                            <button type="button" class="btn btn-warning btn-sm ms-1" data-bs-toggle="modal" data-bs-target="#flagModal{{ session.id }}">
+                                🚩 Flag
+                            </button>
                         {% endif %}
                     </td>
                 </tr>
@@ -147,6 +168,71 @@
     </div>
 </div>
 
+<!-- All modals placed outside the table -->
+{% for session in sessions %}
+<div class="modal fade" id="flagModal{{ session.id }}" tabindex="-1" aria-labelledby="flagModalLabel{{ session.id }}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('flag_session', session_id=session.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="flagModalLabel{{ session.id }}">🚩 Flag Session</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="details{{ session.id }}" class="form-label">Select a reason type:</label>
+                        <select name="details" id="details{{ session.id }}" class="form-select mb-2">
+                            <option value="unknown_login">Unknown Login</option>
+                            <option value="suspicious_activity">Suspicious Activity</option>
+                            <option value="unrecognized_actions">Actions Not Recognized</option>
+                            <option value="other">Other</option>
+                        </select>
+
+                        <label for="reason{{ session.id }}" class="form-label">Additional details:</label>
+                        <textarea
+                            id="reason{{ session.id }}"
+                            class="form-control reason-input"
+                            name="reason"
+                            placeholder="Describe why you are flagging this session..."
+                            rows="3"
+                            maxlength="255"
+                            required
+                        ></textarea>
+                        <small class="form-text text-muted">
+                            <span id="charCount{{ session.id }}">0</span>/255 characters used.
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-warning">Submit Flag</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Revoke confirmation modal (single, reused by all Revoke buttons) -->
+<div class="modal fade" id="confirmRevokeModal" tabindex="-1" aria-labelledby="confirmRevokeLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger-subtle">
+        <h5 class="modal-title" id="confirmRevokeLabel">Revoke session?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        Are you sure you want to revoke this session?
+        <div class="text-muted small mt-2" id="revokeSessionInfo"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+        <button type="button" class="btn btn-danger" id="confirmRevokeBtn">Yes, revoke</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% if time_left %}
 <script>
     let countdown = {{ time_left }};
@@ -164,4 +250,91 @@
     }, 1000);
 </script>
 {% endif %}
+
+<!-- Character Counter Script -->
+<script>
+document.querySelectorAll('.reason-input').forEach(function(textarea) {
+    const countEl = document.getElementById('charCount' + textarea.id.replace('reason',''));
+    textarea.addEventListener('input', function() {
+        countEl.textContent = textarea.value.length;
+    });
+});
+</script>
+
+<!-- Revoke modal wiring -->
+<script>
+(function () {
+  let targetFormId = null;
+  const modalEl = document.getElementById('confirmRevokeModal');
+  const infoEl  = document.getElementById('revokeSessionInfo');
+  const confirmBtn = document.getElementById('confirmRevokeBtn');
+
+  modalEl.addEventListener('show.bs.modal', function (event) {
+    const triggerBtn = event.relatedTarget;
+    targetFormId = triggerBtn?.getAttribute('data-form-id');
+    const info = triggerBtn?.getAttribute('data-session-info') || '';
+    if (infoEl) infoEl.textContent = info;
+  });
+
+  confirmBtn.addEventListener('click', function () {
+    if (!targetFormId) return;
+    const form = document.getElementById(targetFormId);
+    if (form) form.submit();
+  });
+})();
+</script>
+
+{% if review_changes %}
+<!-- Review Changes Modal -->
+<div class="modal fade" id="reviewChangesModal" tabindex="-1" aria-labelledby="reviewChangesModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-warning-subtle">
+        <h5 class="modal-title" id="reviewChangesModalLabel">Heads up: important changes in this session</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <p class="mb-3">
+          We found the following sensitive changes made during the flagged session.
+          Would you like to review them now?
+        </p>
+
+        <ul class="list-group">
+          {% for item in review_changes %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              {% if item.category == 'Security' %}
+                <span class="badge bg-warning text-dark me-2">Security</span>
+              {% else %}
+                <span class="badge bg-info text-dark me-2">Profile</span>
+              {% endif %}
+              {{ item.label }}
+            </div>
+            <a href="{{ url_for(item.endpoint) }}" class="btn btn-sm btn-outline-dark">Review</a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <a href="{{ url_for('accountInfo') }}" class="btn btn-outline-dark">Go to Profile</a>
+        <a href="{{ url_for('accountSecurity') }}" class="btn btn-outline-dark">Go to Security</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Auto-open the review modal after redirect from flagging
+  document.addEventListener('DOMContentLoaded', function () {
+    var el = document.getElementById('reviewChangesModal');
+    if (el && typeof bootstrap !== 'undefined') {
+      new bootstrap.Modal(el).show();
+    }
+  });
+</script>
+{% endif %}
+
 {% endblock %}

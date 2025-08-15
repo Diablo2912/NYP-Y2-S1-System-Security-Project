@@ -66,6 +66,8 @@ from Forms import ChangeDetForm, ChangePswdForm, CreateAdminForm, CreateProductF
 from chatbot import generate_response
 from modelsProduct import Product, db
 from seasonalUpdateForm import SeasonalUpdateForm
+import re
+import unicodedata
 
 app = Flask(__name__)
 csrf = CSRFProtect()
@@ -142,10 +144,10 @@ app.config['MYSQL_PORT'] = 3306
 # app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
-# app.config['MYSQL_HOST'] = 'localhost'
-# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-# app.config['MYSQL_DB'] = 'sspCropzy'
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+app.config['MYSQL_DB'] = 'sspCropzy'
 #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -397,8 +399,6 @@ def ip_heatmap():
         folium.Marker([p["lat"], p["lon"]], tooltip=p["ip"], popup=folium.Popup(popup_html, max_width=250)).add_to(m)
 
     return m._repr_html_()
-
-
 
 
 @app.route("/block_ip", methods=["POST"])
@@ -2975,6 +2975,8 @@ def verify_before_activity():
 @jwt_required
 def activity_history():
     user_id = g.user['user_id']
+
+    # Gate: verify recent re-auth for viewing activity
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute("SELECT activity_verified_at FROM accounts WHERE id = %s", (user_id,))
     result = cursor.fetchone()
@@ -2995,23 +2997,23 @@ def activity_history():
 
     time_left = 300 - int((datetime.utcnow() - last_verified).total_seconds())
 
-    # --- Fetch session activity logic here ---
+    # --- Fetch session activity ---
     filter_type = request.args.get("filter", "all")
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     query = "SELECT * FROM user_session_activity WHERE user_id = %s"
     params = [user_id]
 
     if filter_type == "active":
-        query += " AND logout_time IS NULL"
+        query += " AND logout_time IS NULL ORDER BY login_time DESC"
     elif filter_type == "revoked":
-        query += " AND logout_time IS NOT NULL"
+        query += " AND logout_time IS NOT NULL ORDER BY login_time DESC"
     elif filter_type.startswith("last_"):
         try:
             limit = int(filter_type.split("_")[1])
             query += " ORDER BY login_time DESC LIMIT %s"
             params.append(limit)
-        except:
-            pass
+        except Exception:
+            query += " ORDER BY login_time DESC"
     else:
         query += " ORDER BY login_time DESC"
 
@@ -3019,6 +3021,7 @@ def activity_history():
     sessions = cursor.fetchall()
     cursor.close()
 
+    # Attach actions per session
     for s in sessions:
         session_id = s['id']
         action_cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -3030,10 +3033,28 @@ def activity_history():
         s['actions'] = action_cursor.fetchall()
         action_cursor.close()
 
-    return render_template("accountPage/activity.html",
-                           sessions=sessions,
-                           selected_filter=filter_type,
-                           time_left=time_left)
+    # NEW: get user's flagged session ids for UI state
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cur.execute("""
+        SELECT DISTINCT session_id
+        FROM session_flags
+        WHERE user_id = %s
+    """, (user_id,))
+    flagged_session_ids = [row['session_id'] for row in cur.fetchall()]
+    cur.close()
+
+    # Modal payload (if we queued it after flagging)
+    review_changes = session.pop('review_changes', None)
+
+    return render_template(
+        "accountPage/activity.html",
+        sessions=sessions,
+        selected_filter=filter_type,
+        time_left=time_left,
+        review_changes=review_changes,
+        flagged_session_ids=flagged_session_ids,  # <-- pass to template
+    )
+
 
 
 @app.route('/revoke_session/<session_id>', methods=['POST'])
@@ -3118,6 +3139,360 @@ def check_session_validity():
 
     return jsonify({"valid": True})
 
+@app.route('/flag_session/<int:session_id>', methods=['POST'])
+@jwt_required
+def flag_session(session_id):
+    user_id = g.user['user_id']
+
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("SELECT id, user_id FROM user_session_activity WHERE id=%s", (session_id,))
+    s = cursor.fetchone()
+    if not s or s['user_id'] != user_id:
+        cursor.close()
+        flash("Session not found.", "danger")
+        return redirect(request.referrer or url_for('accountHist'))
+
+    reason = request.form.get('reason', 'OTHER')
+    details = (request.form.get('details') or '').strip()
+
+    cursor2 = mysql.connection.cursor()
+    cursor2.execute("""
+        INSERT INTO session_flags (session_id, user_id, reason, details)
+        VALUES (%s,%s,%s,%s)
+    """, (session_id, user_id, reason, details))
+    mysql.connection.commit()
+    cursor2.close()
+
+    # fetch actions and detect
+    cursor.execute("""
+        SELECT action
+        FROM user_actions_log
+        WHERE session_id = %s
+        ORDER BY timestamp DESC
+    """, (session_id,))
+    actions = [r['action'] for r in cursor.fetchall()]
+    cursor.close()
+
+    findings = detect_sensitive_changes(actions)
+    if findings:
+        session['review_changes'] = findings
+        flash("We noticed important account changes in this session. Please review.", "warning")
+        # IMPORTANT: go to the page that renders the modal
+        return redirect(url_for('activity_history'))
+    else:
+        flash("Thanks—We’ve recorded your report for this session.", "success")
+        # you can still go back to activity_history for consistency
+        return redirect(url_for('activity_history'))
+
+
+
+@app.route('/admin/session_flags')
+@jwt_required
+def view_session_flags():
+    jwt_user = g.user
+    if jwt_user['status'] not in ['admin']:
+        return render_template('404glen.html')
+
+    user_id = jwt_user['user_id']
+    session_id = jwt_user['session_id']
+
+    # Optional status filter (keep or remove as you like)
+    status_filter = (request.args.get('status') or 'OPEN').upper()
+    allowed = {'OPEN', 'RESOLVED', 'DISMISSED', 'ALL'}
+    if status_filter not in allowed:
+        status_filter = 'OPEN'
+
+    q = """
+        SELECT
+            sf.id,
+            sf.session_id,
+            sf.user_id              AS flagged_user_id,
+            sf.created_at           AS flagged_at,
+            sf.details,
+            sf.reason,
+            sf.status,
+            sf.resolved_by,
+            sf.resolved_at,
+            sf.resolution_note,
+            a.first_name,
+            a.last_name,
+            a.email,
+            ra.first_name AS resolver_first_name,
+            ra.last_name  AS resolver_last_name
+        FROM session_flags sf
+        JOIN accounts a   ON a.id = sf.user_id
+        LEFT JOIN accounts ra ON ra.id = sf.resolved_by
+    """
+    params = []
+    if status_filter != 'ALL':
+        q += " WHERE sf.status = %s"
+        params.append(status_filter)
+    q += " ORDER BY sf.created_at DESC"
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cur.execute(q, tuple(params))
+    flags = cur.fetchall()
+    cur.close()
+
+    # NEW: fetch actions for the sessions we’re showing
+    actions_by_session = {}
+    session_ids = list({f['session_id'] for f in flags})
+    if session_ids:
+        # Build a single IN query
+        placeholders = ",".join(["%s"] * len(session_ids))
+        cur2 = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur2.execute(f"""
+            SELECT session_id, timestamp, action
+            FROM user_actions_log
+            WHERE session_id IN ({placeholders})
+            ORDER BY timestamp ASC
+        """, tuple(session_ids))
+        rows = cur2.fetchall()
+        cur2.close()
+
+        for r in rows:
+            actions_by_session.setdefault(r['session_id'], []).append(r)
+
+    try:
+        email_prompt = session.pop('flag_email_prompt', None)
+    except Exception:
+        email_prompt = None
+
+    # (Your existing audit/notify)
+    log_user_action(user_id=user_id, session_id=session_id, action="Viewed session flags")
+
+    return render_template(
+        "/accountPage/admin_session_flags.html",
+        flags=flags,
+        actions_by_session=actions_by_session,
+        status_filter=status_filter,
+        email_prompt=email_prompt
+    )
+
+
+CHANGE_VERBS = [
+    "change", "changed", "update", "updated", "set", "modified", "modify",
+    "enable", "enabled", "disable", "disabled", "turn on", "turn off",
+    "toggle", "reset", "register", "registered", "enroll", "enrolled",
+    "save", "saved", "edit", "edited", "configure", "configured", "setup", "set up"
+]
+
+# verbs that imply no change (view-only)
+VIEW_VERBS = ["view", "viewed", "access", "accessed", "open", "opened", "visit", "visited", "display", "displayed"]
+
+# subjects we care about -> (keywords, label, endpoint)
+SUBJECTS = [
+    # Security
+    (("2fa", "two factor", "two-factor"),         "2FA status changed",           "accountInfo"),
+    (("password",),                                "Password changed",             "accountSecurity"),
+    (("face id", "faceid", "biometric"),           "Face ID settings changed",     "accountInfo"),
+    # Profile
+    (("email",),                                   "Email changed",                "accountInfo"),
+    (("phone", "phone number"),                    "Phone number changed",         "accountInfo"),
+    (("first name", "last name", "full name", "name"), "Name changed",            "accountInfo"),
+    (("gender",),                                  "Gender changed",               "accountInfo"),
+    # Broad phrasing that your app might log
+    (("profile", "account details", "account info"), "Profile details changed",    "accountInfo"),
+]
+
+def _contains_any(text, words):
+    return any(w in text for w in words)
+
+def detect_sensitive_changes(action_rows):
+    """
+    action_rows: list[str] of user_actions_log.action for a single session.
+    Returns: list[{label, category?, endpoint}]  (category is derived from endpoint)
+    """
+    found = {}
+
+    for raw in action_rows:
+        line = (raw or "").lower()
+
+        # quick skip for pure view lines
+        if _contains_any(line, VIEW_VERBS) and not _contains_any(line, CHANGE_VERBS):
+            continue
+
+        # only consider lines with some change verb
+        if not _contains_any(line, CHANGE_VERBS):
+            continue
+
+        for keys, label, endpoint in SUBJECTS:
+            if _contains_any(line, keys):
+                category = "Security" if endpoint == "accountSecurity" else "Profile"
+                found[label] = {"label": label, "category": category, "endpoint": endpoint}
+
+    return list(found.values())
+
+@app.route('/admin/session_flags/<int:flag_id>/resolve', methods=['POST'])
+@jwt_required
+def admin_resolve_session_flag(flag_id):
+    jwt_user = g.user
+    if jwt_user['status'] not in ['admin']:
+        return render_template('404glen.html')
+
+    note = (request.form.get('resolution_note') or '').strip()[:255]
+
+    cur = mysql.connection.cursor()
+    cur.execute("""
+        UPDATE session_flags
+        SET status='RESOLVED',
+            resolved_by=%s,
+            resolved_at=UTC_TIMESTAMP(),
+            resolution_note=%s
+        WHERE id=%s AND status='OPEN'
+    """, (jwt_user['user_id'], note, flag_id))
+    mysql.connection.commit()
+    changed = cur.rowcount
+    cur.close()
+
+    if changed:
+        # Fetch flag + user info so we can prefill the email modal
+        cur2 = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur2.execute("""
+            SELECT sf.id, sf.details, sf.reason, sf.created_at,
+                   a.first_name, a.last_name, a.email
+            FROM session_flags sf
+            JOIN accounts a ON a.id = sf.user_id
+            WHERE sf.id=%s
+        """, (flag_id,))
+        info = cur2.fetchone()
+        cur2.close()
+
+        if info:
+            session['flag_email_prompt'] = {
+                'flag_id': flag_id,
+                'status': 'RESOLVED',
+                'user_email': info['email'],
+                'user_name': f"{info['first_name']} {info['last_name']}",
+                'details': info['details'],
+                'reason': info.get('reason') or '',
+                'flagged_at': str(info['created_at'])
+            }
+
+        flash("Flag resolved.", "success")
+        try:
+            log_user_action(jwt_user['user_id'], jwt_user.get('session_id'), f"Resolved session flag id={flag_id}")
+        except Exception:
+            pass
+    else:
+        flash("Flag not updated (already closed or not found).", "warning")
+
+    return redirect(url_for('view_session_flags'))
+
+
+# ACTION: Dismiss (sets DISMISSED, who/when, optional note)
+@app.route('/admin/session_flags/<int:flag_id>/dismiss', methods=['POST'])
+@jwt_required
+def admin_dismiss_session_flag(flag_id):
+    jwt_user = g.user
+    if jwt_user['status'] not in ['admin']:
+        return render_template('404glen.html')
+
+    note = (request.form.get('resolution_note') or '').strip()[:255]
+
+    cur = mysql.connection.cursor()
+    cur.execute("""
+        UPDATE session_flags
+        SET status='DISMISSED',
+            resolved_by=%s,
+            resolved_at=UTC_TIMESTAMP(),
+            resolution_note=%s
+        WHERE id=%s AND status='OPEN'
+    """, (jwt_user['user_id'], note, flag_id))
+    mysql.connection.commit()
+    changed = cur.rowcount
+    cur.close()
+
+    if changed:
+        cur2 = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur2.execute("""
+            SELECT sf.id, sf.details, sf.reason, sf.created_at,
+                   a.first_name, a.last_name, a.email
+            FROM session_flags sf
+            JOIN accounts a ON a.id = sf.user_id
+            WHERE sf.id=%s
+        """, (flag_id,))
+        info = cur2.fetchone()
+        cur2.close()
+
+        if info:
+            session['flag_email_prompt'] = {
+                'flag_id': flag_id,
+                'status': 'DISMISSED',
+                'user_email': info['email'],
+                'user_name': f"{info['first_name']} {info['last_name']}",
+                'details': info['details'],
+                'reason': info.get('reason') or '',
+                'flagged_at': str(info['created_at'])
+            }
+
+        flash("Flag dismissed.", "info")
+        try:
+            log_user_action(jwt_user['user_id'], jwt_user.get('session_id'), f"Dismissed session flag id={flag_id}")
+        except Exception:
+            pass
+    else:
+        flash("Flag not updated (already closed or not found).", "warning")
+
+    return redirect(url_for('view_session_flags'))
+
+
+SMART_MAP = str.maketrans({
+    "\u2019": "'",   # ’
+    "\u2018": "'",   # ‘
+    "\u201c": '"',   # “
+    "\u201d": '"',   # ”
+    "\u2014": "-",   # —
+    "\u2013": "-",   # –
+})
+
+def ascii_clean(s: str) -> str:
+    if not s:
+        return ""
+    s = s.translate(SMART_MAP)
+    # fall back to ASCII; drop anything still non-ASCII
+    return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
+
+@app.route('/admin/session_flags/<int:flag_id>/notify', methods=['POST'])
+@jwt_required
+def admin_notify_flagger(flag_id):
+    jwt_user = g.user
+    if jwt_user['status'] not in ['admin']:
+        return render_template('404glen.html')
+
+    subject = (request.form.get('subject') or '').strip()[:120]
+    message = (request.form.get('message') or '').strip()
+
+    subject = ascii_clean(subject)
+    message = ascii_clean(message)
+
+    # Fetch the correct recipient for this flag
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cur.execute("""
+        SELECT a.email, a.first_name, a.last_name
+        FROM session_flags sf
+        JOIN accounts a ON a.id = sf.user_id
+        WHERE sf.id = %s
+    """, (flag_id,))
+    rec = cur.fetchone()
+    cur.close()
+
+    if not rec or not rec['email']:
+        flash("Could not determine the recipient for this flag.", "danger")
+        return redirect(url_for('view_session_flags'))
+
+    # Send email using your existing helper (unchanged)
+    try:
+        send_email(rec['email'], subject, message)
+        flash(f"Email sent to {rec['first_name']} {rec['last_name']} ({rec['email']}).", "success")
+    except Exception as e:
+        # Your helper prints errors; still show UI feedback
+        flash("Failed to send email. Please try again.", "danger")
+
+    return redirect(url_for('view_session_flags'))
+
+
+
 
 @app.route('/verify-otp/<int:id>', methods=['GET', 'POST'])
 def verify_otp(id):
@@ -3181,6 +3556,11 @@ def verify_otp(id):
             if not user:
                 flash("User not found. Please login again.", "error")
                 return redirect(url_for('login'))
+
+            # Success: clear 2FA session markers
+            otp_store.pop(id, None)
+            session.pop('pending_2fa_user_id', None)
+            session.pop('pending_2fa_started_at', None)
 
             session_id = log_session_activity(user['id'], user['status'], 'login')
 
@@ -3595,7 +3975,7 @@ def create_update():
             pending[pending_id] = {
                 'user_id': user_id,
                 'session_id': session_id,
-                'email': user_email,  # ✅ ensure this is stored
+                'email': user_email,  # ensure this is stored
                 'update_data': update_data
             }
             db['pending_updates'] = pending
