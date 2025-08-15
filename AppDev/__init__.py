@@ -55,6 +55,9 @@ from transformers import pipeline
 from twilio.rest import Client
 from werkzeug.utils import secure_filename
 import google.generativeai as genai
+import folium
+from folium.plugins import HeatMap
+import ipaddress
 
 from FeaturedArticles import get_featured_articles
 from Filter import main_blueprint
@@ -251,6 +254,178 @@ def jwt_required(f):
         return f(*args, **kwargs)
 
     return decorated_function
+
+def is_valid_date(s):
+    try:
+        datetime.strptime(s, "%Y-%m-%d")
+        return True
+    except (ValueError, TypeError):
+        return False
+
+def is_routable_ip(ip: str) -> bool:
+    try:
+        ip_obj = ipaddress.ip_address(ip)
+        return not (ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local)
+    except ValueError:
+        return False
+
+def geo_lookup_ip(mysql, ip: str):
+    """
+    Return (lat, lon, country_code, city) or None if unknown.
+    Caches results in ip_geo_cache to avoid repeated external calls.
+    """
+    if not is_routable_ip(ip):
+        return None
+
+    # 1) try cache
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cur.execute("SELECT lat, lon, country_code, city FROM ip_geo_cache WHERE ip=%s", (ip,))
+    row = cur.fetchone()
+    if row and row["lat"] and row["lon"]:
+        cur.close()
+        return (row["lat"], row["lon"], row["country_code"], row["city"])
+
+    # 2) call ipwho.is
+    try:
+        r = requests.get(f"https://ipwho.is/{ip}", timeout=5)
+        j = r.json()
+        if j.get("success") and j.get("latitude") and j.get("longitude"):
+            lat = float(j["latitude"])
+            lon = float(j["longitude"])
+            cc = j.get("country_code", "UNK")
+            city = j.get("city", "")
+            # upsert cache
+            cur.execute("""
+                INSERT INTO ip_geo_cache (ip, country_code, city, lat, lon)
+                VALUES (%s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE country_code=VALUES(country_code),
+                                        city=VALUES(city),
+                                        lat=VALUES(lat),
+                                        lon=VALUES(lon)
+            """, (ip, cc, city, lat, lon))
+            mysql.connection.commit()
+            cur.close()
+            return (lat, lon, cc, city)
+    except Exception as e:
+        print("[geo_lookup_ip] error:", e)
+
+    cur.close()
+    return None
+
+
+def get_ip_geo_points(mysql, start_date=None, end_date=None, days=10):
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    if is_valid_date(start_date) and is_valid_date(end_date):
+        cur.execute("""
+            SELECT ip_address, COUNT(*) AS cnt
+            FROM logs
+            WHERE DATE(date) BETWEEN %s AND %s
+              AND ip_address IS NOT NULL AND ip_address <> ''
+            GROUP BY ip_address
+        """, (start_date, end_date))
+    else:
+        cur.execute("""
+            SELECT ip_address, COUNT(*) AS cnt
+            FROM logs
+            WHERE DATE(date) >= CURDATE() - INTERVAL %s DAY
+              AND ip_address IS NOT NULL AND ip_address <> ''
+            GROUP BY ip_address
+        """, (days - 1,))
+    rows = cur.fetchall()
+    cur.close()
+
+    points = []
+    for r in rows:
+        ip = (r["ip_address"] or "").strip()
+        if not ip:
+            continue
+        loc = geo_lookup_ip(mysql, ip)  # your existing helper
+        if not loc:
+            continue
+        lat, lon, cc, city = loc
+        points.append({
+            "ip": ip,
+            "lat": lat,
+            "lon": lon,
+            "count": int(r["cnt"]),
+            "country": cc,
+            "city": city or ""
+        })
+    return points
+
+@app.route("/ip_heatmap")
+@jwt_required
+def ip_heatmap():
+    if g.user['status'] != 'admin':
+        return render_template('404.html')
+
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+    days = request.args.get("days", type=int, default=10)
+
+    pts = get_ip_geo_points(mysql, start_date, end_date, days)
+
+    # center map
+    center_lat, center_lon = (1.3521, 103.8198)
+    if pts:
+        center_lat = sum(p['lat'] for p in pts) / len(pts)
+        center_lon = sum(p['lon'] for p in pts) / len(pts)
+
+    m = folium.Map(location=[center_lat, center_lon], zoom_start=2, control_scale=True, tiles="OpenStreetMap")
+
+    heat_data = [[p["lat"], p["lon"], p["count"]] for p in pts]
+    if heat_data:
+        HeatMap(heat_data, radius=14, blur=20, max_zoom=6).add_to(m)
+
+    for p in pts:
+        popup_html = f"""
+        <div style='font-size:13px'>
+          <b>IP:</b> {p['ip']}<br/>
+          <b>City:</b> {p['city']}<br/>
+          <b>Country:</b> {p['country']}<br/>
+          <b>Events:</b> {p['count']}<br/>
+          <form method="POST" action="/block_ip" style="margin-top:6px">
+            <input type="hidden" name="ip" value="{p['ip']}"/>
+            <input class="btn btn-sm btn-danger" type="submit" value="Block IP"/>
+          </form>
+        </div>
+        """
+        folium.Marker([p["lat"], p["lon"]], tooltip=p["ip"], popup=folium.Popup(popup_html, max_width=250)).add_to(m)
+
+    return m._repr_html_()
+
+
+
+
+@app.route("/block_ip", methods=["POST"])
+@jwt_required
+def block_ip():
+    if g.user["status"] != "admin":
+        flash("Only admins can block IPs.", "danger")
+        return redirect(url_for("logging_analytics"))
+
+    ip = (request.form.get("ip") or "").strip()
+    reason = "Manually blocked from heatmap"
+    if not ip:
+        flash("No IP provided.", "warning")
+        return redirect(url_for("logging_analytics"))
+
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute("""INSERT INTO ip_blocklist (ip, reason, created_by)
+                       VALUES (%s, %s, %s)
+                       ON DUPLICATE KEY UPDATE reason=VALUES(reason)""",
+                    (ip, reason, g.user["user_id"]))
+        mysql.connection.commit()
+        flash(f"Blocked IP: {ip}", "success")
+    except Exception as e:
+        mysql.connection.rollback()
+        flash(f"Failed to block IP ({ip}): {e}", "danger")
+    finally:
+        cur.close()
+
+    return redirect(url_for("logging_analytics"))
 
 
 # SUMMARIZER
@@ -4048,8 +4223,17 @@ def reset_password(token):
 
 @app.after_request
 def set_clickjacking_protection(response):
-    response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['Content-Security-Policy'] = "frame-ancestors 'none';"
+    # Endpoints allowed to be embedded inside iframes from same-origin
+    allowed_iframe_endpoints = {'ip_heatmap'}
+
+    if request.endpoint in allowed_iframe_endpoints:
+        # allow only same-origin dashboard to embed the heatmap
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        response.headers['Content-Security-Policy'] = "frame-ancestors 'self';"
+    else:
+        # keep strict defaults everywhere else
+        response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['Content-Security-Policy'] = "frame-ancestors 'none';"
     return response
 
 
