@@ -4,90 +4,137 @@
 {% block content %}
 {% from "includes/_formHelper.html" import render_field %}
 
-<div class="container mt-4" style="max-width: 820px;">
-  <h1 class="display-5 text-center">Update Product</h1>
+<style>
+  /* Match the app’s light-green form theme */
+  .cz-form-card{ background:#eaf6ef; }
+  .cz-form-card .form-control:focus,
+  .cz-form-card .form-select:focus{
+    border-color:#198754;
+    box-shadow:0 0 0 .25rem rgba(25,135,84,.15);
+  }
+  .cz-form-card .btn-success{ background:#198754; border-color:#198754; }
 
-  <div class="card shadow p-4 mt-3">
-    <form id="updateProductForm" method="POST" action="" enctype="multipart/form-data" novalidate>
-      {{ form.hidden_tag() }}
+  /* Drop area for replacing image */
+  .cz-drop{
+    border:2px dashed rgba(25,135,84,.35);
+    background:#f7fbf8;
+    border-radius:1rem;
+    padding:1rem;
+    text-align:center;
+    transition:.2s ease-in-out;
+    cursor:pointer;
+  }
+  .cz-drop.dragover{ background:#eef7f1; border-color:#198754; }
+  .cz-file-hint{ font-size:.9rem; color:#6c757d; }
+  .cz-thumb { width:100%; max-height:240px; object-fit:contain; }
+</style>
 
-      <!-- Current image -->
-      <div class="mb-3 text-center">
-        <label class="form-label mb-2">Current Product Image</label><br>
-        <img
-          src="{{ url_for('static', filename='uploads/' + (product.image_filename or 'default.jpg')) }}"
-          alt="Product Image" width="150" class="rounded border">
+<section class="py-4 py-lg-5">
+  <div class="container" style="max-width: 980px;">
+    <h1 class="text-center fw-bold mb-3">Update Product</h1>
+
+    <div class="card shadow border-0 rounded-4 cz-form-card">
+      <div class="card-body p-4 p-lg-5">
+        <form id="updateProductForm" method="POST" action="" enctype="multipart/form-data" novalidate>
+          {{ form.hidden_tag() }}
+
+          <div class="row g-4">
+            <!-- Left: current + new image -->
+            <div class="col-lg-5">
+              <!-- Current image -->
+              <label class="form-label fw-semibold mb-2">Current Product Image</label>
+              <div class="text-center mb-3">
+                <img
+                  src="{{ url_for('static', filename='uploads/' + (product.image_filename or 'default.jpg')) }}"
+                  alt="Product Image"
+                  class="img-fluid rounded-3 border"
+                  style="max-height:240px; object-fit:contain;">
+              </div>
+
+              <!-- Replace image -->
+              <label for="product_image" class="form-label fw-semibold">Replace Image (optional)</label>
+
+              <div id="dropArea" class="cz-drop mb-2">
+                <img id="newImagePreview" class="cz-thumb d-none" alt="Preview">
+                <div id="dropText" class="cz-file-hint">
+                  Drag &amp; drop a PNG/JPG here, or click to browse (max 2&nbsp;MB).
+                </div>
+              </div>
+
+              {{ render_field(form.product_image, class="form-control", id="product_image", accept="image/*") }}
+              <div class="invalid-feedback">Only JPG/PNG up to 2&nbsp;MB.</div>
+            </div>
+
+            <!-- Right: fields -->
+            <div class="col-lg-7">
+              <!-- Product name -->
+              <div class="mb-3">
+                <label for="product_name" class="form-label">Product Name</label>
+                {{ render_field(
+                    form.product_name,
+                    class="form-control",
+                    id="product_name",
+                    minlength="1",
+                    maxlength="150",
+                    pattern="^[A-Za-z0-9][A-Za-z0-9 \-_'’(),.&/]{0,149}$",
+                    placeholder="e.g. Organic Wheat Seeds",
+                    required=True
+                ) }}
+                <div class="invalid-feedback">
+                  1–150 chars. Letters/numbers/spaces and - _ ’ ( ) , . &amp; / allowed.
+                </div>
+              </div>
+
+              <!-- Quantity & Category -->
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label for="quantity" class="form-label">Quantity</label>
+                  {{ render_field(form.quantity, class="form-control", id="quantity", type="number", min="0", step="1", required=True) }}
+                  <div class="invalid-feedback">Quantity must be 0 or more.</div>
+                </div>
+
+                <div class="col-md-6">
+                  <label for="category" class="form-label">Category</label>
+                  {{ render_field(form.category, class="form-select", id="category", required=True) }}
+                  <div class="invalid-feedback">Please select a category.</div>
+                </div>
+              </div>
+
+              <!-- Price & CO2 -->
+              <div class="row g-3 mt-1">
+                <div class="col-md-6">
+                  <label for="price" class="form-label">Price ($)</label>
+                  {{ render_field(form.price, class="form-control", id="price", type="number", min="0", step="0.01", inputmode="decimal", placeholder="e.g. 10.00", required=True) }}
+                  <div class="invalid-feedback">Enter a non-negative amount with ≤ 2 decimal places.</div>
+                </div>
+
+                <div class="col-md-6">
+                  <label for="co2" class="form-label">CO₂ Emissions (kg)</label>
+                  {{ render_field(form.co2, class="form-control", id="co2", type="number", min="0", step="0.01", inputmode="decimal", placeholder="e.g. 2.5") }}
+                  <div class="invalid-feedback">Must be 0 or more (≤ 2 decimal places).</div>
+                </div>
+              </div>
+
+              <!-- Description -->
+              <div class="mt-3">
+                <label for="product_description" class="form-label">Product Description</label>
+                {{ render_field(form.product_description, class="form-control", id="product_description", rows="4", maxlength="1000", placeholder="Provide details about the product") }}
+                <div class="form-text"><span id="descCount">0</span>/1000</div>
+              </div>
+
+              <!-- Submit -->
+              <button type="submit" class="btn btn-success w-100 mt-3">Update Product</button>
+
+              <div class="text-center mt-3">
+                <a href="{{ url_for('manageProduct') }}" class="btn btn-outline-secondary">Back to Inventory</a>
+              </div>
+            </div>
+          </div>
+        </form>
       </div>
-
-      <!-- New image -->
-      <div class="mb-3">
-        <label for="product_image" class="form-label">Replace Image (optional)</label>
-        {{ render_field(form.product_image, class="form-control", id="product_image", accept="image/*") }}
-        <div class="invalid-feedback">Only JPG/PNG up to 2 MB.</div>
-        <img id="newImagePreview" class="img-thumbnail mt-2 d-none" alt="Preview" width="150">
-      </div>
-
-      <!-- Product name -->
-      <div class="mb-3">
-        <label for="product_name" class="form-label">Product Name</label>
-        {{ render_field(
-            form.product_name,
-            class="form-control",
-            id="product_name",
-            minlength="1",
-            maxlength="150",
-            pattern="^[A-Za-z0-9][A-Za-z0-9 \\-_'’(),.&/]{0,149}$",
-            placeholder="e.g. Organic Wheat Seeds",
-            required=True
-        ) }}
-        <div class="invalid-feedback">
-          1–150 chars. Letters/numbers/spaces and - _ ’ ( ) , . & / allowed.
-        </div>
-      </div>
-
-      <!-- Quantity -->
-      <div class="mb-3">
-        <label for="quantity" class="form-label">Quantity</label>
-        {{ render_field(form.quantity, class="form-control", id="quantity", type="number", min="0", step="1", required=True) }}
-        <div class="invalid-feedback">Quantity must be 0 or more.</div>
-      </div>
-
-      <!-- Category -->
-      <div class="mb-3">
-        <label for="category" class="form-label">Category</label>
-        {{ render_field(form.category, class="form-select", id="category", required=True) }}
-        <div class="invalid-feedback">Please select a category.</div>
-      </div>
-
-      <!-- Price -->
-      <div class="mb-3">
-        <label for="price" class="form-label">Price ($)</label>
-        {{ render_field(form.price, class="form-control", id="price", type="number", min="0", step="0.01", inputmode="decimal", placeholder="e.g. 10.00", required=True) }}
-        <div class="invalid-feedback">Enter a non-negative amount with ≤ 2 decimal places.</div>
-      </div>
-
-      <!-- CO₂ -->
-      <div class="mb-3">
-        <label for="co2" class="form-label">CO₂ Emissions (kg)</label>
-        {{ render_field(form.co2, class="form-control", id="co2", type="number", min="0", step="0.01", inputmode="decimal", placeholder="e.g. 2.5") }}
-        <div class="invalid-feedback">Must be 0 or more (≤ 2 decimal places).</div>
-      </div>
-
-      <!-- Description -->
-      <div class="mb-3">
-        <label for="product_description" class="form-label">Product Description</label>
-        {{ render_field(form.product_description, class="form-control", id="product_description", rows="3", maxlength="1000", placeholder="Provide details about the product") }}
-        <div class="form-text"><span id="descCount">0</span>/1000</div>
-      </div>
-
-      <button type="submit" class="btn btn-success w-100">Update Product</button>
-    </form>
-
-    <div class="text-center mt-3">
-      <a href="{{ url_for('manageProduct') }}" class="btn btn-outline-secondary">Back to Inventory</a>
     </div>
   </div>
-</div>
+</section>
 
 <script>
 (function () {
@@ -96,6 +143,9 @@
   const el = (id) => document.getElementById(id);
   const imgInput = el('product_image');
   const imgPreview = el('newImagePreview');
+  const dropArea  = el('dropArea');
+  const dropText  = el('dropText');
+
   const nameInput = el('product_name');
   const qtyInput  = el('quantity');
   const catInput  = el('category');
@@ -130,27 +180,47 @@
     }
   }
 
-  // ---- image validate + preview ----
-  if (imgInput) {
-    imgInput.addEventListener('change', function () {
-      const file = this.files && this.files[0];
-      let ok = true;
-      if (file) {
-        const typeOk = /image\/(jpeg|jpg|png)/i.test(file.type);
-        const sizeOk = file.size <= 2 * 1024 * 1024; // 2MB
-        ok = typeOk && sizeOk;
+  // ---- image validate + preview (plus drag & drop) ----
+  function applyImgValidity(ok){
+    toggleState(imgInput, ok);
+    if (!ok) {
+      imgPreview.classList.add('d-none');
+      dropText.style.display = '';
+    }
+  }
 
-        if (ok) {
-          const url = URL.createObjectURL(file);
-          imgPreview.src = url;
-          imgPreview.classList.remove('d-none');
-        } else {
-          imgPreview.classList.add('d-none');
-        }
-      } else {
-        imgPreview.classList.add('d-none');
+  function handleFiles(file){
+    if (!file){ applyImgValidity(true); return; }
+    const okType = /image\/(jpeg|jpg|png)/i.test(file.type);
+    const okSize = file.size <= 2 * 1024 * 1024; // 2MB
+    const ok = okType && okSize;
+    applyImgValidity(ok);
+    if (ok){
+      const url = URL.createObjectURL(file);
+      imgPreview.src = url;
+      imgPreview.classList.remove('d-none');
+      dropText.style.display = 'none';
+    }
+  }
+
+  if (imgInput) {
+    imgInput.addEventListener('change', () => handleFiles(imgInput.files && imgInput.files[0]));
+  }
+
+  if (dropArea){
+    dropArea.addEventListener('click', () => imgInput && imgInput.click());
+    ['dragenter','dragover'].forEach(ev => dropArea.addEventListener(ev, e=>{
+      e.preventDefault(); e.stopPropagation(); dropArea.classList.add('dragover');
+    }));
+    ['dragleave','drop'].forEach(ev => dropArea.addEventListener(ev, e=>{
+      e.preventDefault(); e.stopPropagation(); dropArea.classList.remove('dragover');
+    }));
+    dropArea.addEventListener('drop', e=>{
+      const file = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (imgInput && file){
+        imgInput.files = e.dataTransfer.files;  // reflect to input for submit
+        handleFiles(file);
       }
-      toggleState(this, ok);
     });
   }
 
@@ -206,7 +276,6 @@
 
   // ---- submit guard ----
   form.addEventListener('submit', function (e) {
-    // Trigger checks
     [nameInput, qtyInput, catInput, priceInput, co2Input, descInput, imgInput].forEach((el) => {
       if (el) toggleState(el);
     });

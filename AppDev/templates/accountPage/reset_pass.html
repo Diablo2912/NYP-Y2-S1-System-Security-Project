@@ -3,9 +3,10 @@
 {% block content %}
 {% from "includes/_formHelper.html" import render_field %}
 
+{# Flash messages #}
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
-    <div class="container">
+    <div class="container mt-3">
       {% for category, message in messages %}
         <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
           {{ message }}
@@ -16,56 +17,114 @@
   {% endif %}
 {% endwith %}
 
-<!-- Center the form -->
-<div class="d-flex justify-content-center align-items-center mt-3 p-3">
-  <div class="card bg-success-subtle w-100" style="max-width: 500px;">
-    <div class="card-body">
-      <h1 class="text-center mb-4">Reset Password</h1>
+<section class="py-4 py-lg-5">
+  <div class="container">
+    <div class="row justify-content-center">
+      <!-- wide footprint -->
+      <div class="col-12 col-xl-11">
+        <div class="card border-0 shadow rounded-4 overflow-hidden">
+          <div class="row g-0 align-items-stretch" style="min-height: 420px;">
 
-      <form method="POST" action="" class="row g-3">
-        <!-- New Password Field -->
-        <div class="form-group col-md-12">
-          <div class="input-group">
-            {{ render_field(form.new_pswd, class="form-control ms-1", id="newPasswordField", type="password") }}
-            <button type="button" class="btn btn-outline-success btn-sm" onclick="togglePassword('newPasswordField', 'newEyeIcon')">
-              <i id="newEyeIcon" class="fa fa-eye"></i>
-            </button>
-          </div>
-        </div>
+            <!-- LEFT: image panel (rectangle look) -->
+            <div class="col-lg-7 d-none d-md-block position-relative"
+                 style="background:
+                        linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.45)),
+                        url('{{ url_for('static', filename='assets/crops-growing-in-thailand.jpg') }}') center/cover no-repeat;">
+              <div class="position-absolute bottom-0 start-0 end-0 p-4 text-white">
+                <span class="badge bg-success rounded-pill mb-2">Cropzy</span>
+                <h2 class="h5 fw-semibold mb-1">Reset your password</h2>
+                <p class="small text-white-50 mb-0">Create a new password to secure your account.</p>
+              </div>
+            </div>
 
-        <!-- Confirm Password Field -->
-        <div class="form-group col-md-12">
-          <div class="input-group">
-            {{ render_field(form.confirm_pswd, class="form-control ms-1", id="confirmPasswordField", type="password") }}
-            <button type="button" class="btn btn-outline-success btn-sm" onclick="togglePassword('confirmPasswordField', 'confirmEyeIcon')">
-              <i id="confirmEyeIcon" class="fa fa-eye"></i>
-            </button>
-          </div>
-        </div>
+            <!-- RIGHT: form on soft canvas -->
+            <div class="col-lg-5 bg-body-tertiary d-flex">
+              <div class="p-4 p-lg-5 w-100">
+                <h1 class="h4 fw-bold text-center mb-3">Reset Password</h1>
 
-        <!-- Submit Button -->
-        <input type="submit" value="Submit" class="btn btn-success mt-4"/>
-      </form>
+                <form method="POST" action="" class="needs-validation" novalidate>
+                  <!-- New Password -->
+                  <div class="mb-3">
+                    {{ form.new_pswd.label(class="form-label") }}
+                    <div class="input-group">
+                      {{ form.new_pswd(class="form-control", id="newPassword", type="password", autocomplete="new-password") }}
+                      <button type="button" class="btn btn-outline-secondary" id="toggleNew" aria-label="Show password">
+                        <i id="iconNew" class="fa fa-eye"></i>
+                      </button>
+                    </div>
+                    {% if form.new_pswd.errors %}
+                      <div class="invalid-feedback d-block">{{ form.new_pswd.errors[0] }}</div>
+                    {% else %}
+                      <div class="form-text">Use at least 8 characters, including a number or symbol.</div>
+                    {% endif %}
+                  </div>
 
+                  <!-- Confirm Password -->
+                  <div class="mb-3">
+                    {{ form.confirm_pswd.label(class="form-label") }}
+                    <div class="input-group">
+                      {{ form.confirm_pswd(class="form-control", id="confirmPassword", type="password", autocomplete="new-password") }}
+                      <button type="button" class="btn btn-outline-secondary" id="toggleConfirm" aria-label="Show password">
+                        <i id="iconConfirm" class="fa fa-eye"></i>
+                      </button>
+                    </div>
+                    {% if form.confirm_pswd.errors %}
+                      <div class="invalid-feedback d-block">{{ form.confirm_pswd.errors[0] }}</div>
+                    {% else %}
+                      <div id="matchHelp" class="form-text"></div>
+                    {% endif %}
+                  </div>
+
+                  <!-- Submit -->
+                  <button type="submit" class="btn btn-success w-100">Submit</button>
+                </form>
+              </div>
+            </div>
+
+          </div> <!-- /row -->
+        </div>   <!-- /card -->
+      </div>
     </div>
   </div>
-</div>
+</section>
 
+<!-- Page scripts -->
 <script>
-  function togglePassword(passwordFieldId, eyeIconId) {
-    var passwordField = document.getElementById(passwordFieldId);
-    var eyeIcon = document.getElementById(eyeIconId);
-
-    if (passwordField.type === "password") {
-      passwordField.type = "text";
-      eyeIcon.classList.remove("fa-eye");
-      eyeIcon.classList.add("fa-eye-slash");
-    } else {
-      passwordField.type = "password";
-      eyeIcon.classList.remove("fa-eye-slash");
-      eyeIcon.classList.add("fa-eye");
-    }
+  // toggles
+  function bindToggle(btnId, inputId, iconId) {
+    const btn = document.getElementById(btnId);
+    const input = document.getElementById(inputId);
+    const icon = document.getElementById(iconId);
+    if (!btn || !input || !icon) return;
+    btn.addEventListener('click', () => {
+      const isPwd = input.type === 'password';
+      input.type = isPwd ? 'text' : 'password';
+      icon.classList.toggle('fa-eye', !isPwd);
+      icon.classList.toggle('fa-eye-slash', isPwd);
+    });
   }
+  bindToggle('toggleNew', 'newPassword', 'iconNew');
+  bindToggle('toggleConfirm', 'confirmPassword', 'iconConfirm');
+
+  // live "passwords match" hint (non-blocking)
+  (function () {
+    const a = document.getElementById('newPassword');
+    const b = document.getElementById('confirmPassword');
+    const help = document.getElementById('matchHelp');
+    if (!a || !b || !help) return;
+
+    function check() {
+      if (!b.value) { help.textContent = ''; b.classList.remove('is-valid','is-invalid'); return; }
+      const same = a.value === b.value;
+      help.textContent = same ? 'Passwords match.' : 'Passwords do not match.';
+      help.classList.toggle('text-success', same);
+      help.classList.toggle('text-danger', !same);
+      b.classList.toggle('is-valid', same);
+      b.classList.toggle('is-invalid', !same);
+    }
+    a.addEventListener('input', check);
+    b.addEventListener('input', check);
+  })();
 </script>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">

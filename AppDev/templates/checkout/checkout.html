@@ -1,128 +1,167 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2 class="text-center text-success">Checkout</h2>
+<style>
+  /* Light Cropzy theme */
+  .cz-card{background:#eaf6ef;border:0;border-radius:1rem;}
+  .cz-card .form-control:focus{border-color:#198754;box-shadow:0 0 0 .25rem rgba(25,135,84,.15);}
+  .cz-thumb{width:72px;height:72px;object-fit:cover;border-radius:.75rem;border:1px solid #e5e5e5;}
+  .cz-divider{border-top:1px dashed rgba(25,135,84,.25);}
+  .cz-sticky{position:sticky;top:1rem;}
+</style>
+
+<section class="py-4 py-lg-5">
+  <div class="container">
+    <h2 class="text-center text-success fw-bold mb-4">Checkout</h2>
 
     {% if cart %}
-    <div class="list-group">
-        {% for product in cart.values() %}
-        <div class="list-group-item d-flex justify-content-between align-items-center">
-            <!-- Product Image -->
-            <img src="{{ product['image'] }}" width="70" class="rounded border" alt="{{ product['name'] }}">
-            <div class="ms-2">
-                <h5 class="text-success mb-1">{{ product['name'] }}</h5>
-                <p class="mb-0">${{ "%.2f"|format(product['price']) }} x {{ product['quantity'] }} = ${{ "%.2f"|format(product['price'] * product['quantity']) }}</p>
+    <div class="row g-4">
+      <!-- Order summary (right on desktop, sticky) -->
+      <div class="col-lg-5 order-lg-2">
+        <div class="card cz-card shadow-sm cz-sticky">
+          <div class="card-body p-4">
+            <h5 class="fw-semibold mb-3">Order Summary</h5>
+
+            {% for product in cart.values() %}
+            <div class="d-flex justify-content-between align-items-center py-2">
+              <div class="d-flex align-items-center gap-3">
+                <img src="{{ product['image'] }}" alt="{{ product['name'] }}" class="cz-thumb">
+                <div>
+                  <div class="fw-medium">{{ product['name'] }}</div>
+                  <div class="small text-muted">
+                    ${{ "%.2f"|format(product['price']) }} × {{ product['quantity'] }}
+                  </div>
+                </div>
+              </div>
+              <div class="fw-semibold">
+                ${{ "%.2f"|format(product['price'] * product['quantity']) }}
+              </div>
             </div>
+            {% if not loop.last %}<div class="cz-divider my-2"></div>{% endif %}
+            {% endfor %}
+
+            <div class="cz-divider my-3"></div>
+
+            <div class="d-flex justify-content-between mb-1">
+              <span class="text-muted">Shipping</span><span class="fw-medium">Free</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center fs-5">
+              <span class="fw-semibold">Total</span>
+              <span class="fw-bold text-success">${{ "%.2f"|format(total_price) }}</span>
+            </div>
+          </div>
         </div>
-        {% endfor %}
-    </div>
+      </div>
 
-    <div class="text-end mt-4">
-        <h3 class="text-success">Total: ${{ "%.2f"|format(total_price) }}</h3>
-    </div>
+      <!-- Customer information (left on desktop) -->
+      <div class="col-lg-7 order-lg-1">
+        <div class="card cz-card shadow-sm">
+          <div class="card-body p-4">
+            <h5 class="fw-semibold mb-3">Customer Information</h5>
 
-    <!-- Customer Details Form -->
-    <div class="card p-4 mt-4">
-        <h3 class="text-success">Customer Information</h3>
-        <form id="autoDestructForm" class="needs-validation" novalidate method="POST" action="{{ url_for('create_checkout_session') }}">
-            <!-- Full Name -->
-            <div class="mb-3">
+            <form id="autoDestructForm" class="needs-validation" novalidate
+                  method="POST" action="{{ url_for('create_checkout_session') }}">
+              <!-- Full Name -->
+              <div class="mb-3">
                 <label for="name" class="form-label">Full Name</label>
                 <input
-                    type="text"
-                    class="form-control"
-                    id="name"
-                    name="name"
-                    autocomplete="name"
-                    inputmode="text"
-                    maxlength="60"
-                    placeholder="e.g. Glen Loo"
-                    required>
+                  type="text"
+                  class="form-control"
+                  id="name"
+                  name="name"
+                  autocomplete="name"
+                  inputmode="text"
+                  maxlength="60"
+                  placeholder="e.g. Glen Loo"
+                  required>
                 <div class="form-text">Letters, spaces, hyphens and apostrophes only (2–60 chars).</div>
                 <div class="invalid-feedback" id="nameFeedback">Please enter a valid full name.</div>
-            </div>
+              </div>
 
-            <!-- Phone -->
-            <div class="mb-3">
+              <!-- Phone -->
+              <div class="mb-3">
                 <label for="phone" class="form-label">Phone Number</label>
                 <input
-                    type="tel"
-                    class="form-control"
-                    id="phone"
-                    name="phone"
-                    autocomplete="tel"
-                    inputmode="numeric"
-                    pattern="^[689]\d{7}$"
-                    maxlength="8"
-                    placeholder="e.g. 91234567"
-                    required>
+                  type="tel"
+                  class="form-control"
+                  id="phone"
+                  name="phone"
+                  autocomplete="tel"
+                  inputmode="numeric"
+                  pattern="^[689]\d{7}$"
+                  maxlength="8"
+                  placeholder="e.g. 91234567"
+                  required>
                 <div class="form-text">Singapore number, 8 digits, starting with 6/8/9.</div>
                 <div class="invalid-feedback" id="phoneFeedback">Enter an 8-digit SG number starting with 6/8/9.</div>
-            </div>
+              </div>
 
-            <!-- Email -->
-            <div class="mb-3">
+              <!-- Email -->
+              <div class="mb-3">
                 <label for="email" class="form-label">Email Address</label>
                 <input
-                    type="email"
-                    class="form-control"
-                    id="email"
-                    name="email"
-                    autocomplete="email"
-                    maxlength="254"
-                    placeholder="e.g. name@example.com"
-                    required>
+                  type="email"
+                  class="form-control"
+                  id="email"
+                  name="email"
+                  autocomplete="email"
+                  maxlength="254"
+                  placeholder="e.g. name@example.com"
+                  required>
                 <div class="invalid-feedback" id="emailFeedback">Please enter a valid email address.</div>
-            </div>
+              </div>
 
-            <!-- Address -->
-            <div class="mb-3">
+              <!-- Address -->
+              <div class="mb-3">
                 <label for="address_line1" class="form-label">Address</label>
                 <input
-                    type="text"
-                    class="form-control"
-                    id="address_line1"
-                    name="address_line1"
-                    autocomplete="address-line1"
-                    maxlength="120"
-                    placeholder="Block/Street, Unit (optional)"
-                    required>
+                  type="text"
+                  class="form-control"
+                  id="address_line1"
+                  name="address_line1"
+                  autocomplete="address-line1"
+                  maxlength="120"
+                  placeholder="Block/Street, Unit (optional)"
+                  required>
                 <div class="form-text">At least 5 characters; include letters or numbers.</div>
                 <div class="invalid-feedback" id="addressFeedback">Please enter a valid address.</div>
-            </div>
+              </div>
 
-            <!-- Postal Code -->
-            <div class="mb-3">
+              <!-- Postal Code -->
+              <div class="mb-3">
                 <label for="postal_code" class="form-label">Postal Code</label>
                 <input
-                    type="text"
-                    class="form-control"
-                    id="postal_code"
-                    name="postal_code"
-                    autocomplete="postal-code"
-                    inputmode="numeric"
-                    pattern="^\d{6}$"
-                    maxlength="6"
-                    placeholder="e.g. 123456"
-                    required>
+                  type="text"
+                  class="form-control"
+                  id="postal_code"
+                  name="postal_code"
+                  autocomplete="postal-code"
+                  inputmode="numeric"
+                  pattern="^\d{6}$"
+                  maxlength="6"
+                  placeholder="e.g. 123456"
+                  required>
                 <div class="invalid-feedback" id="postalFeedback">Postal Code must be exactly 6 digits.</div>
+              </div>
+
+              <button type="submit" class="btn btn-success w-100 mt-2">Proceed to Payment</button>
+            </form>
+
+            <a href="{{ url_for('buy_product') }}" class="btn btn-outline-success w-100 mt-3">Continue Shopping</a>
+
+            <div id="timer-container" class="mt-3 text-center small">
+              ⏳ This form will auto-destruct in <span id="countdown">60</span> seconds.
             </div>
-
-            <button type="submit" class="btn btn-success w-100 mt-3">Proceed to Payment</button>
-        </form>
-
-        <a href="{{ url_for('buy_product') }}" class="btn btn-outline-success w-100 mt-3">Continue Shopping</a>
-    </div>
-
-    <div id="timer-container" class="mt-2 mb-4 text-center">
-      ⏳ This form will auto-destruct in <span id="countdown">60</span> seconds.
+          </div>
+        </div>
+      </div>
     </div>
 
     {% else %}
-    <p class="text-center text-danger">Your cart is empty!</p>
+      <p class="text-center text-danger">Your cart is empty!</p>
     {% endif %}
-</div>
+  </div>
+</section>
 
 <script>
 // === Utility helpers ===
@@ -133,7 +172,6 @@ function onlyDigits(s) { return (s || "").replace(/\D+/g, ""); }
 const validators = {
   name(value) {
     const v = normalizeText(value);
-    // Allowed: letters, spaces, hyphens, apostrophes. Must contain at least 2 letters.
     if (!v) return { ok:false, msg:"Name is required." };
     if (!/^[A-Za-z' -]+$/.test(v)) return { ok:false, msg:"Use letters, spaces, hyphens or apostrophes only." };
     if ((v.match(/[A-Za-z]/g) || []).length < 2) return { ok:false, msg:"Please include at least two letters." };
@@ -141,22 +179,18 @@ const validators = {
     if (/(.)\1{3,}/.test(v)) return { ok:false, msg:"Name looks repetitive—please check." };
     return { ok:true };
   },
-
   phone(value) {
     const v = onlyDigits(value);
     if (!v) return { ok:false, msg:"Phone is required." };
     if (!/^[689]\d{7}$/.test(v)) return { ok:false, msg:"Enter an 8-digit SG number starting with 6/8/9." };
     return { ok:true, transform:v };
   },
-
   email(value) {
     const v = normalizeText(value);
     if (!v) return { ok:false, msg:"Email is required." };
-    // Let the browser do most checks; add a quick sanity check:
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) return { ok:false, msg:"Enter a valid email address." };
     return { ok:true, transform:v.toLowerCase() };
   },
-
   address_line1(value) {
     const v = normalizeText(value);
     if (!v) return { ok:false, msg:"Address is required." };
@@ -164,7 +198,6 @@ const validators = {
     if (!/[A-Za-z0-9]/.test(v)) return { ok:false, msg:"Address must include letters or numbers." };
     return { ok:true, transform:v };
   },
-
   postal_code(value) {
     const v = onlyDigits(value);
     if (!/^\d{6}$/.test(v)) return { ok:false, msg:"Postal Code must be exactly 6 digits." };
@@ -210,47 +243,37 @@ const validators = {
 
   // Live listeners
   fields.name.addEventListener('input', () => {
-    // Strip disallowed characters live
     fields.name.value = fields.name.value.replace(/[^A-Za-z' -]+/g, '');
     runValidate('name');
   });
-
   fields.phone.addEventListener('input', () => {
     fields.phone.value = onlyDigits(fields.phone.value).slice(0, 8);
     runValidate('phone');
   });
-
   fields.email.addEventListener('input', () => runValidate('email'));
-
   fields.address_line1.addEventListener('input', () => {
-    // Soft-trim multiple spaces
     fields.address_line1.value = fields.address_line1.value.replace(/\s{2,}/g, ' ');
     runValidate('address_line1');
   });
-
   fields.postal_code.addEventListener('input', () => {
     fields.postal_code.value = onlyDigits(fields.postal_code.value).slice(0, 6);
     runValidate('postal_code');
   });
-
-  // Validate on blur too (helps on desktop)
   Object.keys(fields).forEach(k => fields[k].addEventListener('blur', () => runValidate(k)));
 
-  // Final gate on submit
   form.addEventListener('submit', (e) => {
     let allGood = true;
     Object.keys(fields).forEach(k => { if (!runValidate(k)) allGood = false; });
     if (!allGood) {
       e.preventDefault();
       e.stopPropagation();
-      // Focus first invalid
       const firstInvalid = form.querySelector('.is-invalid');
       if (firstInvalid) firstInvalid.focus();
     }
   });
 })();
 
-// === Auto-destruct timer (unchanged, just robust) ===
+// === Auto-destruct timer ===
 (function () {
   let secondsLeft = 60;
   const countdownEl = document.getElementById('countdown');
@@ -260,9 +283,7 @@ const validators = {
     if (countdownEl) countdownEl.textContent = secondsLeft;
     if (secondsLeft <= 0) {
       clearInterval(timer);
-      if (form) {
-        Array.from(form.elements).forEach(input => input.disabled = true);
-      }
+      if (form) Array.from(form.elements).forEach(input => input.disabled = true);
       const tc = document.getElementById('timer-container');
       if (tc) tc.innerHTML = "<strong>⛔ Time's up! Form disabled.</strong>";
     }
