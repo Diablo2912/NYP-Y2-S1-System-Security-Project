@@ -4,7 +4,7 @@
 
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
-    <div class="container">
+    <div class="container mt-3">
       {% for category, message in messages %}
         <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
           {{ message }}
@@ -15,164 +15,183 @@
   {% endif %}
 {% endwith %}
 
-<div class="d-flex justify-content-center align-items-center mt-3 p-3">
-  <div class="card bg-success-subtle w-100" style="max-width: 500px;">
-    <div class="card-body">
-      <h1 class="text-center mb-4">Change Details</h1>
+<section class="py-4 py-lg-5">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-12 col-xl-11">
+        <div class="card border-0 shadow rounded-4 overflow-hidden">
+          <div class="row g-0 align-items-stretch" style="min-height: 420px;">
 
-      <!-- novalidate to avoid native popups; we handle styling via JS -->
-      <form id="changeDetailsForm" method="POST" action="" class="row g-3" novalidate>
-        {{ form.hidden_tag() }}
+            <!-- LEFT: image panel -->
+            <div class="col-lg-7 d-none d-md-block position-relative"
+                 style="background:
+                        linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.45)),
+                        url('{{ url_for('static', filename='assets/crops-growing-in-thailand.jpg') }}') center/cover no-repeat;">
+              <div class="position-absolute bottom-0 start-0 end-0 p-4 text-white">
+                <span class="badge bg-success rounded-pill mb-2">Cropzy</span>
+                <h2 class="h5 fw-semibold mb-1">Update your details</h2>
+                <p class="small text-white-50 mb-0">Make sure everything looks correct before saving.</p>
+              </div>
+            </div>
 
-        <div class="form-group col-md-6">
-          {{ render_field(
-            form.first_name,
-            id="firstName",
-            class="form-control",
-            minlength="2",
-            maxlength="150",
-            pattern="^[A-Za-z][A-Za-z '\-]{1,149}$",
-            placeholder="e.g. Glen",
-            required=True
-          ) }}
-          <div class="invalid-feedback">Only letters, spaces, ’ and - (2–150 chars).</div>
-        </div>
+            <!-- RIGHT: form on soft canvas -->
+            <div class="col-lg-5 bg-body-tertiary d-flex">
+              <div class="p-4 p-lg-5 w-100">
+                <h1 class="h4 fw-bold text-center mb-3">Change Details</h1>
 
-        <div class="form-group col-md-6">
-          {{ render_field(
-            form.last_name,
-            id="lastName",
-            class="form-control",
-            minlength="2",
-            maxlength="150",
-            pattern="^[A-Za-z][A-Za-z '\-]{1,149}$",
-            placeholder="e.g. Loo",
-            required=True
-          ) }}
-          <div class="invalid-feedback">Only letters, spaces, ’ and - (2–150 chars).</div>
-        </div>
+                <!-- novalidate: let JS drive feedback -->
+                <form id="changeDetailsForm" method="POST" action="" class="row g-3 needs-validation" novalidate autocomplete="off">
+                  {{ form.hidden_tag() }}
 
-        <div class="form-group col-md-6">
-          {{ render_field(
-            form.gender,
-            id="gender",
-            class="form-select",
-            required=True
-          ) }}
-          <div class="invalid-feedback">Please select your gender.</div>
-        </div>
+                  <div class="col-md-6">
+                    {{ render_field(form.first_name, id="firstName", class="form-control", minlength="2", maxlength="150", placeholder="e.g. Glen", required=true) }}
+                    <div class="invalid-feedback">Enter at least 2 letters.</div>
+                  </div>
 
-        <div class="form-group col-md-6">
-          {{ render_field(
-            form.number,
-            id="phone",
-            class="form-control",
-            inputmode="tel",
-            maxlength="16",
-            pattern="^(?:\+65\\s*)?(?:[3689]\\d{7})$",
-            placeholder="e.g. +65 98765432",
-            required=True
-          ) }}
-          <div class="invalid-feedback">Valid SG number: 8 digits (start 3/6/8/9), “+65” optional.</div>
-        </div>
+                  <div class="col-md-6">
+                    {{ render_field(form.last_name, id="lastName", class="form-control", minlength="2", maxlength="150", placeholder="e.g. Loo", required=true) }}
+                    <div class="invalid-feedback">Enter at least 2 letters.</div>
+                  </div>
 
-        <div class="form-group col-md-12">
-          {{ render_field(
-            form.email,
-            id="email",
-            class="form-control",
-            maxlength="254",
-            inputmode="email",
-            autocomplete="email",
-            placeholder="e.g. name@example.com",
-            required=True
-          ) }}
-          <div class="invalid-feedback">Please enter a valid email address.</div>
-        </div>
+                  <div class="col-md-6">
+                    {{ render_field(form.gender, id="gender", class="form-select", required=true) }}
+                    <div class="invalid-feedback">Please select your gender.</div>
+                  </div>
 
-        <div class="form-group col-md-12">
-          <div class="input-group">
-            {{ render_field(
-              form.pswd,
-              id="passwordField",
-              class="form-control ms-1",
-              minlength="8",
-              autocomplete="current-password",
-              required=True
-            ) }}
-            <button type="button" class="btn btn-outline-success btn-sm" onclick="togglePassword()">
-              <i id="eye-icon" class="fa fa-eye"></i>
-            </button>
-          </div>
-          <div class="form-text">Enter your current password to confirm these changes.</div>
-          <div class="invalid-feedback d-block" id="passwordFeedback" style="display:none;">Password must be at least 8 characters.</div>
-        </div>
+                  <div class="col-md-6">
+                    {{ render_field(
+                      form.number,
+                      id="phone",
+                      class="form-control",
+                      inputmode="tel",
+                      pattern="^(?:\+65\s*)?(?:[3689]\d{7})$",
+                      placeholder="e.g. +65 98765432",
+                      required=true
+                    ) }}
+                    <div class="invalid-feedback">SG number: 8 digits (start 3/6/8/9), “+65” optional.</div>
+                  </div>
 
-        <input type="submit" value="Submit" class="btn btn-success mt-4"/>
-      </form>
+                  <div class="col-12">
+                    {{ render_field(form.email, id="email", class="form-control", type="email", maxlength="254", inputmode="email", autocomplete="email", placeholder="name@example.com", required=true) }}
+                    <div class="invalid-feedback">Enter a valid email.</div>
+                  </div>
 
+                  <!-- Current password (confirm change) -->
+                  <div class="col-12">
+                    {{ form.pswd.label(class="form-label") }}
+                    <div class="input-group">
+                      {{ form.pswd(class="form-control", id="passwordField", minlength="8", autocomplete="current-password", required=true) }}
+                      <button type="button" class="btn btn-outline-secondary" id="togglePwd" aria-label="Show password">
+                        <i id="eyeIcon" class="fa fa-eye"></i>
+                      </button>
+                      <div class="invalid-feedback">Password must be at least 8 characters.</div>
+                    </div>
+                    <div id="pwdHint" class="form-text"></div>
+                  </div>
+
+                  <div class="col-12">
+                    <button type="submit" class="btn btn-success w-100 mt-2">Submit</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+          </div><!-- /row -->
+        </div><!-- /card -->
+      </div>
     </div>
   </div>
-</div>
+</section>
 
+<!-- Page scripts -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 <script>
-  function togglePassword() {
-    var passwordField = document.getElementById("passwordField");
-    var eyeIcon = document.getElementById("eye-icon");
-    if (passwordField.type === "password") {
-      passwordField.type = "text";
-      eyeIcon.classList.remove("fa-eye");
-      eyeIcon.classList.add("fa-eye-slash");
-    } else {
-      passwordField.type = "password";
-      eyeIcon.classList.remove("fa-eye-slash");
-      eyeIcon.classList.add("fa-eye");
-    }
-  }
+  // Toggle password visibility
+  document.getElementById('togglePwd')?.addEventListener('click', function () {
+    const input = document.getElementById('passwordField');
+    const icon  = document.getElementById('eyeIcon');
+    if (!input || !icon) return;
+    const isPwd = input.type === 'password';
+    input.type = isPwd ? 'text' : 'password';
+    icon.classList.toggle('fa-eye', !isPwd);
+    icon.classList.toggle('fa-eye-slash', isPwd);
+  });
 
-  // Live validation: turns fields red/green as user types/selects
+  // Live validation
   (function () {
-    const form = document.getElementById('changeDetailsForm');
-    const fields = [
-      document.getElementById('firstName'),
-      document.getElementById('lastName'),
-      document.getElementById('gender'),
-      document.getElementById('phone'),
-      document.getElementById('email'),
-      document.getElementById('passwordField'),
-    ];
+    const form  = document.getElementById('changeDetailsForm');
+    const first = document.getElementById('firstName');
+    const last  = document.getElementById('lastName');
+    const gender= document.getElementById('gender');
+    const phone = document.getElementById('phone');
+    const email = document.getElementById('email');
+    const pwd   = document.getElementById('passwordField');
+    const hint  = document.getElementById('pwdHint');
 
-    function applyState(el) {
-      // For select, empty value is invalid when required
-      const valid = el.checkValidity();
-      el.classList.toggle('is-valid', valid && el.value.trim() !== '');
-      el.classList.toggle('is-invalid', !valid && el.value.trim() !== '');
-      // Special hint for password length while typing
-      if (el.id === 'passwordField') {
-        const pf = document.getElementById('passwordFeedback');
-        if (pf) pf.style.display = (el.value.length > 0 && el.value.length < 8) ? 'block' : 'none';
-      }
+    function setState(el, ok) {
+      el.classList.toggle('is-valid', ok && el.value.trim() !== '');
+      el.classList.toggle('is-invalid', !ok && el.value.trim() !== '');
+      return ok;
     }
 
-    fields.forEach(el => {
-      if (!el) return;
-      const evt = (el.tagName === 'SELECT') ? 'change' : 'input';
-      el.addEventListener(evt, () => applyState(el));
-      el.addEventListener('blur', () => applyState(el)); // also on blur
-    });
+    function validateName(el) {
+      const ok = /^[A-Za-z][A-Za-z .'-]{1,}$/.test(el.value.trim());
+      return setState(el, ok);
+    }
 
-    // On submit, show Bootstrap validation styling
-    form.addEventListener('submit', function (e) {
-      // Trigger validation on all fields
-      fields.forEach(el => el && applyState(el));
-      if (!form.checkValidity()) {
+    function validatePhone() {
+      // Accepts: optional +65, optional space, then 8 digits starting 3/6/8/9
+      const ok = /^(?:\+65\s*)?(?:[3689]\d{7})$/.test(phone.value.trim());
+      return setState(phone, ok);
+    }
+
+    function validateEmail() {
+      const ok = email.checkValidity();
+      return setState(email, ok);
+    }
+
+    function validateGender() {
+      const ok = !!gender.value;
+      return setState(gender, ok);
+    }
+
+    function validatePassword() {
+      const v = pwd.value;
+      const ok = v.length >= 8;
+      setState(pwd, ok);
+      if (hint) {
+        hint.textContent = v.length ? (ok ? 'Looks good.' : 'At least 8 characters.') : '';
+        hint.classList.toggle('text-success', ok && v.length);
+        hint.classList.toggle('text-danger', !ok && v.length);
+      }
+      return ok;
+    }
+
+    first?.addEventListener('input', () => validateName(first));
+    last ?.addEventListener('input', () => validateName(last));
+    gender?.addEventListener('change', validateGender);
+    phone ?.addEventListener('input', validatePhone);
+    email ?.addEventListener('input', validateEmail);
+    pwd   ?.addEventListener('input',  validatePassword);
+
+    form?.addEventListener('submit', function (e) {
+      const allOk = [
+        validateName(first),
+        validateName(last),
+        validateGender(),
+        validatePhone(),
+        validateEmail(),
+        validatePassword()
+      ].every(Boolean);
+
+      if (!allOk) {
         e.preventDefault();
         e.stopPropagation();
+        this.classList.add('was-validated');
+        const firstInvalid = this.querySelector('.is-invalid');
+        if (firstInvalid) firstInvalid.focus();
       }
-      form.classList.add('was-validated');
     });
   })();
 </script>
-
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 {% endblock %}

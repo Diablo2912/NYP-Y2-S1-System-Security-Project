@@ -2,10 +2,28 @@
 
 {% block content %}
 
+{# Keep the very light green tone for the form #}
+<style>
+  .cz-form-card {
+    background-color: #eaf6ef; /* very light green */
+  }
+  .cz-form-card .form-control:focus,
+  .cz-form-card .form-select:focus,
+  .cz-form-card .form-check-input:focus {
+    border-color: #198754; /* Bootstrap success */
+    box-shadow: 0 0 0 .25rem rgba(25,135,84,.15);
+  }
+  .cz-form-card .btn-success {
+    background-color: #198754;
+    border-color: #198754;
+  }
+</style>
+
+{# Flash messages #}
 {% with messages = get_flashed_messages(with_categories=True) %}
   {% if messages %}
     {% for category, message in messages %}
-      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+      <div class="alert alert-{{ category }} alert-dismissible fade show m-3" role="alert">
         {{ message }}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>
@@ -13,181 +31,183 @@
   {% endif %}
 {% endwith %}
 
-<div class="container">
-  <div class="row">
-    <!-- Left Container -->
-    <div class="col-lg-4 p-3">
-      <div class="card d-flex mb-3 m-3">
-        <div class="card-body">
-          <h1>Contact Info</h1>
+<section class="py-4 py-lg-5">
+  <div class="container">
+    <div class="row g-4 align-items-start">
 
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <img class="me-2" src="{{ url_for('static', filename='assets/phone.svg') }}" width="30" height="30">
-              +65 9876 5432
-            </li>
-            <li class="list-group-item">
-              <img class="me-2" src="{{ url_for('static', filename='assets/mail.svg') }}" width="30" height="30">
-              contact@cropzy.com
-            </li>
-            <li class="list-group-item">
-              <img class="me-2" src="{{ url_for('static', filename='assets/location.svg') }}" width="30" height="30">
-              123 Some Road. Singapore
-            </li>
-          </ul>
+      <!-- Left: Contact info -->
+      <div class="col-lg-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+          <div class="card-body p-4">
+            <h2 class="h4 fw-bold mb-3">Contact Info</h2>
+
+            <div class="d-flex align-items-center py-2 border-bottom">
+              <img class="me-3" src="{{ url_for('static', filename='assets/phone.svg') }}" width="28" height="28" alt="">
+              <a class="link-dark text-decoration-none" href="tel:+6598765432">+65 9876 5432</a>
+            </div>
+
+            <div class="d-flex align-items-center py-2 border-bottom">
+              <img class="me-3" src="{{ url_for('static', filename='assets/mail.svg') }}" width="28" height="28" alt="">
+              <a class="link-dark text-decoration-none" href="mailto:contact@cropzy.com">contact@cropzy.com</a>
+            </div>
+
+            <div class="d-flex align-items-center py-2">
+              <img class="me-3" src="{{ url_for('static', filename='assets/location.svg') }}" width="28" height="28" alt="">
+              <span>123 Some Road, Singapore</span>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Right Container (Form) -->
-    <div class="col-lg-8 p-3">
-      <div class="card d-flex mb-3 m-3 bg-success-subtle">
-        <div class="card-body">
-          <h1>Submit Form</h1>
+      <!-- Right: Submit form (light green) -->
+      <div class="col-lg-8">
+        <div class="card border-0 shadow rounded-4 cz-form-card">
+          <div class="card-body p-4 p-lg-5">
+            <h2 class="h4 fw-bold mb-3">Submit Form</h2>
 
-          <!-- Add Bootstrap validation + no HTML5 native popups -->
-          <form class="row g-3 needs-validation" method="POST" novalidate>
-            <!-- First Name -->
-            <div class="col-md-6">
-              <label for="inputFirstname" class="form-label mb-1">First Name</label>
-              <input
-                type="text"
-                class="form-control"
-                id="inputFirstname"
-                name="first_name"
-                placeholder="e.g. Glen"
-                required
-                minlength="2"
-                maxlength="50"
-                pattern="^[A-Za-z][A-Za-z '\-]{1,49}$"
-              >
-              <div class="invalid-feedback">
-                Please enter a valid first name (letters, spaces, ’ or -, 2–50 characters).
-              </div>
-            </div>
-
-            <!-- Last Name -->
-            <div class="col-md-6">
-              <label for="inputLastname" class="form-label mb-1">Last Name</label>
-              <input
-                type="text"
-                class="form-control"
-                id="inputLastname"
-                name="last_name"
-                placeholder="e.g. Loo"
-                required
-                minlength="2"
-                maxlength="50"
-                pattern="^[A-Za-z][A-Za-z '\-]{1,49}$"
-              >
-              <div class="invalid-feedback">
-                Please enter a valid last name (letters, spaces, ’ or -, 2–50 characters).
-              </div>
-            </div>
-
-            <!-- Email -->
-            <div class="col-md-6">
-              <label for="inputEmail" class="form-label mb-1">Email Address</label>
-              <input
-                type="email"
-                class="form-control"
-                id="inputEmail"
-                name="email"
-                placeholder="e.g. name@example.com"
-                required
-                maxlength="254"
-                inputmode="email"
-                autocomplete="email"
-              >
-              <div class="invalid-feedback">
-                Please provide a valid email address.
-              </div>
-            </div>
-
-            <!-- Phone (Singapore) -->
-            <div class="col-md-6">
-              <label for="inputNumber" class="form-label mb-1">Phone</label>
-              <input
-                type="tel"
-                class="form-control"
-                id="inputNumber"
-                name="phone"
-                placeholder="e.g. 9876 5432"
-                required
-                inputmode="tel"
-                maxlength="16"
-                pattern="^(?:\+65\s*)?(?:[3689]\d{7})$"
-                title="Singapore numbers: 8 digits (start 3/6/8/9), optional +65 prefix."
-              >
-              <div class="invalid-feedback">
-                Please enter a valid Singapore number (8 digits starting 3/6/8/9). “+65” is optional.
-              </div>
-            </div>
-
-            <!-- Purpose (Radio) -->
-            <div class="col-12">
-              <span class="form-label d-block mb-1">Purpose of form: (select 1)</span>
-
-              <div class="form-check mt-1">
-                <input class="form-check-input" type="radio" name="purpose" id="flexRadioOption1" value="feedback" required>
-                <label class="form-check-label" for="flexRadioOption1">Feedback</label>
-              </div>
-
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="purpose" id="flexRadioOption2" value="general_enquiry" required>
-                <label class="form-check-label" for="flexRadioOption2">General Enquiry</label>
-              </div>
-
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="purpose" id="flexRadioOption3" value="complaint" required>
-                <label class="form-check-label" for="flexRadioOption3">Complaint</label>
-              </div>
-
-              <div class="invalid-feedback d-block mt-1" id="purposeFeedback" style="display:none;">
-                Please select a purpose.
-              </div>
-            </div>
-
-            <!-- Additional Information -->
-            <div class="mb-3">
-              <label for="addInfo" class="form-label">Additional Information</label>
-              <textarea
-                class="form-control"
-                id="addInfo"
-                name="message"
-                rows="4"
-                required
-                minlength="10"
-                maxlength="1000"
-                placeholder="Tell us more…"
-              ></textarea>
-              <div class="d-flex justify-content-between">
+            <form class="row g-3 needs-validation" method="POST" novalidate>
+              <!-- First Name -->
+              <div class="col-md-6">
+                <label for="inputFirstname" class="form-label mb-1">First Name</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="inputFirstname"
+                  name="first_name"
+                  placeholder="e.g. Glen"
+                  required
+                  minlength="2"
+                  maxlength="50"
+                  pattern="^[A-Za-z][A-Za-z '\-]{1,49}$"
+                >
                 <div class="invalid-feedback">
-                  Please provide at least 10 characters (max 1000).
+                  Please enter a valid first name (letters, spaces, ’ or -, 2–50 characters).
                 </div>
-                <small class="text-muted"><span id="msgCount">0</span>/1000</small>
               </div>
-            </div>
 
-            <!-- reCAPTCHA -->
-            <div class="g-recaptcha mb-3" data-sitekey="{{ site_key }}"></div>
-            <div class="invalid-feedback d-block" id="captchaFeedback" style="display:none;">
-              Please complete the reCAPTCHA.
-            </div>
+              <!-- Last Name -->
+              <div class="col-md-6">
+                <label for="inputLastname" class="form-label mb-1">Last Name</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="inputLastname"
+                  name="last_name"
+                  placeholder="e.g. Loo"
+                  required
+                  minlength="2"
+                  maxlength="50"
+                  pattern="^[A-Za-z][A-Za-z '\-]{1,49}$"
+                >
+                <div class="invalid-feedback">
+                  Please enter a valid last name (letters, spaces, ’ or -, 2–50 characters).
+                </div>
+              </div>
 
-            <div class="col-12 text-end">
-              <button type="submit" class="btn btn-success">Submit Form</button>
-            </div>
-          </form>
+              <!-- Email -->
+              <div class="col-md-6">
+                <label for="inputEmail" class="form-label mb-1">Email Address</label>
+                <input
+                  type="email"
+                  class="form-control"
+                  id="inputEmail"
+                  name="email"
+                  placeholder="e.g. name@example.com"
+                  required
+                  maxlength="254"
+                  inputmode="email"
+                  autocomplete="email"
+                >
+                <div class="invalid-feedback">
+                  Please provide a valid email address.
+                </div>
+              </div>
+
+              <!-- Phone (Singapore) -->
+              <div class="col-md-6">
+                <label for="inputNumber" class="form-label mb-1">Phone</label>
+                <input
+                  type="tel"
+                  class="form-control"
+                  id="inputNumber"
+                  name="phone"
+                  placeholder="e.g. 9876 5432"
+                  required
+                  inputmode="tel"
+                  maxlength="16"
+                  pattern="^(?:\+65\s*)?(?:[3689]\d{7})$"
+                  title="Singapore numbers: 8 digits (start 3/6/8/9), optional +65 prefix."
+                >
+                <div class="invalid-feedback">
+                  Please enter a valid Singapore number (8 digits starting 3/6/8/9). “+65” is optional.
+                </div>
+              </div>
+
+              <!-- Purpose -->
+              <div class="col-12">
+                <span class="form-label d-block mb-1">Purpose of form: (select 1)</span>
+
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="purpose" id="purpose1" value="feedback" required>
+                  <label class="form-check-label" for="purpose1">Feedback</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="purpose" id="purpose2" value="general_enquiry" required>
+                  <label class="form-check-label" for="purpose2">General Enquiry</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="purpose" id="purpose3" value="complaint" required>
+                  <label class="form-check-label" for="purpose3">Complaint</label>
+                </div>
+
+                <div class="invalid-feedback d-block mt-1" id="purposeFeedback" style="display:none;">
+                  Please select a purpose.
+                </div>
+              </div>
+
+              <!-- Additional Information -->
+              <div class="col-12">
+                <label for="addInfo" class="form-label">Additional Information</label>
+                <textarea
+                  class="form-control"
+                  id="addInfo"
+                  name="message"
+                  rows="5"
+                  required
+                  minlength="10"
+                  maxlength="1000"
+                  placeholder="Tell us more…"
+                ></textarea>
+                <div class="d-flex justify-content-between mt-1">
+                  <div class="invalid-feedback d-block">
+                    Please provide at least 10 characters (max 1000).
+                  </div>
+                  <small class="text-muted"><span id="msgCount">0</span>/1000</small>
+                </div>
+              </div>
+
+              <!-- reCAPTCHA -->
+              <div class="col-12">
+                <div class="g-recaptcha" data-sitekey="{{ site_key }}"></div>
+                <div class="invalid-feedback d-block" id="captchaFeedback" style="display:none;">
+                  Please complete the reCAPTCHA.
+                </div>
+              </div>
+
+              <div class="col-12 text-end">
+                <button id="submitBtn" type="submit" class="btn btn-success">Submit Form</button>
+              </div>
+            </form>
+
+          </div>
         </div>
       </div>
-    </div>
 
+    </div>
   </div>
-</div>
+</section>
 
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-
 <script>
   (function () {
     const form = document.querySelector('.needs-validation');
@@ -195,6 +215,7 @@
     const msgCount = document.getElementById('msgCount');
     const captchaFeedback = document.getElementById('captchaFeedback');
     const purposeFeedback = document.getElementById('purposeFeedback');
+    const submitBtn = document.getElementById('submitBtn');
 
     // Character counter
     if (message && msgCount) {
@@ -207,21 +228,23 @@
     document.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], textarea')
       .forEach(el => el.addEventListener('blur', () => { el.value = el.value.trim(); }));
 
-    // Bootstrap-style validation
+    // Bootstrap-like validation + extras
     form.addEventListener('submit', function (event) {
       // Radio validation (purpose)
       const anyPurposeChecked = !!document.querySelector('input[name="purpose"]:checked');
       purposeFeedback.style.display = anyPurposeChecked ? 'none' : 'block';
 
-      // reCAPTCHA presence (best-effort client check; server must verify!)
+      // reCAPTCHA presence (client-side best effort; server still verifies)
       const recaptcha = document.getElementById('g-recaptcha-response');
       const captchaOK = recaptcha && recaptcha.value && recaptcha.value.trim().length > 0;
       captchaFeedback.style.display = captchaOK ? 'none' : 'block';
 
-      // HTML5 validity
       if (!form.checkValidity() || !anyPurposeChecked || !captchaOK) {
         event.preventDefault();
         event.stopPropagation();
+      } else {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sending…';
       }
 
       form.classList.add('was-validated');

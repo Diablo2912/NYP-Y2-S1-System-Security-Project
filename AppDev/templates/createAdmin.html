@@ -1,9 +1,26 @@
 {% extends "base.html" %}
 
 {% block content %}
+
+{# --- Light green form theme + tidy focus ring --- #}
+<style>
+  .cz-form-card {
+    background-color: #eaf6ef; /* very light green */
+  }
+  .cz-form-card .form-control:focus,
+  .cz-form-card .form-select:focus {
+    border-color: #198754;                           /* Bootstrap success */
+    box-shadow: 0 0 0 .25rem rgba(25,135,84,.15);
+  }
+  .cz-form-card .btn-success {
+    background-color: #198754;
+    border-color: #198754;
+  }
+</style>
+
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
-    <div class="container">
+    <div class="container mt-3">
       {% for category, message in messages %}
         <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
           {{ message }}
@@ -16,7 +33,7 @@
 
 <div class="container">
   <div class="row">
-    <!-- Left Container -->
+    <!-- Left Container (unchanged) -->
     <div class="col-lg-4 p-3">
       <div class="card d-flex mb-3 m-3">
         <div class="card-body pb-0">
@@ -53,7 +70,7 @@
                 <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">IP Management</span></a>
             </li>
             <li class="list-group-item">
-              <a href="/freezeAccountDetails" class="link-underline link-underline-opacity-0">  <!-- FIXED -->
+              <a href="/freezeAccountDetails" class="link-underline link-underline-opacity-0">
                 <img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" class="me-2">
                 <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Account Status</span>
               </a>
@@ -63,80 +80,76 @@
       </div>
     </div>
 
-    <!-- Right Form -->
-    <div class="col-lg-8 d-flex justify-content-center align-items-center mt-3 p-3">
-      <div class="card bg-success-subtle w-100" style="max-width: 600px;">
-        <div class="card-body">
-          <h1 class="text-center mb-4">Create Staff Account</h1>
+    <!-- Right: Form (UI refreshed) -->
+    <div class="col-lg-8 d-flex align-items-start mt-3 p-3">
+      <div class="card border-0 shadow rounded-4 cz-form-card w-100">
+        <div class="card-body p-4 p-lg-5">
+          <h1 class="h4 fw-bold text-center mb-4">Create Staff Account</h1>
 
           <form id="createStaffForm" method="POST" action="" class="row g-3" novalidate>
-            {{ form.hidden_tag() }}  <!-- CSRF -->
+            {{ form.hidden_tag() }}
 
-            <div class="form-group col-md-6">
+            <div class="col-md-6">
               {{ form.first_name.label(class="form-label") }}
-              {{ form.first_name(class="form-control", id="first_name", maxlength="150", autocomplete="off") }}
+              {{ form.first_name(class="form-control", id="first_name", maxlength="150", autocomplete="off", placeholder="e.g. Glen") }}
               <div class="invalid-feedback"></div>
               {% for error in form.first_name.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
             </div>
 
-            <div class="form-group col-md-6">
+            <div class="col-md-6">
               {{ form.last_name.label(class="form-label") }}
-              {{ form.last_name(class="form-control", id="last_name", maxlength="150", autocomplete="off") }}
+              {{ form.last_name(class="form-control", id="last_name", maxlength="150", autocomplete="off", placeholder="e.g. Loo") }}
               <div class="invalid-feedback"></div>
               {% for error in form.last_name.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
             </div>
 
-            <!-- Gender -->
-            <div class="form-group col-md-6">
+            <div class="col-md-6">
               {{ form.gender.label(class="form-label") }}
               {{ form.gender(class="form-select", id="gender") }}
               <div class="invalid-feedback"></div>
               {% for error in form.gender.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
             </div>
 
-            <!-- Role -->
-            <div class="form-group col-md-6">
+            <div class="col-md-6">
               {{ form.status.label(class="form-label") }}
               {{ form.status(class="form-select", id="status") }}
               <div class="invalid-feedback"></div>
               {% for error in form.status.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
             </div>
 
-            <div class="form-group col-md-6">
+            <div class="col-md-6">
               {{ form.number.label(class="form-label") }}
               {{ form.number(class="form-control", id="phone", inputmode="numeric", maxlength="15", autocomplete="off", placeholder="8–15 digits") }}
-              <div class="form-text">Digits only, 8–15 characters.</div>
+              <small class="form-text text-muted">Digits only, 8–15 characters.</small>
               <div class="invalid-feedback"></div>
               {% for error in form.number.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
             </div>
 
-            <div class="form-group col-md-12">
+            <div class="col-12">
               {{ form.email.label(class="form-label") }}
-              {{ form.email(class="form-control", id="email", inputmode="email", autocomplete="off") }}
+              {{ form.email(class="form-control", id="email", inputmode="email", autocomplete="off", placeholder="name@example.com") }}
               <div class="invalid-feedback"></div>
               {% for error in form.email.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
             </div>
 
-            <!-- Password -->
-            <div class="form-group col-md-12">
+            <div class="col-12">
               {{ form.pswd.label(class="form-label") }}
               <div class="input-group">
-                {{ form.pswd(class="form-control ms-1", id="passwordField", autocomplete="new-password") }}
-                <button type="button" class="btn btn-outline-success btn-sm" onclick="togglePassword('passwordField', 'eyeIcon1')">
+                {{ form.pswd(class="form-control", id="passwordField", autocomplete="new-password", placeholder="Enter a strong password") }}
+                <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('passwordField', 'eyeIcon1')" aria-label="Show password">
                   <i id="eyeIcon1" class="fa-solid fa-eye"></i>
                 </button>
               </div>
-              <div class="form-text">At least 8 chars, incl. upper, lower, number & symbol.</div>
+              <small class="form-text text-muted">At least 8 chars, incl. upper, lower, number &amp; symbol.</small>
               <div class="invalid-feedback"></div>
               {% for error in form.pswd.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
             </div>
 
-            <!-- Confirm Password -->
-            <div class="form-group col-md-12">
+            <div class="col-12">
               {{ form.cfm_pswd.label(class="form-label") }}
               <div class="input-group">
-                {{ form.cfm_pswd(class="form-control ms-1", id="confirmPasswordField", autocomplete="new-password") }}
-                <button type="button" class="btn btn-outline-success btn-sm" onclick="togglePassword('confirmPasswordField', 'eyeIcon2')">
+                {{ form.cfm_pswd(class="form-control", id="confirmPasswordField", autocomplete="new-password", placeholder="Re-enter password") }}
+                <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('confirmPasswordField', 'eyeIcon2')" aria-label="Show password">
                   <i id="eyeIcon2" class="fa-solid fa-eye"></i>
                 </button>
               </div>
@@ -144,53 +157,45 @@
               {% for error in form.cfm_pswd.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
             </div>
 
-            <div class="g-recaptcha mb-3" data-sitekey="{{ site_key }}"></div>
+            <div class="g-recaptcha mb-2" data-sitekey="{{ site_key }}"></div>
 
             <div class="col-12">
-              <input type="submit" value="Submit" class="btn btn-success mt-4 w-100" />
+              <button type="submit" class="btn btn-success w-100 mt-2">Submit</button>
             </div>
           </form>
+
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- FontAwesome CDN -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
 <script>
   function togglePassword(passwordFieldId, eyeIconId) {
-    const passwordField = document.getElementById(passwordFieldId);
-    const eyeIcon = document.getElementById(eyeIconId);
-    if (passwordField.type === "password") {
-      passwordField.type = "text";
-      eyeIcon.classList.remove("fa-eye");
-      eyeIcon.classList.add("fa-eye-slash");
-    } else {
-      passwordField.type = "password";
-      eyeIcon.classList.remove("fa-eye-slash");
-      eyeIcon.classList.add("fa-eye");
-    }
+    const input = document.getElementById(passwordFieldId);
+    const icon  = document.getElementById(eyeIconId);
+    if (!input || !icon) return;
+    const isPwd = input.type === "password";
+    input.type = isPwd ? "text" : "password";
+    icon.classList.toggle("fa-eye", !isPwd);
+    icon.classList.toggle("fa-eye-slash", isPwd);
   }
 
   (function () {
-    // Helpers
-    const nameSanitizer = /[^A-Za-z \-']/g; // letters, space, hyphen, apostrophe
+    const nameSanitizer = /[^A-Za-z \-']/g;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
     function setValidity(el, ok, msg) {
-      const fb = el.parentElement.querySelector('.invalid-feedback') || el.closest('.form-group')?.querySelector('.invalid-feedback');
-      if (ok) {
-        el.classList.remove('is-invalid'); el.classList.add('is-valid');
-        if (fb) fb.textContent = '';
-      } else {
-        el.classList.remove('is-valid'); el.classList.add('is-invalid');
-        if (fb) fb.textContent = msg || 'Please correct this field.';
-      }
+      const fb = el.closest('.col, .col-12, .col-md-6, .form-group')?.querySelector('.invalid-feedback');
+      el.classList.toggle('is-valid', ok);
+      el.classList.toggle('is-invalid', !ok);
+      if (fb) fb.textContent = ok ? '' : (msg || 'Please correct this field.');
+      return ok;
     }
 
-    // Fields
+    // fields
     const firstName = document.getElementById('first_name');
     const lastName  = document.getElementById('last_name');
     const phone     = document.getElementById('phone');
@@ -201,112 +206,74 @@
     const statusSel = document.getElementById('status');
     const form      = document.getElementById('createStaffForm');
 
-    // Name validation
-    function validateName(el) {
-      const before = el.value;
-      el.value = before.replace(nameSanitizer, '');
+    function validateName(el){
+      el.value = el.value.replace(nameSanitizer, '');
       const v = el.value.trim();
       if (v.length < 2) return setValidity(el, false, 'Enter at least 2 characters.');
       if (!/^[A-Za-z]/.test(v)) return setValidity(el, false, 'Must start with a letter.');
       if (/--|''|\s{2,}/.test(v)) return setValidity(el, false, 'No repeated punctuation or double spaces.');
       return setValidity(el, true);
     }
-    if (firstName) {
-      firstName.addEventListener('input', () => validateName(firstName));
-      firstName.addEventListener('blur', () => validateName(firstName));
-    }
-    if (lastName) {
-      lastName.addEventListener('input', () => validateName(lastName));
-      lastName.addEventListener('blur', () => validateName(lastName));
-    }
+    firstName?.addEventListener('input', () => validateName(firstName));
+    firstName?.addEventListener('blur',  () => validateName(firstName));
+    lastName ?.addEventListener('input', () => validateName(lastName));
+    lastName ?.addEventListener('blur',  () => validateName(lastName));
 
-    // Phone validation (digits only, 8–15)
-    function validatePhone() {
-      // keep only digits
-      phone.value = phone.value.replace(/\D/g, '');
-      const len = phone.value.length;
-      if (len === 0) return setValidity(phone, false, 'Phone is required.');
-      if (len < 8)   return setValidity(phone, false, 'Minimum 8 digits.');
-      if (len > 15)  return setValidity(phone, false, 'Maximum 15 digits.');
+    function validatePhone(){
+      phone.value = phone.value.replace(/\D/g,'');
+      const n = phone.value.length;
+      if (n === 0) return setValidity(phone, false, 'Phone is required.');
+      if (n < 8)   return setValidity(phone, false, 'Minimum 8 digits.');
+      if (n > 15)  return setValidity(phone, false, 'Maximum 15 digits.');
       return setValidity(phone, true);
     }
-    if (phone) {
-      phone.addEventListener('input', validatePhone);
-      phone.addEventListener('blur', validatePhone);
-    }
+    phone?.addEventListener('input', validatePhone);
+    phone?.addEventListener('blur',  validatePhone);
 
-    // Email validation
-    function validateEmail() {
-      const v = email.value.trim();
-      if (!emailRegex.test(v)) return setValidity(email, false, 'Enter a valid email address.');
-      return setValidity(email, true);
+    function validateEmail(){
+      const ok = emailRegex.test(email.value.trim());
+      return setValidity(email, ok, 'Enter a valid email address.');
     }
-    if (email) {
-      email.addEventListener('input', validateEmail);
-      email.addEventListener('blur', validateEmail);
-    }
+    email?.addEventListener('input', validateEmail);
+    email?.addEventListener('blur',  validateEmail);
 
-    // Password validation
-    function validatePass1() {
+    function validatePass1(){
       const v = pass1.value;
-      const okLen = v.length >= 8;
-      const hasU  = /[A-Z]/.test(v);
-      const hasL  = /[a-z]/.test(v);
-      const hasD  = /\d/.test(v);
-      const hasS  = /[^A-Za-z0-9]/.test(v);
-      const ok = okLen && hasU && hasL && hasD && hasS;
-      const msg = 'Min 8 chars incl. upper, lower, number & symbol.';
-      setValidity(pass1, ok, msg);
-      // also validate confirm if typed
+      const ok = v.length >= 8 && /[A-Z]/.test(v) && /[a-z]/.test(v) && /\d/.test(v) && /[^A-Za-z0-9]/.test(v);
+      setValidity(pass1, ok, 'Min 8 chars incl. upper, lower, number & symbol.');
       if (pass2.value.length) validatePass2();
       return ok;
     }
-    function validatePass2() {
-      const ok = pass2.value === pass1.value && pass2.value.length > 0;
-      setValidity(pass2, ok, ok ? '' : 'Passwords do not match.');
-      return ok;
+    function validatePass2(){
+      const ok = pass2.value.length > 0 && pass2.value === pass1.value;
+      return setValidity(pass2, ok, 'Passwords do not match.');
     }
-    if (pass1) {
-      pass1.addEventListener('input', validatePass1);
-      pass1.addEventListener('blur', validatePass1);
-    }
-    if (pass2) {
-      pass2.addEventListener('input', validatePass2);
-      pass2.addEventListener('blur', validatePass2);
-    }
+    pass1?.addEventListener('input', validatePass1);
+    pass1?.addEventListener('blur',  validatePass1);
+    pass2?.addEventListener('input', validatePass2);
+    pass2?.addEventListener('blur',  validatePass2);
 
-    // Selects validation (must choose a non-empty value if your form uses an empty default)
-    function validateSelect(el) {
+    function validateSelect(el){
       if (!el) return true;
-      const ok = el.value && el.value !== '';
-      setValidity(el, ok, 'Please choose an option.');
-      return ok;
+      const ok = !!el.value;
+      return setValidity(el, ok, 'Please choose an option.');
     }
-    if (gender) {
-      gender.addEventListener('change', () => validateSelect(gender));
-      gender.addEventListener('blur', () => validateSelect(gender));
-    }
-    if (statusSel) {
-      statusSel.addEventListener('change', () => validateSelect(statusSel));
-      statusSel.addEventListener('blur', () => validateSelect(statusSel));
-    }
+    gender   ?.addEventListener('change', () => validateSelect(gender));
+    statusSel?.addEventListener('change', () => validateSelect(statusSel));
 
-    // Submit gate
-    form.addEventListener('submit', function (e) {
+    form?.addEventListener('submit', function(e){
       let ok = true;
-      if (firstName) ok = validateName(firstName) !== false && ok;
-      if (lastName)  ok = validateName(lastName)  !== false && ok;
-      if (phone)     ok = (validatePhone() !== false) && ok;
-      if (email)     ok = (validateEmail() !== false) && ok;
-      if (pass1)     ok = validatePass1() && ok;
-      if (pass2)     ok = validatePass2() && ok;
-      if (gender)    ok = validateSelect(gender) && ok;
-      if (statusSel) ok = validateSelect(statusSel) && ok;
+      ok = validateName(firstName) && ok;
+      ok = validateName(lastName ) && ok;
+      ok = validateSelect(gender) && ok;
+      ok = validateSelect(statusSel) && ok;
+      ok = validatePhone() && ok;
+      ok = validateEmail() && ok;
+      ok = validatePass1() && ok;
+      ok = validatePass2() && ok;
 
       if (!ok) {
-        e.preventDefault();
-        e.stopPropagation();
-        // focus first invalid
+        e.preventDefault(); e.stopPropagation();
         const firstInvalid = form.querySelector('.is-invalid');
         if (firstInvalid) firstInvalid.focus();
       }

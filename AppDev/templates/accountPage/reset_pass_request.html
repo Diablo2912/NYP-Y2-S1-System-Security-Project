@@ -3,35 +3,63 @@
 {% block content %}
 {% from "includes/_formHelper.html" import render_field %}
 
+{# Flash messages #}
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
-    <div class="container">
+    <div class="container mt-3">
       {% for category, message in messages %}
         <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
           {{ message }}
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          <button type="button" class="btn btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
       {% endfor %}
     </div>
   {% endif %}
 {% endwith %}
 
-<!-- Center the form -->
-<div class="d-flex justify-content-center align-items-center mt-3 p-3">
-  <div class="card bg-success-subtle w-100" style="max-width: 500px;">
-    <div class="card-body">
-      <h1 class="text-center mb-4">Reset Password</h1>
+<section class="py-4 py-lg-5">
+  <div class="container">
+    <div class="row justify-content-center">
+      <!-- wide overall footprint -->
+      <div class="col-12 col-xl-11">
+        <div class="card border-0 shadow rounded-4 overflow-hidden">
+          <div class="row g-0 align-items-stretch" style="min-height: 380px;">
 
-      <form method="POST" action="" class="row g-3">
-        <div class="form-group col-md-12">
-          <div class="input-group">
-          {{ render_field(form.email, class="form-control") }}</div>
-        </div>
-        <input type="submit" value="Request Email Link" class="btn btn-success mt-4"/>
-      </form>
+            <!-- LEFT: image panel (desktop only) -->
+            <div class="col-lg-6 d-none d-md-block position-relative"
+                 style="background:
+                        linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.45)),
+                        url('{{ url_for('static', filename='assets/crops-growing-in-thailand.jpg') }}') center/cover no-repeat;">
+              <div class="position-absolute bottom-0 start-0 end-0 p-4 text-white">
+                <span class="badge bg-success rounded-pill mb-2">Cropzy</span>
+                <h2 class="h5 fw-semibold mb-1">Reset your password</h2>
+                <p class="small text-white-50 mb-0">We’ll send a link to your email.</p>
+              </div>
+            </div>
+
+            <!-- RIGHT: form on soft canvas -->
+            <div class="col-lg-6 bg-body-tertiary d-flex">
+              <div class="p-4 p-lg-5 w-100">
+                <h1 class="h4 fw-bold text-center mb-3">Reset Password</h1>
+
+                <form method="POST" action="" class="needs-validation" novalidate>
+                  <div class="mb-3">
+                    {{ render_field(form.email, class="form-control") }}
+                  </div>
+
+                  <button type="submit" class="btn btn-success w-100">Request Email Link</button>
+
+                  <p class="text-center text-muted small mt-3 mb-0">
+                    If the email exists in our system, you’ll receive a reset link shortly.
+                  </p>
+                </form>
+              </div>
+            </div>
+
+          </div> <!-- /row -->
+        </div>   <!-- /card -->
+      </div>
     </div>
   </div>
-</div>
-<!-- Add FontAwesome for the eye icon -->
-
+</section>
 {% endblock %}
