@@ -511,11 +511,14 @@ def generate_log_report_pdf(filename, login_activity, category_summary, trend_da
     from reportlab.lib import colors
     from reportlab.platypus import Paragraph, Frame, Table, TableStyle
     from reportlab.lib.styles import getSampleStyleSheet
+    from xml.sax.saxutils import escape
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import Paragraph, Frame
 
     c = canvas.Canvas(filename, pagesize=A4, encrypt=pdf_encrypt)
     page_w, page_h = A4
 
-    # ---------- Drawing helper: fit figure into a target box ----------
+    # ---------- helpers ----------
     def draw_chart(fig, x, y, target_w, target_h):
         img_io = io.BytesIO()
         fig.savefig(img_io, format='PNG', bbox_inches='tight', dpi=150)
@@ -534,47 +537,33 @@ def generate_log_report_pdf(filename, login_activity, category_summary, trend_da
         c.drawImage(image, x_draw, y_draw, width=w_pt, height=h_pt, preserveAspectRatio=True, mask='auto')
         plt.close(fig)
 
-    # Robust hour-bucket getter (supports dicts keyed by 0..23 or "HH:00")
     def get_hour_bucket(hour_str):
-        # try "HH:00" key
-        bucket = login_activity.get(hour_str)
+        bucket = (login_activity or {}).get(hour_str)
         if bucket is not None:
             return bucket
-        # try int key (00:00 -> 0, 13:00 -> 13)
         try:
             h_int = int(hour_str.split(":")[0])
-            return login_activity.get(h_int, {})
+            return (login_activity or {}).get(h_int, {})
         except Exception:
             return {}
 
-    # ---------- Title (Page 1) ----------
+    # ---------- layout ----------
+    MARGIN_L, MARGIN_R, MARGIN_T, MARGIN_B = 40, 40, 90, 40
+    GUTTER, ROW_SPACING = 24, 20
+    FULL_L, FULL_R, FULL2_L, FULL2_R = 20, 20, 10, 10
+
+    col_w = (page_w - MARGIN_L - MARGIN_R - GUTTER) / 2
+    left_x, right_x = MARGIN_L, MARGIN_L + col_w + GUTTER
+
+    TREND_H, MIDDLE_H, LOGIN_H = 230, 260, 260
+
+    # ---------- title ----------
     c.setFont("Helvetica-Bold", 18)
     c.drawString(50, page_h - 50, "Cropzy System Logging Analytics Report")
     c.setFont("Helvetica", 12)
     c.drawString(50, page_h - 70, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    # ---------- Layout constants ----------
-    MARGIN_L = 40
-    MARGIN_R = 40
-    MARGIN_T = 90
-    MARGIN_B = 40
-    GUTTER   = 24
-    ROW_SPACING = 20
-
-    FULL_L = 20
-    FULL_R = 20
-    FULL2_L = 10
-    FULL2_R = 10
-
-    col_w = (page_w - MARGIN_L - MARGIN_R - GUTTER) / 2
-    left_x  = MARGIN_L
-    right_x = MARGIN_L + col_w + GUTTER
-
-    TREND_H  = 230
-    MIDDLE_H = 260
-    LOGIN_H  = 260
-
-    # ---------- Prepare data (sanitization) ----------
+    # ---------- sanitize categories ----------
     clean_labels, clean_values = [], []
     for k, v in (category_summary or {}).items():
         try:
@@ -587,11 +576,11 @@ def generate_log_report_pdf(filename, login_activity, category_summary, trend_da
     total = sum(clean_values)
 
     # =======================
-    # PAGE 1
+    # PAGE 1: Category table → Previous 10 Logs → Trend
     # =======================
-    y_cursor = page_h - MARGIN_T  # start below title block
+    y_cursor = page_h - MARGIN_T
 
-    # --- Category table at top of Page 1 ---
+    # Category table
     c.setFont("Helvetica-Bold", 14)
     c.drawString(MARGIN_L, y_cursor - 10, "Category Count")
     y_cursor -= 28
@@ -600,7 +589,7 @@ def generate_log_report_pdf(filename, login_activity, category_summary, trend_da
     all_cats = ["Info", "Warning", "Error", "Critical"]
     table_data = [["Category", "Count"]]
     for cat in all_cats:
-        table_data.append([cat, int(category_summary.get(cat, 0))])
+        table_data.append([cat, int((category_summary or {}).get(cat, 0))])
 
     tbl = Table(table_data, colWidths=[table_width * 0.6, table_width * 0.4])
     tbl.setStyle(TableStyle([
@@ -618,11 +607,88 @@ def generate_log_report_pdf(filename, login_activity, category_summary, trend_da
     tbl.drawOn(c, MARGIN_L, y_cursor - th)
     y_cursor = y_cursor - th - ROW_SPACING
 
-    # --- Trend (full width) under the table ---
+    # Latest 10 Logs
     c.setFont("Helvetica-Bold", 12)
-    label_trend_y = y_cursor - 14
-    c.drawString(MARGIN_L, label_trend_y, "Logs Trend Over Time:")
-    y_cursor = label_trend_y - 6  # small padding below label
+    c.drawString(MARGIN_L, y_cursor - 14, "Previous 10 Logs:")
+    y_cursor -= 20
+
+    latest_logs = []
+    if mysql:
+        try:
+            cur = mysql.connection.cursor()
+            cur.execute("""
+                SELECT id, user_id, date, time, category, activity, status, ip_address
+                FROM logs
+                ORDER BY date DESC, time DESC
+                LIMIT 10
+            """)
+            latest_logs = cur.fetchall() or []
+            cur.close()
+        except Exception:
+            latest_logs = []
+
+    if latest_logs:
+        headers = ["Date", "Time", "Category", "Status", "IP", "Activity"]
+        rows = [headers]
+        sample = latest_logs[0]
+        is_tuple = not isinstance(sample, dict)
+        for r in latest_logs:
+            if is_tuple:
+                rows.append([
+                    str(r[2] or ""), str(r[3] or ""), str(r[4] or ""),
+                    str(r[6] or ""), str(r[7] or ""),
+                    (str(r[5] or "")[:80] + ("…" if len(str(r[5] or "")) > 80 else ""))
+                ])
+            else:
+                rows.append([
+                    str(r.get("date","")), str(r.get("time","")), str(r.get("category","")),
+                    str(r.get("status","")), str(r.get("ip_address","")),
+                    (str(r.get("activity",""))[:80] + ("…" if len(str(r.get("activity",""))) > 80 else ""))
+                ])
+        col_widths = [table_width*0.12, table_width*0.10, table_width*0.14, table_width*0.12, table_width*0.17, table_width*0.35]
+        logs_tbl = Table(rows, colWidths=col_widths, repeatRows=1)
+        logs_tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f8f8f8")),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#fcfcfc")]),
+        ]))
+        ltw, lth = logs_tbl.wrapOn(c, table_width, page_h)
+
+        # Ensure room for the trend chart beneath; trim if needed.
+        min_space_for_trend = TREND_H + ROW_SPACING + 60
+        available = y_cursor - (MARGIN_B + min_space_for_trend)
+        if lth > max(40, available):
+            approx_row_h = 14
+            max_rows = max(2, int(available // approx_row_h))
+            if max_rows < len(rows):
+                rows = rows[:max_rows]
+                logs_tbl = Table(rows, colWidths=col_widths, repeatRows=1)
+                logs_tbl.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f8f8f8")),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#fcfcfc")]),
+                ]))
+                ltw, lth = logs_tbl.wrapOn(c, table_width, page_h)
+
+        logs_tbl.drawOn(c, MARGIN_L, y_cursor - lth)
+        y_cursor = y_cursor - lth - ROW_SPACING
+    else:
+        c.setFont("Helvetica", 10)
+        c.drawString(MARGIN_L, y_cursor - 12, "No logs available.")
+        y_cursor -= (ROW_SPACING + 8)
+
+    # Trend (full width)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(MARGIN_L, y_cursor - 14, "Logs Trend Over Time:")
+    y_cursor -= 20
 
     fig, ax = plt.subplots(figsize=(12, 3.2))
     safe_dates = list(trend_dates or [])
@@ -632,16 +698,19 @@ def generate_log_report_pdf(filename, login_activity, category_summary, trend_da
         if n:
             ax.plot(safe_dates[:n], series[:n], label=str(category))
     ax.set_title("Logs Trend Over Time")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Logs")
-    ax.legend()
-    ax.grid(True)
+    ax.set_xlabel("Date"); ax.set_ylabel("Logs")
+    ax.legend(); ax.grid(True)
     trend_y = y_cursor - TREND_H
     draw_chart(fig, FULL_L, trend_y, page_w - FULL_L - FULL_R, TREND_H)
 
-    # --- Middle row: Bar (left) + Pie (right) ---
+    # =======================
+    # PAGE 2: Category Distribution (Bar + Pie) → Login Activity (below)
+    # =======================
+    c.showPage()
+
+    # Category Distribution (Bar - left)
     c.setFont("Helvetica-Bold", 12)
-    label_mid_y = trend_y - ROW_SPACING - 14
+    label_mid_y = page_h - 90 - 14
     c.drawString(MARGIN_L, label_mid_y, "Logs Category Distribution:")
     middle_y = label_mid_y - 6 - MIDDLE_H
 
@@ -650,64 +719,65 @@ def generate_log_report_pdf(filename, login_activity, category_summary, trend_da
         ax.bar(clean_labels, clean_values)
         ax.set_ylabel("Count")
     else:
-        ax.axis('off')
-        ax.text(0.5, 0.5, "No category data", ha='center', va='center', fontsize=12)
+        ax.axis('off'); ax.text(0.5, 0.5, "No category data", ha='center', va='center', fontsize=12)
     ax.set_title("Log Category Distribution (Bar)")
     draw_chart(fig, left_x, middle_y, col_w, MIDDLE_H)
 
+    # Category Distribution (Pie - right)
     fig, ax = plt.subplots(figsize=(5, 3))
     if total > 0:
         ax.pie(clean_values, labels=clean_labels, autopct='%1.1f%%', startangle=140)
     else:
-        ax.axis('off')
-        ax.text(0.5, 0.5, "No category data", ha='center', va='center', fontsize=12)
+        ax.axis('off'); ax.text(0.5, 0.5, "No category data", ha='center', va='center', fontsize=12)
     ax.set_title("Log Category Distribution")
     draw_chart(fig, right_x, middle_y, col_w, MIDDLE_H)
 
-    # =======================
-    # PAGE 2: Login (super wide) + AI Summary
-    # =======================
-    c.showPage()
-
-    # Header
+    # Login Activity (placed BELOW the distributions)
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(MARGIN_L, page_h - 70, "Login Activity:")
+    login_label_y = middle_y - ROW_SPACING - 14
+    c.drawString(MARGIN_L, login_label_y, "Login Activity:")
 
-    # --- Login Activity (super wide) ---
     fig, ax = plt.subplots(figsize=(13, 3.6))
     hours = [f"{i:02d}:00" for i in range(24)]
     for role in ['user', 'manager', 'admin']:
         role_data = [int((get_hour_bucket(h) or {}).get(role, 0) or 0) for h in hours]
         ax.plot(hours, role_data, label=role.capitalize())
-    ax.set_title('Login Activity')
-    ax.set_xlabel('Hour')
-    ax.set_ylabel('Logins')
-    ax.legend()
-    ax.grid(True)
-    login_chart_top = page_h - 80
-    login_chart_y = login_chart_top - LOGIN_H
+    ax.set_title('Login Activity'); ax.set_xlabel('Hour'); ax.set_ylabel('Logins')
+    ax.legend(); ax.grid(True)
+    login_chart_y = login_label_y - 6 - LOGIN_H
     draw_chart(fig, FULL2_L, login_chart_y, page_w - FULL2_L - FULL2_R, LOGIN_H)
 
-    # --- AI Logs Summary below login chart ---
+    # =======================
+    # PAGE 3: AI Summary (moved here)
+    # =======================
+    c.showPage()
     styles = getSampleStyleSheet()
     styleN = styles["Normal"]
     styleN.fontSize = 10
-    styleN.leading = 12
+    styleN.leading = 14  # add some breathing room
 
     ai_summary_text = generate_logs_summary(mysql) if mysql else "No AI summary available."
 
-    c.setFont("Helvetica-Bold", 12)
-    after_login_y = login_chart_y - 16
-    c.drawString(MARGIN_L, after_login_y, "AI Logs Summary:")
+    # Escape HTML, then turn newlines into <br/> so Paragraph respects them
+    safe = escape(ai_summary_text.strip())
+    safe = safe.replace("\r\n", "\n")  # normalize
+    safe = safe.replace("\n\n", "<br/><br/>")  # paragraph gaps
+    safe = safe.replace("\n", "<br/>")  # line breaks
 
-    available_h = after_login_y - 12 - MARGIN_B
-    paragraph = Paragraph(ai_summary_text, styleN)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(MARGIN_L, page_h - 90, "AI Logs Summary:")
+
+    available_h = (page_h - 90) - 12 - MARGIN_B
+    paragraph = Paragraph(safe, styleN)
     frame = Frame(MARGIN_L, MARGIN_B, page_w - MARGIN_L - MARGIN_R, available_h, showBoundary=0)
     frame.addFromList([paragraph], c)
 
-    # Save PDF
+    # save
     c.save()
+
+
     return filename
+
 
 
 
@@ -1918,8 +1988,6 @@ def download_pdf_report():
     current_user = g.user
     if current_user['status'] != 'admin':
         return render_template('404.html')
-
-    flash("PDF password: First Name + Phone Number (no spaces, case-sensitive)", "info")
 
     # --- Build password: firstname + phone digits ---
     # Try a few common keys for first name and phone
