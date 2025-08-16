@@ -68,7 +68,7 @@ from modelsProduct import Product, db
 from seasonalUpdateForm import SeasonalUpdateForm
 import re
 import unicodedata
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 app = Flask(__name__)
 csrf = CSRFProtect()
@@ -2173,10 +2173,23 @@ def inject_user():
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("500 per 1 minutes")
 def login():
+    def _is_safe_next(target: str) -> bool:
+        if not target:
+            return False
+        p = urlparse(target)
+        # only allow same-origin relative paths like "/accountSecurity"
+        return (p.scheme == '' and p.netloc == '' and target.startswith('/'))
+
+    # prefer form value, then querystring, then any saved value
+    next_param = request.form.get('next') or request.args.get('next') or session.get('post_login_next')
+    next_target = next_param if _is_safe_next(next_param) else None
+
     login_form = LoginForm(request.form)
     site_key = os.getenv("RECAPTCHA_SITE_KEY")
     # redirect
     if 'jwt_token' in request.cookies:
+        if next_target:
+            return redirect(next_target)
         return redirect(url_for('home'))
 
     if request.method == 'POST':
@@ -2247,6 +2260,10 @@ def login():
                     session['pending_2fa_user_id'] = user['id']
                     session['pending_2fa_started_at'] = time.time()
                     session['pending_2fa_attempts'] = 0  # NEW
+
+                    if next_target:
+                        session['post_login_next'] = next_target
+
                     log_user_action(
                         user_id=user['id'],
                         session_id=None,
@@ -2267,8 +2284,9 @@ def login():
                         'exp': datetime.utcnow() + timedelta(hours=1)
                     }
 
+                    target = next_target or url_for('home')
                     token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
-                    response = make_response(redirect(url_for('home')))
+                    response = make_response(redirect(target))
                     response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
                     flash('Login successful!', 'success')
                     log_user_action(
@@ -2287,8 +2305,12 @@ def login():
             flash('Incorrect password.', 'danger')
         else:
             flash('Email not found. Please sign up.', 'danger')
+
+    if next_target:
+        session['post_login_next'] = next_target
+
     # no cache
-    response = make_response(render_template('/accountPage/login.html', form=login_form, site_key=site_key))
+    response = make_response(render_template('/accountPage/login.html', form=login_form, site_key=site_key, ))
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     return response
@@ -3498,10 +3520,67 @@ def admin_notify_flagger(flag_id):
 
     return redirect(url_for('view_session_flags'))
 
-@app.route('/security_actions')
+@app.route('/security_actions', methods=['GET', 'POST'])
 def security_actions():
-    jwt_user = getattr(g, 'user', None)  # may be None if not logged in
-    return render_template('security_actions.html', jwt_user=jwt_user)
+    # Works whether logged in or not
+    jwt_data  = verify_jwt_token(request.cookies.get('jwt_token'))
+    logged_in = bool(jwt_data)
+
+    if request.method == 'POST':
+        action = (request.form.get('action') or '').lower()
+
+        if action == 'reset':
+            try:
+                if jwt_data:
+                    log_user_action(
+                        user_id=jwt_data['user_id'],
+                        session_id=jwt_data.get('session_id'),
+                        action="Triggered reset password from security_actions"
+                    )
+            except Exception:
+                pass
+            # We’ll use the GET bridge instead of POST for reset (see Step 4).
+            return redirect(url_for('security_reset_and_logout'))
+
+        if action == 'freeze':
+            # If not logged in: go to login and then bounce to Account Security
+            if not logged_in:
+                return redirect(url_for('login', next=url_for('accountSecurity')))
+
+            # If logged in: requirement is to log out immediately, then go to Login with next=Account Security
+            return force_logout_response(url_for('login', next=url_for('accountSecurity')))
+
+    # GET: render your two-button page
+    return render_template('security_actions.html',
+                           logged_in=logged_in,
+                           session_id=request.args.get('session_id'))
+
+
+@app.route('/security_actions/reset_and_logout')
+def security_reset_and_logout():
+    # Logout first, then send to your existing reset request page
+    return force_logout_response(url_for('reset_password_request'))
+
+def force_logout_response(redirect_to):
+    # Clear server-side session
+    try:
+        session.clear()
+    except Exception:
+        pass
+
+    # Build redirect response
+    resp = make_response(redirect(redirect_to))
+
+    # Delete auth cookies (adjust names as needed)
+    resp.delete_cookie('jwt_token', path='/')  # your JWT cookie
+    resp.delete_cookie(app.config.get('SESSION_COOKIE_NAME', 'session'), path='/')  # Flask session cookie
+    # If you use extra cookies, clear them too:
+    for c in ('remember_token', 'csrf_access_token', 'csrf_refresh_token'):
+        resp.delete_cookie(c, path='/')
+
+    return resp
+
+
 
 
 
