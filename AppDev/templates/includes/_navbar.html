@@ -1,38 +1,35 @@
+<nav class="navbar navbar-expand-xl navbar-light bg-white border-bottom shadow-sm sticky-top py-2">
+  <div class="container">
 
-<nav class="navbar navbar-expand-xl bg-body-secondary">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="/">Cropzy</a>
+    <a class="navbar-brand fw-semibold fs-4 me-4 text-nowrap" href="/">Cropzy</a>
 
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
-            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+    <button class="navbar-toggler p-2" type="button" data-bs-toggle="collapse"
+            data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
+            aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
 
-    <div class="collapse navbar-collapse justify-content-between" id="navbarSupportedContent">
-      <!-- Left-aligned menu items -->
-      <ul class="navbar-nav mb-2 mb-lg-0">
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
 
+      <!-- Left menu (single line, smaller font) -->
+      <ul class="navbar-nav mb-0 me-3 flex-row flex-nowrap align-items-center gap-3">
         {% if current_user and current_user.status in ['admin', 'manager'] %}
-        <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Products</a>
-          <ul class="dropdown-menu">
-            <li><a class="dropdown-item" href="/buyProduct">Buy Products</a></li>
-            <li><a class="dropdown-item" href="/createProduct">Create Products</a></li>
-            <li><a class="dropdown-item" href="/manageProduct">Manage Products</a></li>
-          </ul>
-        </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle px-2 py-2 fs-6 text-nowrap" href="#" role="button" data-bs-toggle="dropdown">Products</a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="/buyProduct">Buy Products</a></li>
+              <li><a class="dropdown-item" href="/createProduct">Create Products</a></li>
+              <li><a class="dropdown-item" href="/manageProduct">Manage Products</a></li>
+            </ul>
+          </li>
         {% else %}
-        <li class="nav-item">
-          <a class="nav-link" href="/buyProduct">Buy Products</a>
-        </li>
+          <li class="nav-item"><a class="nav-link px-2 py-2 fs-6 text-nowrap" href="/buyProduct">Buy Products</a></li>
         {% endif %}
 
-        <li class="nav-item">
-          <a class="nav-link" href="/carbonFootprintTracker">CFT</a>
-        </li>
+        <li class="nav-item"><a class="nav-link px-2 py-2 fs-6 text-nowrap" href="/carbonFootprintTracker">CFT</a></li>
 
         <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Resources</a>
+          <a class="nav-link dropdown-toggle px-2 py-2 fs-6 text-nowrap" href="#" role="button" data-bs-toggle="dropdown">Resources</a>
           <ul class="dropdown-menu">
             <li><a class="dropdown-item" href="/educationalGuide">Educational Guide</a></li>
             <li><a class="dropdown-item" href="/farmTools">Farm Management Tools</a></li>
@@ -40,28 +37,23 @@
           </ul>
         </li>
 
-        <li class="nav-item">
-          <a class="nav-link" href="/aboutUs">About Us</a>
-        </li>
-
-        <li class="nav-item">
-          <a class="nav-link" href="/contactUs">Contact Us</a>
-        </li>
+        <li class="nav-item"><a class="nav-link px-2 py-2 fs-6 text-nowrap" href="/aboutUs">About Us</a></li>
+        <li class="nav-item"><a class="nav-link px-2 py-2 fs-6 text-nowrap" href="/contactUs">Contact Us</a></li>
       </ul>
 
-      <!-- Centered search bar -->
-      <form class="d-flex mx-auto w-50" role="search">
+      <!-- Center search (smaller; won’t force wrapping) -->
+      <form class="d-none d-lg-flex ms-auto me-3" role="search" style="max-width: 420px;">
         <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search">
         <button class="btn btn-outline-success" type="submit">Search</button>
       </form>
 
-      <!-- Right-aligned Account and Cart -->
-      <ul class="navbar-nav me-3">
+      <!-- Right icons -->
+      <ul class="navbar-nav align-items-center flex-row gap-2">
         <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-            <img src="{{ url_for('static', filename='assets/person.svg') }}" width="30" height="30">
+          <a class="nav-link dropdown-toggle px-2 py-2" href="#" role="button" data-bs-toggle="dropdown" aria-label="Account">
+            <img src="{{ url_for('static', filename='assets/person.svg') }}" width="28" height="28" alt="Account">
           </a>
-          <ul class="dropdown-menu" style="min-width:8rem">
+          <ul class="dropdown-menu dropdown-menu-end" style="min-width:8rem">
             {% if current_user %}
               <li><a class="dropdown-item" href="/accountInfo">Account Info</a></li>
               {% if current_user.status == 'admin' %}
@@ -77,11 +69,12 @@
           </ul>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="/cart">
-            <img src="{{ url_for('static', filename='assets/cart.svg') }}" width="30" height="30">
+          <a class="nav-link px-2 py-2 d-flex align-items-center" href="/cart" aria-label="Cart">
+            <img src="{{ url_for('static', filename='assets/cart.svg') }}" width="28" height="28" alt="Cart">
           </a>
         </li>
       </ul>
+
     </div>
   </div>
 </nav>
