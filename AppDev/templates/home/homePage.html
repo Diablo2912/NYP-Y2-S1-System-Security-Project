@@ -70,9 +70,7 @@
                 </div>
 
                 <!-- Carousel Controls -->
-                <br>
-                <br>
-                <br>
+                <br><br><br>
                 <button class="carousel-control-prev" type="button" data-bs-target="#articles-carousel" data-bs-slide="prev">
                     <span class="carousel-control-prev-icon" aria-hidden="true" style="background-color: white; border-radius: 50%;"></span>
                     <span class="visually-hidden">Previous</span>
@@ -107,12 +105,20 @@
 
             <!-- Updates Table -->
             <div class="table-responsive">
-                <table class="table table-striped">
+                <style>
+                  .cell-content { max-width: 420px; }
+                  .text-truncate-2 {
+                    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+                    overflow: hidden;
+                  }
+                </style>
+
+                <table class="table table-striped align-middle">
                     <thead>
                         <tr>
                             <th>#</th>
                             <th>Title</th>
-                            <th>Content</th>
+                            <th class="cell-content">Content</th>
                             <th>Date</th>
                             <th>Season</th>
                             <th>Actions</th>
@@ -121,15 +127,57 @@
                     <tbody>
                         {% if updates %}
                             {% for update in updates %}
+                                {% set is_admin = current_user and current_user.status == 'admin' %}
+                                {# owner_id may not exist on older entries; handle safely #}
+                                {% set is_owner = current_user and (update.get('owner_id') == current_user.user_id) %}
+                                {% set can_manage = is_admin or is_owner %}
+
                                 <tr>
                                     <td>{{ loop.index }}</td>
-                                    <td>{{ update.title }}</td>
-                                    <td>{{ update.content }}</td>
-                                    <td>{{ update.date }}</td>
-                                    <td>{{ update.season }}</td>
+
                                     <td>
-                                        <a href="{{ url_for('request_delete', index=loop.index0) }}" class="btn btn-danger btn-sm">Delete</a>
-                                        <a href="{{ url_for('edit_update', index=loop.index0) }}" class="btn btn-warning btn-sm">Edit</a>
+                                      <div class="fw-semibold">{{ update.title }}</div>
+                                      {% if is_owner %}
+                                        <span class="badge bg-success-subtle text-success mt-1">You</span>
+                                      {% elif is_admin %}
+                                        <span class="badge bg-secondary-subtle text-secondary mt-1">Admin</span>
+                                      {% endif %}
+                                    </td>
+
+                                    <td class="cell-content">
+                                      <div class="text-truncate-2" title="{{ update.content }}">{{ update.content }}</div>
+                                    </td>
+
+                                    <td>{{ update.date }}</td>
+
+                                    <td>
+                                      {% set season = (update.season or '')|lower %}
+                                      {% if season == 'spring' %}
+                                        <span class="badge bg-success">Spring</span>
+                                      {% elif season == 'summer' %}
+                                        <span class="badge bg-warning text-dark">Summer</span>
+                                      {% elif season == 'autumn' %}
+                                        <span class="badge bg-secondary">Autumn</span>
+                                      {% elif season == 'winter' %}
+                                        <span class="badge bg-info text-dark">Winter</span>
+                                      {% else %}
+                                        <span class="badge bg-light text-dark">{{ update.season }}</span>
+                                      {% endif %}
+                                    </td>
+
+                                    <td>
+                                      {% if can_manage %}
+                                        <a href="{{ url_for('edit_update', index=loop.index0) }}" class="btn btn-sm btn-outline-primary me-1">Edit</a>
+                                        <a href="{{ url_for('request_delete', index=loop.index0) }}" class="btn btn-sm btn-outline-danger">Delete</a>
+                                      {% else %}
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-secondary"
+                                                disabled
+                                                data-bs-toggle="tooltip"
+                                                data-bs-title="Only the creator or an admin can manage this update">
+                                          Edit / Delete
+                                        </button>
+                                      {% endif %}
                                     </td>
                                 </tr>
                             {% endfor %}
@@ -181,5 +229,12 @@
         </div>
     </section>
 </div>
+
+<script>
+  // enable Bootstrap tooltips if present
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+    if (window.bootstrap && bootstrap.Tooltip) new bootstrap.Tooltip(el);
+  });
+</script>
 
 {% endblock %}

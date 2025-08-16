@@ -4232,6 +4232,7 @@ def create_update():
         with shelve.open('seasonal_updates.db', writeback=True) as db:
             pending = db.get('pending_updates', {})
             pending[pending_id] = {
+                'owner_id': user_id,
                 'user_id': user_id,
                 'session_id': session_id,
                 'email': user_email,  # ensure this is stored
@@ -4285,7 +4286,10 @@ def finalize_create(token):
                 return redirect(url_for('home'))
 
             updates = db.get('updates', [])
-            updates.append(entry['update_data'])
+            updates.append({
+                'owner_id': entry.get('owner_id'),
+                **entry['update_data']
+            })
             db['updates'] = updates
 
         log_user_action(
@@ -4306,18 +4310,34 @@ def finalize_create(token):
         flash("Something went wrong or the link has expired.", "danger")
         return redirect(url_for('home'))
 
+def can_manage_update(update_dict, current_user):
+    if not current_user:
+        return False
+    if current_user.get('status') == 'admin':
+        return True
+    return update_dict.get('owner_id') == current_user.get('user_id')
+
 
 @app.route('/delete_update/<int:index>', methods=['POST'])
 @jwt_required
 def delete_update(index):
-    # Save index in session and send email
-    session['delete_pending_index'] = index
+    with shelve.open('seasonal_updates.db') as db:
+        updates = db.get('updates', [])
+        if not (0 <= index < len(updates)):
+            flash("Invalid update index.", "danger")
+            return redirect(url_for('home'))
+        update = updates[index]
 
+    if not can_manage_update(update, g.user):
+        flash("You don't have permission to delete this update.", "danger")
+        return redirect(url_for('home'))
+
+    # proceed with your existing email confirmation flow
+    session['delete_pending_index'] = index
     token = serializer.dumps({
         'user_id': g.user['user_id'],
         'email': g.user['email']
     }, salt='delete-update-verification')
-
     confirm_url = url_for('finalize_delete', token=token, _external=True)
 
     msg = Message("[Cropzy] Confirm Deletion of Update", sender=EMAIL_SENDER, recipients=[g.user['email']])
@@ -4351,20 +4371,20 @@ def finalize_delete(token):
         with shelve.open('seasonal_updates.db', writeback=True) as db:
             updates = db.get('updates', [])
             if 0 <= index < len(updates):
+                update = updates[index]
+                # defensive: allow if email owner or admin initiated earlier
+                # (we don't know admin here; rely on email link + prior check)
                 removed = updates.pop(index)
                 db['updates'] = updates
 
                 log_user_action(user_id, session.get('current_session_id'),
-                                f"Deleted seasonal update: {removed['title']}")
-
-                # ✅ Send email notification
+                                f"Deleted seasonal update: {removed.get('title')}")
                 notify_user_action(
                     to_email=user_email,
                     action_type="Deleted Seasonal Update",
-                    item_name=removed['title']
+                    item_name=removed.get('title')
                 )
-
-                flash(f"Update \"{removed['title']}\" deleted successfully!", "success")
+                flash(f"Update \"{removed.get('title')}\" deleted successfully!", "success")
             else:
                 flash("Invalid update index.", "danger")
 
@@ -4372,6 +4392,7 @@ def finalize_delete(token):
         flash("Verification link expired or invalid.", "danger")
 
     return redirect(url_for('home'))
+
 
 
 @app.route('/edit_update/<int:index>', methods=['GET', 'POST'])
@@ -4386,15 +4407,18 @@ def edit_update(index):
             flash('Invalid update index.', 'danger')
             return redirect(url_for('home'))
 
+    # block if not owner nor admin
+    if not can_manage_update(update, g.user):
+        flash("You don't have permission to edit this update.", "danger")
+        return redirect(url_for('home'))
+
     if form.validate_on_submit():
-        # Save the edit temporarily
         edited_data = {
             'title': form.update.data,
             'content': form.content.data,
             'date': form.date.data.strftime('%d-%m-%Y'),
             'season': form.season.data
         }
-
         with shelve.open('seasonal_updates.db', writeback=True) as db:
             db['pending_edits'] = db.get('pending_edits', {})
             db['pending_edits'][str(index)] = {
@@ -4402,21 +4426,14 @@ def edit_update(index):
                 'session_id': g.user.get('session_id'),
                 'data': edited_data
             }
-
-        # Send verification email
+        # email verification (unchanged)
         token = serializer.dumps({
             'user_id': g.user['user_id'],
             'index': index,
             'email': g.user['email']
         }, salt='edit-update-verification')
-
         confirm_url = url_for('finalize_edit', token=token, _external=True)
-
-        msg = Message(
-            "[Cropzy] Confirm Edit of Seasonal Update",
-            sender=EMAIL_SENDER,
-            recipients=[g.user['email']]
-        )
+        msg = Message("[Cropzy] Confirm Edit of Seasonal Update", sender=EMAIL_SENDER, recipients=[g.user['email']])
         msg.body = f"""Hello,
 
 You attempted to edit a seasonal update on Cropzy.
@@ -4431,13 +4448,14 @@ If you did not initiate this, you may ignore this message.
         flash("Edit submitted. Please confirm via the email sent to you.", "info")
         return redirect(url_for('home'))
 
-    # Pre-fill the form with current update data
+    # prefill
     form.update.data = update.get('title', '')
     form.content.data = update.get('content', '')
     form.date.data = datetime.strptime(update.get('date', '01-01-2025'), '%d-%m-%Y')
     form.season.data = update.get('season', '')
 
     return render_template('/home/update.html', title='Edit Update', form=form, is_edit=True, index=index)
+
 
 
 @app.route('/finalize_edit/<token>')
