@@ -35,6 +35,7 @@
             <li class="list-group-item px-2 py-1"><a href="/createAdmin" class="d-flex align-items-center text-decoration-none text-dark"><img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Create Staff</a></li>
             <li class="list-group-item px-2 py-1"><a href="/logging" class="d-flex align-items-center text-decoration-none text-dark"><img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Logs</a></li>
             <li class="list-group-item px-2 py-1"><a href="/logging_analytics" class="d-flex align-items-center text-decoration-none text-dark"><img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">Logging Analytics</a></li>
+             <li class="list-group-item px-2 py-1"><a href="/ip_management" class="d-flex align-items-center text-decoration-none text-dark"><img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="20" height="20" class="me-2">IP Management</a></li>
           </ul>
         </div>
       </div>
@@ -300,9 +301,15 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-ywzG+YB8q1YQk... (shortened)" crossorigin="anonymous" referrerpolicy="no-referrer" />
 <script>
-  document.getElementById("generateReportBtn").addEventListener("click", function () {
-  window.location.href = "/generate_pdf_report";
-});
+  document.getElementById("generateReportBtn").addEventListener("click", function (e) {
+    e.preventDefault(); // stop default navigation for a moment
+
+    // Show the password info to the user
+    alert("PDF password: First Name + Phone Number (no spaces, case-sensitive)");
+
+    // Then continue with the download
+    window.location.href = "/generate_pdf_report";
+  });
 
   //Pass login activity to JS
   const loginActivity = {{ login_activity | tojson }};
