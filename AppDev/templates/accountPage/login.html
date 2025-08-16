@@ -22,11 +22,21 @@
     <div class="card-body">
       <h1 class="text-center mb-4">Login</h1>
 
-      <form id="autoDestructForm" method="POST" action="" class="row g-3" autocomplete="off">
+      <form
+        id="autoDestructForm"
+        method="POST"
+        action="{{ url_for('login', next=request.args.get('next') or session.get('post_login_next')) }}"
+        class="row g-3"
+        autocomplete="off"
+      >
         {{ form.hidden_tag() }}
+        <!-- keep next across POST -->
+        <input type="hidden" name="next" value="{{ request.args.get('next') or session.get('post_login_next') or '' }}">
+
         <div class="form-group col-md-12">
           <div class="input-group" autocomplete="off">
-          {{ render_field(form.email, class="form-control") }}</div>
+            {{ render_field(form.email, class="form-control") }}
+          </div>
         </div>
 
         <div class="form-group col-md-12">
@@ -37,8 +47,9 @@
             </button>
           </div>
         </div>
+
         <div id="timer-container" style="margin-bottom: 1rem;">
-    ⏳   This form will auto-destruct in <span id="countdown">300</span> seconds.
+          ⏳ This form will auto-destruct in <span id="countdown">300</span> seconds.
         </div>
 
         <div class="form-group col-md-12">
@@ -59,14 +70,13 @@
     var passwordField = document.getElementById(passwordFieldId);
     var eyeIcon = document.getElementById(eyeIconId);
 
-    // Toggle password visibility
     if (passwordField.type === "password") {
-      passwordField.type = "text";  // Show password
-      eyeIcon.classList.remove("fa-eye");  // Change icon to "eye-slash"
+      passwordField.type = "text";
+      eyeIcon.classList.remove("fa-eye");
       eyeIcon.classList.add("fa-eye-slash");
     } else {
-      passwordField.type = "password";  // Hide password
-      eyeIcon.classList.remove("fa-eye-slash");  // Change icon back to "eye"
+      passwordField.type = "password";
+      eyeIcon.classList.remove("fa-eye-slash");
       eyeIcon.classList.add("fa-eye");
     }
   }
@@ -74,42 +84,34 @@
   function sendUnfreezeRequest(apiUrl) {
     fetch(apiUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({})
     })
     .then(response => response.json())
-    .then(data => {
-      alert(data.message); // Optionally use toast or nicer alert
-    })
+    .then(data => { alert(data.message); })
     .catch(error => {
       alert("Failed to send unfreeze email.");
       console.error(error);
     });
-}
-      let secondsLeft = 300; //set 5 minutes
-    const countdownEl = document.getElementById('countdown');
-    const form = document.getElementById('autoDestructForm');
+  }
 
-    const timer = setInterval(() => {
-        secondsLeft--;
-        countdownEl.textContent = secondsLeft;
+  let secondsLeft = 300; // 5 minutes
+  const countdownEl = document.getElementById('countdown');
+  const form = document.getElementById('autoDestructForm');
 
-        if (secondsLeft <= 0) {
-            clearInterval(timer);
-            // Option 1: Disable all form inputs
-            Array.from(form.elements).forEach(input => input.disabled = true);
+  const timer = setInterval(() => {
+    secondsLeft--;
+    countdownEl.textContent = secondsLeft;
 
-            // Option 2: Optional message
-            document.getElementById('timer-container').innerHTML = "<strong>⛔ Time's up! Form disabled.</strong>";
-        }
-    }, 1000);
+    if (secondsLeft <= 0) {
+      clearInterval(timer);
+      Array.from(form.elements).forEach(input => input.disabled = true);
+      document.getElementById('timer-container').innerHTML = "<strong>⛔ Time's up! Form disabled.</strong>";
+    }
+  }, 1000);
 </script>
 
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-
-<!-- Add FontAwesome for the eye icon -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
 {% endblock %}

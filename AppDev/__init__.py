@@ -68,6 +68,7 @@ from modelsProduct import Product, db
 from seasonalUpdateForm import SeasonalUpdateForm
 import re
 import unicodedata
+from urllib.parse import urljoin, urlparse
 
 app = Flask(__name__)
 csrf = CSRFProtect()
@@ -2172,10 +2173,23 @@ def inject_user():
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("500 per 1 minutes")
 def login():
+    def _is_safe_next(target: str) -> bool:
+        if not target:
+            return False
+        p = urlparse(target)
+        # only allow same-origin relative paths like "/accountSecurity"
+        return (p.scheme == '' and p.netloc == '' and target.startswith('/'))
+
+    # prefer form value, then querystring, then any saved value
+    next_param = request.form.get('next') or request.args.get('next') or session.get('post_login_next')
+    next_target = next_param if _is_safe_next(next_param) else None
+
     login_form = LoginForm(request.form)
     site_key = os.getenv("RECAPTCHA_SITE_KEY")
     # redirect
     if 'jwt_token' in request.cookies:
+        if next_target:
+            return redirect(next_target)
         return redirect(url_for('home'))
 
     if request.method == 'POST':
@@ -2246,6 +2260,10 @@ def login():
                     session['pending_2fa_user_id'] = user['id']
                     session['pending_2fa_started_at'] = time.time()
                     session['pending_2fa_attempts'] = 0  # NEW
+
+                    if next_target:
+                        session['post_login_next'] = next_target
+
                     log_user_action(
                         user_id=user['id'],
                         session_id=None,
@@ -2266,8 +2284,9 @@ def login():
                         'exp': datetime.utcnow() + timedelta(hours=1)
                     }
 
+                    target = next_target or url_for('home')
                     token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
-                    response = make_response(redirect(url_for('home')))
+                    response = make_response(redirect(target))
                     response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
                     flash('Login successful!', 'success')
                     log_user_action(
@@ -2286,8 +2305,12 @@ def login():
             flash('Incorrect password.', 'danger')
         else:
             flash('Email not found. Please sign up.', 'danger')
+
+    if next_target:
+        session['post_login_next'] = next_target
+
     # no cache
-    response = make_response(render_template('/accountPage/login.html', form=login_form, site_key=site_key))
+    response = make_response(render_template('/accountPage/login.html', form=login_form, site_key=site_key, ))
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     return response
@@ -3045,6 +3068,7 @@ def activity_history():
 
     # Modal payload (if we queued it after flagging)
     review_changes = session.pop('review_changes', None)
+    security_banner =session.pop('show_security_banner', None)
 
     return render_template(
         "accountPage/activity.html",
@@ -3052,6 +3076,7 @@ def activity_history():
         selected_filter=filter_type,
         time_left=time_left,
         review_changes=review_changes,
+        security_banner=security_banner,
         flagged_session_ids=flagged_session_ids,  # <-- pass to template
     )
 
@@ -3172,6 +3197,10 @@ def flag_session(session_id):
     """, (session_id,))
     actions = [r['action'] for r in cursor.fetchall()]
     cursor.close()
+    session['show_security_banner'] = {
+        'session_id': session_id,
+        'flagged_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    }
 
     findings = detect_sensitive_changes(actions)
     if findings:
@@ -3490,6 +3519,67 @@ def admin_notify_flagger(flag_id):
         flash("Failed to send email. Please try again.", "danger")
 
     return redirect(url_for('view_session_flags'))
+
+@app.route('/security_actions', methods=['GET', 'POST'])
+def security_actions():
+    # Works whether logged in or not
+    jwt_data  = verify_jwt_token(request.cookies.get('jwt_token'))
+    logged_in = bool(jwt_data)
+
+    if request.method == 'POST':
+        action = (request.form.get('action') or '').lower()
+
+        if action == 'reset':
+            try:
+                if jwt_data:
+                    log_user_action(
+                        user_id=jwt_data['user_id'],
+                        session_id=jwt_data.get('session_id'),
+                        action="Triggered reset password from security_actions"
+                    )
+            except Exception:
+                pass
+            # We’ll use the GET bridge instead of POST for reset (see Step 4).
+            return redirect(url_for('security_reset_and_logout'))
+
+        if action == 'freeze':
+            # If not logged in: go to login and then bounce to Account Security
+            if not logged_in:
+                return redirect(url_for('login', next=url_for('accountSecurity')))
+
+            # If logged in: requirement is to log out immediately, then go to Login with next=Account Security
+            return force_logout_response(url_for('login', next=url_for('accountSecurity')))
+
+    # GET: render your two-button page
+    return render_template('security_actions.html',
+                           logged_in=logged_in,
+                           session_id=request.args.get('session_id'))
+
+
+@app.route('/security_actions/reset_and_logout')
+def security_reset_and_logout():
+    # Logout first, then send to your existing reset request page
+    return force_logout_response(url_for('reset_password_request'))
+
+def force_logout_response(redirect_to):
+    # Clear server-side session
+    try:
+        session.clear()
+    except Exception:
+        pass
+
+    # Build redirect response
+    resp = make_response(redirect(redirect_to))
+
+    # Delete auth cookies (adjust names as needed)
+    resp.delete_cookie('jwt_token', path='/')  # your JWT cookie
+    resp.delete_cookie(app.config.get('SESSION_COOKIE_NAME', 'session'), path='/')  # Flask session cookie
+    # If you use extra cookies, clear them too:
+    for c in ('remember_token', 'csrf_access_token', 'csrf_refresh_token'):
+        resp.delete_cookie(c, path='/')
+
+    return resp
+
 
 
 
@@ -4390,21 +4480,60 @@ def notify_user_action(to_email, action_type, item_name=None, details=None):
     - item_name: Optional name/title of the item involved.
     - details: Optional extra details to include in the email.
     """
+    # Local imports keep this function self-contained
+    from flask import request, url_for
+    from urllib.parse import urljoin
+    import unicodedata
+
+    # ASCII sanitizer to avoid MIMEText default (US-ASCII) crashes on smart quotes/em dashes
+    SMART_MAP = str.maketrans({
+        "\u2019": "'",  # ’
+        "\u2018": "'",  # ‘
+        "\u201c": '"',  # “
+        "\u201d": '"',  # ”
+        "\u2014": "-",  # —
+        "\u2013": "-",  # –
+    })
+    def ascii_clean(s: str) -> str:
+        if not s:
+            return ""
+        return unicodedata.normalize("NFKD", s.translate(SMART_MAP)).encode("ascii", "ignore").decode("ascii")
+
     try:
+        # Build absolute link to the Security Actions page (works in or out of a request context)
+        try:
+            base_url = request.url_root  # e.g., http://localhost:5000/
+        except Exception:
+            base_url = app.config.get('PUBLIC_BASE_URL') or ''  # set this in config for background jobs
+
+        try:
+            path = url_for('security_actions')  # relative path
+        except Exception:
+            path = '/security_actions'
+
+        security_url = urljoin(base_url, path) if base_url else path
+
+        # Compose subject/body
         subject = f"[Cropzy] {action_type}"
-        message = f"The following action was performed on your Cropzy account:\n\n"
-        message += f"Action: {action_type}\n"
-
+        lines = []
+        lines.append("The following action was performed on your Cropzy account:\n")
+        lines.append(f"Action: {action_type}")
         if item_name:
-            message += f"Item: {item_name}\n"
-
+            lines.append(f"Item: {item_name}")
         if details:
-            message += f"Details: {details}\n"
+            lines.append(f"Details: {details}")
+        lines.append(f"\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        lines.append("\nIf you did not authorize this action, you can reset your password or freeze your account here:")
+        lines.append(security_url)
+        lines.append("\n- Cropzy Team")
 
-        message += f"\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        message += "\nIf you did not authorize this action, please contact support immediately.\n\n- Cropzy Team"
+        message = "\n".join(lines)
 
-        # Construct and send email
+        # Sanitize to ASCII to avoid encoding errors in MIMEText(..., 'plain')
+        subject = ascii_clean(subject)
+        message = ascii_clean(message)
+
+        # Construct and send email (unchanged transport)
         msg = MIMEMultipart()
         msg['From'] = app.config['MAIL_USERNAME']
         msg['To'] = to_email
@@ -4421,6 +4550,7 @@ def notify_user_action(to_email, action_type, item_name=None, details=None):
 
     except Exception as e:
         print(f"[ERROR] Failed to send notification: {e}")
+
 
 
 def send_email(to_email, subject, message):
