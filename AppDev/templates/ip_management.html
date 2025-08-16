@@ -79,6 +79,11 @@
               <div class="col-md-4">
                 <input name="reason" class="form-control" placeholder="Reason" required>
               </div>
+              <div class="mb-3">
+                <label class="form-label">Expiry date (expires 24h from start of this date)</label>
+                <input type="date" class="form-control" name="expiry_date">
+                <div class="form-text">Leave blank for a permanent block.</div>
+              </div>
               <div class="col-md-1 d-grid">
                 <button type="submit" class="btn btn-outline-primary">Block</button>
               </div>
@@ -94,6 +99,7 @@
                   <th>Reason</th>
                   <th>Created By</th>
                   <th>Created At</th>
+                  <th>Expires At</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -104,6 +110,7 @@
                   <td>{{ ip_row.reason }}</td>
                   <td>{{ ip_row.created_by }}</td>
                   <td>{{ ip_row.created_at }}</td>
+                  <td>{{ ip_row.expires_at }}</td>
                   <td>
                     <!-- Example Unblock button (wire this route in Flask) -->
                     <form method="POST" action="{{ url_for('unblock_ip') }}" class="d-inline">
