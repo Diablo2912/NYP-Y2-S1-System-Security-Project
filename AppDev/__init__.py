@@ -79,6 +79,11 @@ limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "5
 UPLOAD_FOLDER = 'static/uploads/'
 images = UploadSet('images', IMAGES)
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+
+def allowed_file(filename: str) -> bool:
+    """Check if the filename has an allowed extension."""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 otp_store = {}
 
 if not os.path.exists(UPLOAD_FOLDER):
@@ -121,12 +126,12 @@ mail = Mail(app)
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'glen'
-# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-# app.config['MYSQL_DB'] = 'ssp_db'
-# app.config['MYSQL_PORT'] = 3306
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'glen'
+app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+app.config['MYSQL_DB'] = 'ssp_db'
+app.config['MYSQL_PORT'] = 3306
 
 # BRANDON SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -144,11 +149,11 @@ mail = Mail(app)
 # app.config['MYSQL_DB'] = 'ssp_db'
 # app.config['MYSQL_PORT'] = 3306
 #
-# #SACHIN SQL DB CONFIG
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-app.config['MYSQL_DB'] = 'sspCropzy'
+# # #SACHIN SQL DB CONFIG
+# app.config['MYSQL_HOST'] = 'localhost'
+# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+# app.config['MYSQL_DB'] = 'sspCropzy'
 # #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -164,6 +169,55 @@ with app.app_context():
     db.create_all()
 
 serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+
+
+def check_db_connection(mysql):
+    """
+    Quick DB health check.
+    Returns True if DB connection works, False otherwise.
+    Sends a test email if DB connection fails.
+    """
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("SELECT 1")  # lightweight test
+        print("Database connection successful")
+        cur.close()
+        return True
+    except Exception as e:
+        print(f"[DEBUG][DB-CONNECTION-ERROR] Database connection failed: {e}")
+
+        # Send email alert
+        try:
+            date = datetime.now().strftime("%Y-%m-%d")
+            time = datetime.now().strftime("%I:%M %p")
+            subject = "Subject: [ALERT]: MySQL Database connection failure detected"
+            body = f"""
+Dear Admin,
+
+A MySQL Database connection failure detected:
+
+Incident Details:
+Severity    : Critical
+Description : MySQL Database connection unsuccessful: {e}
+Date        : {date}
+Time        : {time}
+
+Please investigate this issue as soon as possible to ensure the security and integrity of the system.
+
+If you require further context or logs, contact the security team or check the system alerts.    
+
+This is an automated message. Please do not reply.  
+For assistance, contact the Cropzy Security Team directly.
+
+Regards,  
+Cropzy Security Monitoring System
+"""
+            send_email("glenloo2007@gmail.com", subject, body)
+            print("[DEBUG] Test email sent to test@gmail.com")
+        except Exception as mail_err:
+            print(f"[DEBUG] Failed to send test email: {mail_err}")
+
+        return False
 
 def generate_self_signed_cert(cert_file='certs/cert.pem', key_file='certs/key.pem'):
     cert_path = pathlib.Path(cert_file)
@@ -498,6 +552,7 @@ def generate_logs_summary(mysql):
 
     except Exception as e:
         print(f"[Error] Failed to summarize logs: {e}")
+        admin_log_activity(mysql, activity=f"Logs dashboard AI Summariser failure: {e}", category="Error")
         return "Error: Could not summarize logs."
 
 
@@ -1021,6 +1076,11 @@ def create_product():
         # image upload
         image_file = form.product_image.data
         if image_file and image_file.filename != '':
+            if not allowed_file(image_file.filename):  # <-- use image_file
+                admin_log_activity( mysql, f"Blocked upload of disallowed file '{image_file.filename}' by {current_user['user_id']} ", category="Warning", user_id=current_user['user_id'] )
+                flash("File type not allowed. Only png, jpg, jpeg are permitted.", "danger")
+                return redirect(request.url)
+
             filename = secure_filename(image_file.filename)
             image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             image_file.save(image_path)
@@ -1214,71 +1274,88 @@ def clear_products():
 
 @app.route('/carbonFootprintTracker', methods=['GET', 'POST'])
 def carbonFootprintTracker():
-    if 'selected_products' not in session:
-        session['selected_products'] = []  # Initialize session storage
+    actor_id = session.get('user_id')
 
-    products = Product.query.all()
+    try:
+        if 'selected_products' not in session:
+            session['selected_products'] = []  # Initialize session storage
 
-    if request.method == 'POST':
-        product_name = request.form.get('product')
+        products = Product.query.all()
 
-        # Find the product from the database
-        product = Product.query.filter_by(name=product_name).first()
+        if request.method == 'POST':
+            product_name = request.form.get('product')
 
-        if product:
-            # store product details
-            session['selected_products'].append({
-                'id': product.id,
-                'name': product.name,
-                'category': product.category,
-                'co2': product.co2
-            })
-            session.modified = True  # save session changes
+            # Find the product from the database
+            product = Product.query.filter_by(name=product_name).first()
 
-    # calculate co2 emission
-    selected_products = session['selected_products']
-    total_co2 = sum(product['co2'] for product in selected_products)
+            if product:
+                # store product details
+                session['selected_products'].append({
+                    'id': product.id,
+                    'name': product.name,
+                    'category': product.category,
+                    'co2': product.co2
+                })
+                session.modified = True  # save session changes
 
-    co2_equivalent = ""
-    goal_status = ""
+        # calculate co2 emission
+        selected_products = session['selected_products']
+        total_co2 = sum(product['co2'] for product in selected_products)
 
-    # co2 impact comparison
-    if total_co2 > 0:
-        if total_co2 < 10:
-            co2_equivalent = "Equivalent to charging a smartphone 1,200 times."
-        elif total_co2 < 30:
-            co2_equivalent = "Equivalent to driving a car for 10 miles."
-        elif total_co2 < 50:
-            co2_equivalent = "Equivalent to running an AC for 3 hours."
+        co2_equivalent = ""
+        goal_status = ""
+
+        # co2 impact comparison
+        if total_co2 > 0:
+            if total_co2 < 10:
+                co2_equivalent = "Equivalent to charging a smartphone 1,200 times."
+            elif total_co2 < 30:
+                co2_equivalent = "Equivalent to driving a car for 10 miles."
+            elif total_co2 < 50:
+                co2_equivalent = "Equivalent to running an AC for 3 hours."
+            else:
+                co2_equivalent = "Equivalent to 100kg of CO₂ emitted!"
+
+        # co2 alternative suggestions
+        suggested_alternatives = []
+        for product in selected_products:
+            if 'category' in product:
+                low_co2_alternative = Product.query.filter(
+                    Product.category == product['category'], Product.co2 < product['co2']
+                ).order_by(Product.co2).first()
+
+                if low_co2_alternative:
+                    suggested_alternatives.append((product, low_co2_alternative))
+
+        # co2 goal tracker
+        target_co2_limit = 30  # Set a sustainable benchmark
+        if total_co2 < target_co2_limit:
+            goal_status = f"✅ You are within the sustainable limit! ({total_co2}kg CO₂)"
         else:
-            co2_equivalent = "Equivalent to 100kg of CO₂ emitted!"
+            goal_status = f"⚠️ Reduce emissions! Try staying under {target_co2_limit}kg CO₂."
 
-    # co2 alternative suggestions
-    suggested_alternatives = []
-    for product in selected_products:
-        if 'category' in product:
-            low_co2_alternative = Product.query.filter(
-                Product.category == product['category'], Product.co2 < product['co2']
-            ).order_by(Product.co2).first()
+        # log successful render
+        try:
+            admin_log_activity(mysql, f"CFT rendered for user {actor_id} ({len(products)} products)", category="Info", user_id=actor_id)
+        except Exception:
+            pass
 
-            if low_co2_alternative:
-                suggested_alternatives.append((product, low_co2_alternative))
+        return render_template('carbonFootprintTracker.html',
+                               products=products,
+                               selected_products=selected_products,
+                               total_co2=total_co2,
+                               co2_equivalent=co2_equivalent,
+                               suggested_alternatives=suggested_alternatives,
+                               goal_status=goal_status)
 
-    # co2 goal tracker
-    target_co2_limit = 30  # Set a sustainable benchmark
-    if total_co2 < target_co2_limit:
-        goal_status = f"✅ You are within the sustainable limit! ({total_co2}kg CO₂)"
-    else:
-        goal_status = f"⚠️ Reduce emissions! Try staying under {target_co2_limit}kg CO₂."
-
-    return render_template('carbonFootprintTracker.html',
-                           products=products,
-                           selected_products=selected_products,
-                           total_co2=total_co2,
-                           co2_equivalent=co2_equivalent,
-                           suggested_alternatives=suggested_alternatives,
-                           goal_status=goal_status)
-
+    except Exception as e:
+        # log error if CFT fails
+        try:
+            admin_log_activity(mysql, f"CFT error / DOWN: {e}", category="Error", user_id=actor_id)
+        except Exception:
+            pass
+        flash("⚠️ Carbon Footprint Tracker is temporarily unavailable.", "danger")
+        return redirect(url_for('home'))
 
 @app.route('/deleteSelectedProduct/<int:product_id>', methods=['POST'])
 def deleteSelectedProduct(product_id):
@@ -1437,6 +1514,8 @@ def accountHist():
 def dashboard():
     jwt_user = g.user
     if jwt_user['status'] not in ['admin']:
+        admin_log_activity(mysql, f"Unauthorised User tried to access admin dashboard", category="Warning",
+                           user_id=jwt_user['user_id'])
         return render_template('404glen.html')
 
     user_id = jwt_user['user_id']
@@ -1497,6 +1576,8 @@ def dashboard():
 def ip_management():
     jwt_user = g.user
     if jwt_user['status'] not in ['admin']:
+        admin_log_activity(mysql, f"Unauthorised User tried to access an admin platform", category="Warning",
+                           user_id=jwt_user['user_id'])
         return render_template('404glen.html')
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -1550,6 +1631,7 @@ def ipmgmt_block_ip():
         )
         mysql.connection.commit()
         flash(f"Blocked IP: {ip_norm}", "success")
+        admin_log_activity(mysql, f'Admin {user_id} has blocked {ip_norm} due to {reason}', category="Info", user_id=g.user["user_id"])
     except Exception as e:
         mysql.connection.rollback()
         flash(f"Failed to block IP ({ip_norm}): {e}", "danger")
@@ -1590,6 +1672,8 @@ def update_user_status(id):
 
     if current_user['status'] != 'admin':
         flash("Only staff can change user statuses.", "danger")
+        admin_log_activity(mysql, f"Unauthorised User tried to access an admin platform", category="Warning",
+                           user_id=current_user['user_id'])
         return redirect(url_for('dashboard'))
 
     cursor = mysql.connection.cursor()
@@ -1619,6 +1703,13 @@ def update_user_status(id):
         item_name=f"You changed user ID {id}'s status from '{old_status}' to '{new_status}'."
     )
 
+    admin_log_activity(
+        mysql,
+        f"Admin {current_user['user_id']} updated user {id} role from {old_status} to {new_status}",
+        category="Info",
+        user_id=current_user['user_id']
+    )
+
     cursor.close()
 
     flash("User status updated successfully.", "success")
@@ -1632,8 +1723,21 @@ def createAdmin():
     current_user = g.user
     site_key = os.getenv("RECAPTCHA_SITE_KEY")
 
+    ip_address = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+    # If testing locally, uncomment this line:
+    # ip_address = requests.get("https://api.ipify.org").text
+
+    # Get country code from IP
+
+    if ip_address.startswith("127.") or ip_address.startswith("192.") or ip_address.startswith(
+            "10.") or ip_address.startswith("172."):
+        ip_address = get_public_ip()
+
+    current_country = get_user_country(ip_address)
+    print(f"User IP: {ip_address}, Country: {current_country}")
+
     if current_user['status'] not in ['admin']:
-        return render_template('404.html')
+        return render_template('404glen.html')
 
     create_admin_form = CreateAdminForm(request.form)
 
@@ -1677,8 +1781,8 @@ def createAdmin():
             hashed_password = hash_password(create_admin_form.pswd.data)
 
             cursor.execute('''
-                INSERT INTO accounts (first_name, last_name, gender, phone_number, email, password, status, two_factor_status) 
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO accounts (first_name, last_name, gender, phone_number, email, password, status, two_factor_status, countries) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             ''', (
                 first_name,
                 last_name,
@@ -1687,7 +1791,8 @@ def createAdmin():
                 email,
                 hashed_password,
                 status,
-                'disabled'
+                'disabled',
+                current_country
             ))
 
             mysql.connection.commit()
@@ -1701,6 +1806,13 @@ def createAdmin():
                 to_email=current_user['email'],
                 action_type="Created Admin Account",
                 item_name=f"You created an admin account for {email}."
+            )
+
+            admin_log_activity(
+                mysql,
+                f"An account email: {email}, role: {status} has been created successfully",
+                category="Info",
+                user_id=current_user['user_id']
             )
 
             cursor.close()
@@ -1719,6 +1831,8 @@ def update_log_status(id):
 
     if current_user['status'] != 'admin':
         flash("Only admins can change log statuses.", "danger")
+        admin_log_activity(mysql, f"Unauthorised User tried to access an admin platform", category="Warning",
+                           user_id=current_user['user_id'])
         return redirect(url_for('logging'))
 
     cursor = mysql.connection.cursor()
@@ -1749,6 +1863,8 @@ def delete_log(id):
 
     if current_user['status'] != 'admin':
         flash("Only admins can delete logs.", "danger")
+        admin_log_activity(mysql, f"Unauthorised User tried to access an admin platform", category="Warning",
+                           user_id=current_user['user_id'])
         return redirect(url_for('logging'))
 
     cursor = mysql.connection.cursor()
@@ -1776,6 +1892,8 @@ def delete_log(id):
 def logging():
     current_user = g.user
     if current_user['status'] != 'admin':
+        admin_log_activity(mysql, f"Unauthorised User tried to access logs ", category="Warning",
+                           user_id=current_user['user_id'])
         return render_template('404.html')
 
     search_query = request.args.get("search", "").strip().lower()
@@ -1867,6 +1985,8 @@ def logging():
 def logging_analytics():
     current_user = g.user
     if current_user['status'] != 'admin':
+        admin_log_activity(mysql, f"Unauthorised User tried to access logging dashboard platform", category="Warning",
+                           user_id=current_user['user_id'])
         return render_template('404.html')
 
     today = datetime.now().date()
@@ -1988,7 +2108,14 @@ def logging_analytics():
 def download_pdf_report():
     current_user = g.user
     if current_user['status'] != 'admin':
+        admin_log_activity(mysql, f"Unauthorised User tried to download logs report", category="Warning",
+                           user_id=current_user['user_id'])
         return render_template('404.html')
+
+    admin_log_activity(mysql,
+                       f"Admin {current_user['user_id']} downloaded report",
+                       category="Info",
+                       user_id=current_user['user_id'])
 
     # --- Build password: firstname + phone digits ---
     # Try a few common keys for first name and phone
@@ -2338,6 +2465,26 @@ def inject_user():
     user = verify_jwt_token(token) if token else None
     return dict(current_user=user)
 
+def is_ip_blocked(mysql, client_ip: str) -> bool:
+    """
+    Returns True if the given client_ip is found in ip_blocklist.
+    Supports exact IP matches. (Extendable to CIDR in future.)
+    """
+    try:
+        # Normalize/validate IP (optional, if you already do elsewhere)
+        try:
+            ipaddress.ip_address(client_ip)
+        except ValueError:
+            return False  # if it's not a valid IP, don't accidentally block
+
+        cur = mysql.connection.cursor()
+        cur.execute("SELECT 1 FROM ip_blocklist WHERE ip=%s LIMIT 1", (client_ip,))
+        row = cur.fetchone()
+        cur.close()
+        return bool(row)
+    except Exception:
+        # If DB temporarily down, fail-open here; your 2FA/geo rules still apply
+        return False
 
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("500 per 1 minutes")
@@ -2355,7 +2502,8 @@ def login():
 
     login_form = LoginForm(request.form)
     site_key = os.getenv("RECAPTCHA_SITE_KEY")
-    # redirect
+
+    # redirect if already logged in
     if 'jwt_token' in request.cookies:
         if next_target:
             return redirect(next_target)
@@ -2390,18 +2538,40 @@ def login():
         cursor.close()
 
         if user:
-            # Hardcoded IP (Singapore - SG) for testing purposes
+            # Get client IP
             ip_address = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
 
             # If running locally (private IP), use real public IP
-            if ip_address.startswith("127.") or ip_address.startswith("192.") or ip_address.startswith(
-                    "10.") or ip_address.startswith("172."):
+            if ip_address.startswith(("127.", "192.", "10.", "172.")):
                 ip_address = get_public_ip()
 
+            # ⬇⬇⬇ NEW: Block if IP is in ip_blocklist
+            if is_ip_blocked(mysql, ip_address):
+                flash("Login from your region is not allowed.", "danger")
+                try:
+                    log_user_action(
+                        user_id=user['id'],
+                        session_id=None,
+                        action=f"Login blocked - IP in blocklist | IP: {ip_address} | Agent: {user_agent}"
+                    )
+                except Exception:
+                    pass
+                try:
+                    admin_log_activity(
+                        mysql,
+                        f"Unusual location access warning triggered. Login blocked for user {user['id']} from blocked IP {ip_address}",
+                        category="Warning",
+                        user_id=user['id']
+                    )
+                except Exception:
+                    pass
+                return redirect(url_for('login'))
+            # ⬆⬆⬆ END NEW
+
+            # Country restrictions
             current_country = get_user_country(ip_address)
             print(f"User IP: {ip_address}, Country: {current_country}")
 
-            # Ensure 'countries' is not None
             allowed_countries = user.get('countries') or ''
             allowed_list = [c.strip() for c in allowed_countries.split(',')] if allowed_countries else []
 
@@ -2417,7 +2587,8 @@ def login():
             if is_account_frozen(user['id']):
                 unfreeze_link = url_for('ajax_send_unfreeze_email', user_id=user['id'])
                 message = Markup(
-                    f"Account has been frozen. Send unfreeze email <a href='#' class='alert-link' onclick=\"sendUnfreezeRequest('{unfreeze_link}')\">here</a>.")
+                    f"Account has been frozen. Send unfreeze email <a href='#' class='alert-link' onclick=\"sendUnfreezeRequest('{unfreeze_link}')\">here</a>."
+                )
                 flash(message, "danger")
                 return redirect(url_for('login'))
 
@@ -2428,7 +2599,7 @@ def login():
                     send_otp_email(user['email'], user['id'], user['first_name'], user['last_name'])
                     session['pending_2fa_user_id'] = user['id']
                     session['pending_2fa_started_at'] = time.time()
-                    session['pending_2fa_attempts'] = 0  # NEW
+                    session['pending_2fa_attempts'] = 0
 
                     if next_target:
                         session['post_login_next'] = next_target
@@ -2468,7 +2639,6 @@ def login():
                         action_type="Login Notification",
                         item_name=f"Your Cropzy account was just logged in from IP: {ip_addr}\n\nDevice: {user_agent}"
                     )
-
                     return response
 
             flash('Incorrect password.', 'danger')
@@ -2478,8 +2648,7 @@ def login():
     if next_target:
         session['post_login_next'] = next_target
 
-    # no cache
-    response = make_response(render_template('/accountPage/login.html', form=login_form, site_key=site_key, ))
+    response = make_response(render_template('/accountPage/login.html', form=login_form, site_key=site_key))
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     return response
@@ -3389,6 +3558,8 @@ def flag_session(session_id):
 def view_session_flags():
     jwt_user = g.user
     if jwt_user['status'] not in ['admin']:
+        admin_log_activity(mysql, f"Unauthorised User tried to access an admin platform", category="Warning",
+                           user_id=jwt_user['user_id'])
         return render_template('404glen.html')
 
     user_id = jwt_user['user_id']
@@ -3526,6 +3697,8 @@ def detect_sensitive_changes(action_rows):
 def admin_resolve_session_flag(flag_id):
     jwt_user = g.user
     if jwt_user['status'] not in ['admin']:
+        admin_log_activity(mysql, f"Unauthorised User tried to access an admin platform", category="Warning",
+                           user_id=jwt_user['user_id'])
         return render_template('404glen.html')
 
     note = (request.form.get('resolution_note') or '').strip()[:255]
@@ -4169,6 +4342,8 @@ def delete_user(id):
 def admin_delete_user(id):
     current_user = g.user
     if current_user['status'] != 'admin':
+        admin_log_activity(mysql, f"Unauthorised User tried to access an admin platform", category="Warning",
+                           user_id=current_user['user_id'])
         flash("You are not authorized to delete this account.", "danger")
         return redirect(url_for('accountInfo'))
 
@@ -4189,6 +4364,13 @@ def admin_delete_user(id):
         user_id=current_user['user_id'],
         session_id=current_user['session_id'],
         action=f"Admin deleted user account (ID: {id})"
+    )
+
+    admin_log_activity(
+        mysql,
+        f"Admin deleted a user account (ID: {id})",
+        category="Info",
+        user_id=current_user['user_id']
     )
     flash("User account deleted successfully.", "success")
     return redirect(url_for('dashboard'))
@@ -4645,6 +4827,7 @@ def create_checkout_session():
         )
         return redirect(checkout_session.url)
     except Exception as e:
+        admin_log_activity(mysql, f"Stripe payment has failed for users", category="Critical", user_id=g.user["user_id"])
         return f"Error: {str(e)}", 500
 
 
@@ -4737,7 +4920,6 @@ def notify_user_action(to_email, action_type, item_name=None, details=None):
 
     except Exception as e:
         print(f"[ERROR] Failed to send notification: {e}")
-
 
 
 def send_email(to_email, subject, message):
@@ -4965,20 +5147,42 @@ def set_clickjacking_protection(response):
 
 @app.route('/freeze_account/<int:user_id>', methods=['POST'])
 def freeze_account(user_id):
-    cursor = mysql.connection.cursor()
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
+    # 🔎 Check if the target account is an admin
+    cursor.execute("SELECT status FROM accounts WHERE id = %s", (user_id,))
+    user = cursor.fetchone()
+
+    if user and user.get("status") == "admin":
+        # Critical: an admin account was frozen (possible compromise)
+        try:
+            admin_log_activity(
+                mysql,
+                f"Admin (ID {user_id}) account compromised",
+                category="Critical",
+                user_id=g.user['user_id']
+            )
+        except Exception as e:
+            print(f"[DEBUG] Failed to log critical admin freeze: {e}")
+
+    # Proceed with freezing (works for all accounts)
     cursor.execute(
-        "INSERT INTO frozen_account (user_id, reason, frozen_at, is_frozen) VALUES (%s, %s, NOW(), TRUE)",
-        (user_id, 'Manual freeze by user'))
-
+        """
+        INSERT INTO frozen_account (user_id, reason, frozen_at, is_frozen)
+        VALUES (%s, %s, NOW(), TRUE)
+        """,
+        (user_id, 'Manual freeze by user')
+    )
     mysql.connection.commit()
     cursor.close()
+
+    # Clear session and JWT
     session.clear()
     response = make_response(redirect(url_for('login')))
     response.delete_cookie('jwt_token')
     flash("Account has been frozen.", "danger")
 
-    return response  # Or wherever you're managing users
+    return response
 
 
 def is_account_frozen(user_id):
@@ -5065,7 +5269,9 @@ def ajax_send_unfreeze_email():
 
 @app.errorhandler(429)
 def ratelimit_handler(e):
+    admin_log_activity(mysql, "Too many request sent at once, ratelimit reached", category="Warning", user_id=g.user["user_id"])
     return render_template("errors/429.html", error=str(e)), 429
+
 
 @app.route('/404_NOT_FOUND')
 def notfound():
@@ -5073,5 +5279,7 @@ def notfound():
 
 if __name__ == "__main__":
     generate_self_signed_cert()
+    with app.app_context():
+        check_db_connection(mysql)
 
     app.run(ssl_context=("certs/cert.pem", "certs/key.pem"), host="127.0.0.1", port=443, debug=True)
