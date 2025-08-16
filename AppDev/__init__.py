@@ -1586,7 +1586,8 @@ def ip_management():
                ip,
                reason,
                created_by,
-               created_at
+               created_at,
+               expires_at
         FROM ip_blocklist
         ORDER BY created_at DESC
     """)
@@ -1618,20 +1619,26 @@ def ipmgmt_block_ip():
 
     cur = mysql.connection.cursor()
     try:
-        # Upsert with created_by filled from current user
+        # Upsert with a 24-hour expiry from now (refreshes on duplicate)
         cur.execute(
             """
-            INSERT INTO ip_blocklist (ip, reason, created_by)
-            VALUES (%s, %s, %s)
+            INSERT INTO ip_blocklist (ip, reason, created_by, expires_at)
+            VALUES (%s, %s, %s, NOW() + INTERVAL 24 HOUR)
             ON DUPLICATE KEY UPDATE
                 reason = VALUES(reason),
-                created_by = VALUES(created_by)
+                created_by = VALUES(created_by),
+                expires_at = NOW() + INTERVAL 24 HOUR
             """,
             (ip_norm, reason, user_id),
         )
         mysql.connection.commit()
-        flash(f"Blocked IP: {ip_norm}", "success")
-        admin_log_activity(mysql, f'Admin {user_id} has blocked {ip_norm} due to {reason}', category="Info", user_id=g.user["user_id"])
+        flash(f"Blocked IP for 24h: {ip_norm}", "success")
+        admin_log_activity(
+            mysql,
+            f'Admin {user_id} blocked {ip_norm} (expires in 24h) — reason: {reason}',
+            category="Info",
+            user_id=g.user["user_id"]
+        )
     except Exception as e:
         mysql.connection.rollback()
         flash(f"Failed to block IP ({ip_norm}): {e}", "danger")
@@ -1639,6 +1646,64 @@ def ipmgmt_block_ip():
         cur.close()
 
     return redirect(url_for("ip_management"))
+
+def cleanup_expired_blocks(mysql):
+    """
+    Insert a log row for each expired IP, then delete them from ip_blocklist.
+    Log format:
+      user_id   -> NULL
+      date      -> DATE(expires_at)
+      time      -> '00:00'
+      category  -> 'Info'
+      activity  -> f"{ip} has expired at {YYYY-MM-DD}"
+      status    -> NULL
+      ip_address-> NULL
+    """
+    import MySQLdb
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        # 1) Find all expired blocks
+        cur.execute("""
+            SELECT ip, DATE(expires_at) AS exp_date
+            FROM ip_blocklist
+            WHERE expires_at IS NOT NULL AND expires_at < NOW()
+        """)
+        expired = cur.fetchall() or []
+
+        # 2) Log each expired IP with the requested field values
+        if expired:
+            ins = mysql.connection.cursor()
+            try:
+                for row in expired:
+                    ip = row["ip"]
+                    # exp_date is a date object or string depending on connector; normalize to ISO
+                    exp_date = row["exp_date"]
+                    exp_date_str = exp_date.strftime("%Y-%m-%d") if hasattr(exp_date, "strftime") else str(exp_date)
+
+                    activity = f"{ip} has expired at {exp_date_str}"
+                    ins.execute(
+                        """
+                        INSERT INTO logs (user_id, date, time, category, activity, status, ip_address)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (None, exp_date_str, "00:00", "Info", activity, None, None),
+                    )
+            finally:
+                ins.close()
+
+            # 3) Delete expired rows
+            cur.execute("""
+                DELETE FROM ip_blocklist
+                WHERE expires_at IS NOT NULL AND expires_at < NOW()
+            """)
+
+        mysql.connection.commit()
+    except Exception:
+        mysql.connection.rollback()
+        raise
+    finally:
+        cur.close()
 
 @app.post('/unblock_ip')
 @jwt_required
@@ -5373,5 +5438,6 @@ if __name__ == "__main__":
     generate_self_signed_cert()
     with app.app_context():
         check_db_connection(mysql)
+        cleanup_expired_blocks(mysql)
 
     app.run(ssl_context=("certs/cert.pem", "certs/key.pem"), host="127.0.0.1", port=443, debug=True)
