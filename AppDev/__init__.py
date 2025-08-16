@@ -2665,6 +2665,9 @@ def login():
             if ip_address.startswith(("127.", "192.", "10.", "172.")):
                 ip_address = get_public_ip()
 
+            # Hardcoded IP for testing (uncomment to force a fixed IP every login)
+            # ip_address = "172.21.0.1"
+
             # ⬇⬇⬇ NEW: Block if IP is in ip_blocklist
             if is_ip_blocked(mysql, ip_address):
                 flash("Login from your region is not allowed.", "danger")
