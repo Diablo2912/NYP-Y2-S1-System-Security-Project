@@ -67,6 +67,9 @@ from chatbot import generate_response
 from modelsProduct import Product, db
 from seasonalUpdateForm import SeasonalUpdateForm
 
+from authlib.integrations.flask_client import OAuth
+
+
 app = Flask(__name__)
 csrf = CSRFProtect()
 
@@ -89,6 +92,16 @@ if isinstance(fernet_key, str):
     fernet_key = fernet_key.encode()
 
 fernet = Fernet(fernet_key)
+
+oauth = OAuth(app)
+
+oauth.register(
+    name='google',
+    client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs={'scope': 'openid email profile'},
+)
 
 app.register_blueprint(main_blueprint)
 app.config['SECRET_KEY'] = '5791262abcdefg'
@@ -118,12 +131,12 @@ mail = Mail(app)
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'glen'
-app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'glen'
+# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 
 # BRANDON SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -148,12 +161,12 @@ app.config['MYSQL_PORT'] = 3306
 # app.config['MYSQL_DB'] = 'sspCropzy'
 #
 # #SADEV SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'root'
-# app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
-# app.config['MYSQL_DB'] = 'ssp_db'
-# app.config['MYSQL_PORT'] = 3306
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'root'
+app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+app.config['MYSQL_DB'] = 'ssp_db'
+app.config['MYSQL_PORT'] = 3306
 
 mysql = MySQL(app)
 
@@ -4264,6 +4277,151 @@ def set_clickjacking_protection(response):
         response.headers['X-Frame-Options'] = 'DENY'
         response.headers['Content-Security-Policy'] = "frame-ancestors 'none';"
     return response
+
+@app.route("/login/google")
+def login_google():
+    import secrets
+    nonce = secrets.token_urlsafe(16)
+    session["oidc_nonce"] = nonce
+    redirect_uri = url_for("google_callback", _external=True)
+    return oauth.google.authorize_redirect(redirect_uri, nonce=nonce)
+
+@app.route("/auth/google/callback")
+def google_callback():
+    import time, secrets, bcrypt
+    from datetime import datetime, timedelta
+    import MySQLdb
+    from flask import request, make_response
+
+    try:
+        # Exchange code for tokens
+        token = oauth.google.authorize_access_token()
+        nonce = session.pop("oidc_nonce", None)
+        userinfo = None
+        try:
+            userinfo = oauth.google.parse_id_token(token, nonce=nonce)
+        except Exception:
+            userinfo = oauth.google.get("userinfo").json()
+    except Exception as e:
+        import traceback
+        print("Google OAuth error:", repr(e))
+        traceback.print_exc()
+        print("error:", request.args.get("error"))
+        print("error_description:", request.args.get("error_description"))
+        print("state:", request.args.get("state"))
+        flash("Google sign-in failed. Check server logs for details.", "danger")
+        return redirect(url_for("login"))
+
+    # Extract profile fields
+    sub   = (userinfo or {}).get("sub")
+    email = (userinfo or {}).get("email")
+    email_verified = bool((userinfo or {}).get("email_verified"))
+    picture = (userinfo or {}).get("picture")
+    name = (userinfo or {}).get("name") or ""
+
+    if not sub:
+        flash("Google sign-in failed (missing subject).", "danger")
+        return redirect(url_for("login"))
+
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    # 1) Already linked
+    cursor.execute("SELECT * FROM accounts WHERE google_sub=%s", (sub,))
+    user = cursor.fetchone()
+
+    # 2) Link existing by email if verified
+    if not user and email and email_verified:
+        cursor.execute("SELECT * FROM accounts WHERE email=%s", (email,))
+        user = cursor.fetchone()
+        if user:
+            cursor.execute("""
+                UPDATE accounts
+                   SET google_sub=%s,
+                       oauth_provider='google',
+                       oauth_picture=%s,
+                       oauth_email_verified=%s
+                 WHERE id=%s
+            """, (sub, picture, int(email_verified), user["id"]))
+            mysql.connection.commit()
+
+    # 3) New account
+    if not user:
+        first = name.split(" ", 1)[0] if name else ""
+        last  = name.split(" ", 1)[1] if (" " in name) else ""
+
+        rand_pw = secrets.token_urlsafe(24).encode("utf-8")
+        hashed_pw = bcrypt.hashpw(rand_pw, bcrypt.gensalt()).decode("utf-8")
+
+        cursor.execute("""
+            INSERT INTO accounts
+                (first_name, last_name, email, password, status, two_factor_status,
+                 google_sub, oauth_provider, oauth_picture, oauth_email_verified)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """, (
+            first, last, email, hashed_pw, "user", "disabled",
+            sub, "google", picture, int(email_verified),
+        ))
+        mysql.connection.commit()
+        cursor.execute("SELECT * FROM accounts WHERE google_sub=%s", (sub,))
+        user = cursor.fetchone()
+
+    cursor.execute("UPDATE accounts SET last_login_provider='google' WHERE id=%s", (user["id"],))
+    mysql.connection.commit()
+    cursor.close()
+
+    # --- Handle 2FA ---
+    if user.get("two_factor_status") == "enabled":
+        if not user.get("email"):
+            flash("Your account has 2FA enabled but no email is set. Contact support.", "danger")
+            return redirect(url_for("login"))
+
+        try:
+            send_otp_email(user["email"], user["id"], user.get("first_name",""), user.get("last_name",""))
+        except Exception as e:
+            print("Failed to send OTP:", repr(e))
+
+        session["pending_2fa_user_id"] = user["id"]
+        session["pending_2fa_started_at"] = time.time()
+        session["pending_2fa_attempts"] = 0
+
+        flash("Enter the 6-digit code sent to your email to finish signing in.", "info")
+        return redirect(url_for("verify_otp", id=user["id"]))
+
+    # --- Normal login (no 2FA) ---
+    session_id = log_session_activity(user['id'], user['status'], 'login')
+
+    payload = {
+        'user_id': user['id'],
+        'first_name': user.get('first_name'),
+        'last_name': user.get('last_name'),
+        'email': user.get('email'),
+        'gender': user.get('gender'),
+        'phone': user.get('phone_number'),
+        'status': user.get('status'),
+        'session_id': session_id,
+        'exp': datetime.utcnow() + timedelta(hours=1),
+    }
+
+    token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+    if isinstance(token, bytes):
+        token = token.decode("utf-8")
+
+    resp = make_response(redirect(url_for('home')))
+    resp.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Strict')
+
+    try:
+        log_user_action(user_id=user['id'], session_id=session_id, action="Login via Google (no 2FA)")
+        notify_user_action(
+            to_email=user['email'],
+            action_type="Login Notification",
+            item_name="Signed in with Google"
+        )
+    except Exception:
+        pass
+
+    flash("Signed in with Google.", "success")
+    return resp
+
 
 
 @app.route('/freeze_account/<int:user_id>', methods=['POST'])
