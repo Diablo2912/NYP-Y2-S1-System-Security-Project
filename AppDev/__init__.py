@@ -1498,28 +1498,41 @@ def accountSecurity():
 @app.route('/accountHist')
 @jwt_required
 def accountHist():
-    user_id = g.user['email']  # Get logged-in user ID
+    # Make sure we have a logged-in user
+    user = getattr(g, "user", None)
+    if not user:
+        # If your jwt loader didn’t populate g.user, redirect or handle accordingly
+        return redirect(url_for('login'))
 
-    # Get all transactions from session (if not found, return empty list)
-    all_transactions = session.get("transactions", [])
+    email = user.get('email')
 
-    # DEBUGGING: Print transactions for testing
-    print(f"All Transactions: {all_transactions}")
-    print(f"Logged-in User ID: {user_id}")
+    # Pull all transactions from session (or empty list)
+    all_transactions = session.get("transactions") or []
 
-    # Ensure transactions are correctly structured and filter them
-    user_transactions = [t for t in all_transactions if t.get("email") == user_id]
+    # Filter to this user’s transactions
+    user_transactions = [t for t in all_transactions if t.get("email") == email]
 
-    # DEBUGGING: Check filtered transactions
-    print(f"User Transactions: {user_transactions}")
+    # Optional: search across transaction id and product names
+    q = (request.args.get("search") or "").strip().lower()
+    if q:
+        def matches(txn):
+            # id could be "id" or "transaction_id"
+            if q in str(txn.get("id", "")).lower() or q in str(txn.get("transaction_id", "")).lower():
+                return True
+            # search products
+            for p in txn.get("products", []):
+                if q in str(p.get("product_name", "")).lower():
+                    return True
+            return False
+        user_transactions = [t for t in user_transactions if matches(t)]
 
-    # Apply Search Filter (if applicable)
-    search_query = request.args.get("search", "").strip().lower()
-    if search_query:
-        user_transactions = [t for t in user_transactions if
-                             search_query in t["id"].lower() or search_query in t["name"].lower()]
-
-    return render_template('/accountPage/accountHist.html', transactions=user_transactions, search_query=search_query)
+    # IMPORTANT: pass user to the template so the left card renders
+    return render_template(
+        "accountPage/accountHist.html",
+        user=user,
+        transactions=user_transactions,
+        search_query=q
+    )
 
 
 @app.route('/dashboard')

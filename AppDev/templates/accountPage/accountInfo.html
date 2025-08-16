@@ -1,10 +1,9 @@
 {% extends "base.html" %}
-
 {% block content %}
 
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
-    <div class="container">
+    <div class="container mt-3">
       {% for category, message in messages %}
         <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
           {{ message }}
@@ -15,97 +14,117 @@
   {% endif %}
 {% endwith %}
 
+{% set u = user or current_user %}
+
+<style>
+  /* Shared sidebar + mint panel theme */
+  :root{
+    --mint-50:#f3f9f6; --mint-100:#e6f3ee; --mint-200:#d9eee3;
+  }
+  .account-side .list-group-item{border:0;border-radius:0;padding:.9rem 1.1rem}
+  .account-side .list-group-item:hover{background:#f3f8f5}
+  .account-side .list-group-item.active{background:#198754;border-color:#198754;color:#fff}
+  .account-side .avatar{
+    width:60px;height:60px;border-radius:50%;background:#eaf6ef;
+    display:inline-flex;align-items:center;justify-content:center;
+  }
+  .cz-mint-panel{
+    background: linear-gradient(180deg,var(--mint-200),var(--mint-100)) !important;
+    border: 1px solid #c6e4d6; border-radius: 1.25rem;
+    box-shadow: 0 8px 20px rgba(16,98,61,.08);
+  }
+  .cz-mint-chip{
+    background: var(--mint-50) !important;
+    border: 1px solid #cfe7db !important;
+    border-radius: 999px; padding: .9rem 1.25rem;
+  }
+</style>
+
 <div class="container">
   <div class="row">
-    {% if user %}
-    <!-- Left Container -->
+    {% if u %}
+    <!-- Left Sidebar -->
     <div class="col-lg-4 p-3">
-      <div class="card d-flex mb-3 m-3">
-        <div class="card-body pb-0">
-          <div class="d-flex mb-3">
-            <img class="flex" src="{{ url_for('static', filename='assets/person.svg') }}" width="60" height="60">
-            <div class="flex-grow-1 ms-3">
-              <h2 class="card-title mb-1">{{ user.first_name }}</h2>
-              <h6 class="card-subtitle text-body-secondary">{{ user.email }}</h6>
+      <div class="card shadow-sm border-0 rounded-4 account-side m-3">
+        <div class="card-body pb-3">
+          <div class="d-flex align-items-center">
+            <div class="avatar">
+              <img src="{{ url_for('static', filename='assets/person.svg') }}" width="34" height="34" alt="">
+            </div>
+            <div class="ms-3">
+              <h5 class="mb-0">{{ u.first_name }}</h5>
+              <div class="text-body-secondary small">{{ u.email }}</div>
             </div>
           </div>
-
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <a href="{{ url_for('accountInfo') }}" class="link-underline link-underline-opacity-0">
-                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
-                <span class="badge bg-success p-2 fs-5 align-middle shadow">Your Info</span>
-              </a>
-            </li>
-            <li class="list-group-item">
-              <a href="{{ url_for('accountSecurity') }}" class="link-underline link-underline-opacity-0">
-                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
-                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Security Settings</span>
-              </a>
-            </li>
-            <li class="list-group-item">
-              <a href="{{ url_for('accountHist') }}" class="link-underline link-underline-opacity-0">
-                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
-                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Purchase History</span>
-              </a>
-            </li>
-            <li class="list-group-item">
-              <a href="{{ url_for('activity_history') }}" class="link-underline link-underline-opacity-0">
-                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
-                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Session Activity</span>
-              </a>
-            </li>
-            <li class="list-group-item">
-              <a href="{{ url_for('account_security_review') }}" class="link-underline link-underline-opacity-0">
-                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40">
-                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Security Review</span>
-              </a>
-            </li>
-
-
-          </ul>
+        </div>
+        <div class="list-group list-group-flush">
+          <a href="{{ url_for('accountInfo') }}"
+             class="list-group-item list-group-item-action d-flex align-items-center {% if request.endpoint=='accountInfo' %}active{% endif %}">
+            <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="22" height="22" alt="">
+            Your Info
+          </a>
+          <a href="{{ url_for('accountSecurity') }}"
+             class="list-group-item list-group-item-action d-flex align-items-center {% if request.endpoint=='accountSecurity' %}active{% endif %}">
+            <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="22" height="22" alt="">
+            Security Settings
+          </a>
+          <a href="{{ url_for('accountHist') }}"
+             class="list-group-item list-group-item-action d-flex align-items-center {% if request.endpoint=='accountHist' %}active{% endif %}">
+            <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="22" height="22" alt="">
+            Purchase History
+          </a>
+          <a href="{{ url_for('activity_history') }}"
+             class="list-group-item list-group-item-action d-flex align-items-center {% if request.endpoint=='activity_history' %}active{% endif %}">
+            <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="22" height="22" alt="">
+            Session Activity
+          </a>
+          <a href="{{ url_for('account_security_review') }}"
+             class="list-group-item list-group-item-action d-flex align-items-center {% if request.endpoint=='account_security_review' %}active{% endif %}">
+            <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="22" height="22" alt="">
+            Security Review
+          </a>
         </div>
       </div>
     </div>
 
-    <!-- Right Container -->
+    <!-- Right: Account Info -->
     <div class="col-lg-8 p-3">
-      <div class="card d-flex mb-3 m-3 bg-success-subtle">
+      <div class="card d-flex mb-3 m-3 cz-mint-panel border-0 rounded-4">
         <div class="card-body">
-          <h1 class="card-title">Account Info</h1>
+          <h1 class="mb-4">Account Info</h1>
 
           <ul class="list-group list-group-flush">
-            <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
-              <label class="col-md-3 m-1 fs-6">Name</label>
-              <span class="fs-5 p-0">{{ user.first_name }}</span>
-              <span class="fs-5 ps-1">{{ user.last_name }}</span>
+            <li class="list-group-item row g-3 cz-mint-chip m-2">
+              <label class="col-md-3 m-0">Name</label>
+              <span class="col fs-5">{{ u.first_name }} {{ u.last_name }}</span>
             </li>
-            <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
-              <label class="col-md-3 m-1 fs-6">User ID</label>
-              <span class="fs-5 p-0">{{ user.id }}</span>
+            <li class="list-group-item row g-3 cz-mint-chip m-2">
+              <label class="col-md-3 m-0">User ID</label>
+              <span class="col fs-5">{{ u.id }}</span>
             </li>
-            <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
-              <label class="col-md-3 m-1 fs-6">Gender</label>
-              <span class="fs-5 p-0">{{ user.gender }}</span>
+            <li class="list-group-item row g-3 cz-mint-chip m-2">
+              <label class="col-md-3 m-0">Gender</label>
+              <span class="col fs-5">{{ u.gender }}</span>
             </li>
-            <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
-              <label class="col-md-3 m-1 fs-6">Phone Number</label>
-              <span class="fs-5 p-0">{{ user.phone_number }}</span>
+            <li class="list-group-item row g-3 cz-mint-chip m-2">
+              <label class="col-md-3 m-0">Phone Number</label>
+              <span class="col fs-5">{{ u.phone_number }}</span>
             </li>
-            <li class="list-group-item row g-3 bg-body-tertiary rounded-pill border-black border-2 m-2">
-              <label class="col-md-3 m-1 fs-6">Email</label>
-              <span class="fs-5 p-0">{{ user.email }}</span>
+            <li class="list-group-item row g-3 cz-mint-chip m-2">
+              <label class="col-md-3 m-0">Email</label>
+              <span class="col fs-5">{{ u.email }}</span>
             </li>
           </ul>
 
-          <div class="text-end m-2 mt-5">
-            <a href="{{ url_for('change_dets', id=user.id) }}" class="btn btn-success">Change Details</a>
+          <div class="text-end mt-4">
+            <a href="{{ url_for('change_dets', id=u.id) }}" class="btn btn-success">Change Details</a>
 
-            <form action="{{ url_for('delete_user', id=user.id) }}" method="POST" class="d-inline-block">
-              <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal_{{ user.id }}">
+            <!-- Delete account (with reCAPTCHA inside modal) -->
+            <form action="{{ url_for('delete_user', id=u.id) }}" method="POST" class="d-inline-block">
+              <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal_{{ u.id }}">
                 Delete Account
               </button>
-              <div class="modal" id="deleteModal_{{ user.id }}">
+              <div class="modal" id="deleteModal_{{ u.id }}">
                 <div class="modal-dialog">
                   <div class="modal-content">
                     <div class="modal-header">
@@ -113,9 +132,7 @@
                       <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body text-start">
-                      Are you sure you want to delete {{ user.first_name }} {{ user.last_name }}?
-
-                      <!-- reCAPTCHA widget -->
+                      Are you sure you want to delete {{ u.first_name }} {{ u.last_name }}?
                       <div class="g-recaptcha mt-3" data-sitekey="{{ captcha_site_key }}"></div>
                     </div>
                     <div class="modal-footer">
@@ -127,62 +144,57 @@
               </div>
             </form>
 
-            <!-- 2FA Section -->
-            {% if user.two_factor_status == 'enabled' %}
-              <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#disable2FAModal_{{ user.id }}">
+            {% if u.two_factor_status == 'enabled' %}
+              <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#disable2FAModal_{{ u.id }}">
                 Disable 2FA
               </button>
 
-              <button type="button" class="btn btn-warning mb-1" data-bs-toggle="modal" data-bs-target="#viewCodeModal_{{ user.id }}">
+              <button type="button" class="btn btn-warning mb-1" data-bs-toggle="modal" data-bs-target="#viewCodeModal_{{ u.id }}">
                 View Recovery Code
               </button>
 
-              {% if user.face is none %}
-                <a href="{{ url_for('setup_face_id', id=user.id) }}" class="btn btn-warning">
-                  Setup Face ID
-                </a>
+              {% if u.face is none %}
+                <a href="{{ url_for('setup_face_id', id=u.id) }}" class="btn btn-warning">Setup Face ID</a>
               {% else %}
-                <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#disableFaceIDModal_{{ user.id }}">
+                <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#disableFaceIDModal_{{ u.id }}">
                   Disable Face ID
                 </button>
               {% endif %}
 
-
-            <!-- Disable 2FA Modal -->
-            <div class="modal fade" id="disableFaceIDModal_{{ user.id }}" tabindex="-1" aria-hidden="true">
-              <div class="modal-dialog">
-                <div class="modal-content">
-                  <form action="{{ url_for('delete_face_id', id=user.id) }}" method="POST">
-                    <div class="modal-header">
-                      <h5 class="modal-title">Disable Face ID</h5>
-                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body text-start">
-                      <strong>Disabling Face ID will remove an additional method of authentication.</strong><br><br>
-                      Are you sure you want to <strong>disable</strong> Face ID for <strong>{{ user.email }}</strong>?
-                      <br><br>You can always re-register your face later from this page.
-                    </div>
-                    <div class="modal-footer">
-                      <button type="submit" class="btn btn-danger">Disable Face ID</button>
-                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            </div>
-
-              <!-- Disable 2FA Modal -->
-              <div class="modal fade" id="disable2FAModal_{{ user.id }}" tabindex="-1" aria-hidden="true">
+              <!-- Disable Face ID -->
+              <div class="modal fade" id="disableFaceIDModal_{{ u.id }}" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog">
                   <div class="modal-content">
-                    <form action="{{ url_for('disable_two_factor', id=user.id) }}" method="POST">
+                    <form action="{{ url_for('delete_face_id', id=u.id) }}" method="POST">
+                      <div class="modal-header">
+                        <h5 class="modal-title">Disable Face ID</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                      </div>
+                      <div class="modal-body text-start">
+                        <strong>Disabling Face ID will remove an additional method of authentication.</strong><br><br>
+                        Are you sure you want to <strong>disable</strong> Face ID for <strong>{{ u.email }}</strong>?
+                      </div>
+                      <div class="modal-footer">
+                        <button type="submit" class="btn btn-danger">Disable Face ID</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Disable 2FA -->
+              <div class="modal fade" id="disable2FAModal_{{ u.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                  <div class="modal-content">
+                    <form action="{{ url_for('disable_two_factor', id=u.id) }}" method="POST">
                       <div class="modal-header">
                         <h5 class="modal-title">Disable 2FA</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                       </div>
                       <div class="modal-body text-start">
                         <strong>Disabling 2FA will reduce your account’s security.</strong><br><br>
-                        Are you sure you want to <strong>disable</strong> 2FA for {{ user.email }}?
+                        Are you sure you want to <strong>disable</strong> 2FA for {{ u.email }}?
                       </div>
                       <div class="modal-footer">
                         <button type="submit" class="btn btn-danger">Disable</button>
@@ -193,17 +205,17 @@
                 </div>
               </div>
 
-              <!-- View Recovery Code Modal -->
-              <div class="modal fade" id="viewCodeModal_{{ user.id }}" tabindex="-1" aria-hidden="true">
+              <!-- Recovery code -->
+              <div class="modal fade" id="viewCodeModal_{{ u.id }}" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog">
                   <div class="modal-content">
                     <div class="modal-header">
                       <h5 class="modal-title">Recovery Code</h5>
-                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body text-start">
                       Use this recovery code to log in if you lose access to your email or cannot receive OTP.<br><br>
-                      <strong>Recovery Code:</strong><br>{{ user.recovery_code }}
+                      <strong>Recovery Code:</strong><br>{{ u.recovery_code }}
                     </div>
                     <div class="modal-footer">
                       <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -211,23 +223,23 @@
                   </div>
                 </div>
               </div>
+
             {% else %}
-              <!-- Enable 2FA Button -->
-              <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#enable2FAModal_{{ user.id }}">
+              <!-- Enable 2FA -->
+              <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#enable2FAModal_{{ u.id }}">
                 Enable 2FA
               </button>
-
-              <form action="{{ url_for('enable_two_factor', id=user.id) }}" method="POST" class="d-inline">
-                <div class="modal fade" id="enable2FAModal_{{ user.id }}" tabindex="-1" aria-hidden="true">
+              <form action="{{ url_for('enable_two_factor', id=u.id) }}" method="POST" class="d-inline">
+                <div class="modal fade" id="enable2FAModal_{{ u.id }}" tabindex="-1" aria-hidden="true">
                   <div class="modal-dialog">
                     <div class="modal-content">
                       <div class="modal-header">
                         <h5 class="modal-title">Enable 2FA</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                       </div>
                       <div class="modal-body text-start">
                         <strong>Enabling 2FA adds extra protection to your account.</strong><br><br>
-                        Are you sure you want to enable 2FA for <strong>{{ user.email }}</strong>?
+                        Are you sure you want to enable 2FA for <strong>{{ u.email }}</strong>?
                       </div>
                       <div class="modal-footer">
                         <button type="submit" class="btn btn-success">Confirm</button>
@@ -247,5 +259,4 @@
 </div>
 
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-
 {% endblock %}

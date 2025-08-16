@@ -1,52 +1,136 @@
 {% extends "base.html" %}
-
 {% block content %}
+
 <style>
-  /* Layout & sizing */
+  /* ---------- Page shell ---------- */
+  :root{
+    --cz-green: #198754;
+    --cz-surface: rgba(25,135,84,.06);
+    --cz-border: rgba(25,135,84,.16);
+    --cz-sticky-top: 96px; /* nav (~60) + toolbar (~36) */
+  }
+  .cz-hero{
+    background: linear-gradient(180deg, rgba(25,135,84,.07), rgba(25,135,84,.04));
+    border: 1px solid var(--cz-border);
+    border-radius: 16px;
+    padding: 1rem 1.25rem;
+    margin-top: 1rem;
+  }
+  .cz-hero h1{
+    font-size: clamp(1.4rem, 1.1rem + 1.2vw, 2rem);
+    margin: 0;
+    font-weight: 800;
+    letter-spacing: .2px;
+  }
+  .cz-subtle{
+    color: var(--bs-secondary-color, #6c757d);
+    font-size: .95rem;
+  }
+  .cz-pills{ display:flex; gap:.5rem; flex-wrap:wrap; }
+  .cz-pill{
+    background:#fff; border:1px solid var(--cz-border);
+    border-radius:999px; padding:.25rem .6rem; font-weight:600;
+  }
+
+  /* ---------- Sticky toolbar (filter + actions) ---------- */
+  .cz-toolbar{
+    position: sticky; top: 64px; /* below global navbar */
+    z-index: 5;
+    backdrop-filter: blur(6px);
+    background: rgba(255,255,255,.82);
+    border-bottom: 1px solid rgba(0,0,0,.06);
+    padding: .6rem .25rem;
+    margin: .25rem 0 1rem;
+  }
+  @media (max-width: 991.98px){
+    :root{ --cz-sticky-top: 56px; }
+    .cz-toolbar{ top: 56px; }
+  }
+
+  /* ---------- Table layout tweaks (unchanged logic) ---------- */
   .table-flags th, .table-flags td { vertical-align: middle; }
   .table-flags .col-when   { width: 16%; }
   .table-flags .col-user   { width: 22%; }
   .table-flags .col-details{ width: 16%; }
-  .table-flags .col-reason { width: 28%; text-align: center; }  /* centered reason */
+  .table-flags .col-reason { width: 28%; text-align: center; }
   .table-flags .col-status { width: 8%;  white-space: nowrap; text-align: center; }
   .table-flags .col-view   { width: 10%; white-space: nowrap; text-align: center; }
-  .table-flags .col-act    { width: 10%; white-space: nowrap; text-align: center; } /* centered action */
+  .table-flags .col-act    { width: 10%; white-space: nowrap; text-align: center; }
 
-  /* Chips / buttons */
+  /* Optional sticky table header (uncomment if you like it)
+  .table-sticky thead th{
+    position: sticky; top: var(--cz-sticky-top);
+    z-index: 3; background: #f8fbf9;
+    box-shadow: inset 0 -1px 0 rgba(0,0,0,.05), 0 1px 0 rgba(0,0,0,.05);
+  } */
+
   .badge-chip { border-radius: 999px; padding: .35rem .6rem; font-weight: 600; }
   .btn-chip   { border-radius: 999px; padding: .35rem .9rem; }
   .btn-outline-dark.btn-chip { padding: .35rem .9rem; }
 
-  /* Collapse area */
   .collapse-card { max-height: 220px; overflow: auto; }
 
-  /* Softer row tints */
+  /* Row tints for quick scanning */
   tr.table-warning { background-color: #fff8e1 !important; }
   tr.table-success { background-color: #eefaf0 !important; }
   tr.table-light   { background-color: #f6f7fb !important; }
 </style>
 
-<div class="container mt-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="mb-0"><span class="me-2">🚩</span> Session Flags</h2>
+<div class="container">
 
-    {% if status_filter is defined %}
-    <form class="d-flex align-items-center" method="get" action="{{ url_for('view_session_flags') }}">
-      <label class="me-2 fw-semibold">Status:</label>
-      <select name="status" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
-        <option value="OPEN"      {{ 'selected' if status_filter=='OPEN' }}>Open</option>
-        <option value="RESOLVED"  {{ 'selected' if status_filter=='RESOLVED' }}>Resolved</option>
-        <option value="DISMISSED" {{ 'selected' if status_filter=='DISMISSED' }}>Dismissed</option>
-        <option value="ALL"       {{ 'selected' if status_filter=='ALL' }}>All</option>
-      </select>
-      <noscript><button class="btn btn-outline-dark btn-sm ms-2">Filter</button></noscript>
-    </form>
-    {% endif %}
+  <!-- Hero header -->
+  <div class="cz-hero">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+      <div>
+        <h1>🚩 Session Flags</h1>
+        <div class="cz-subtle">Review, resolve, or dismiss user-reported session concerns.</div>
+      </div>
+
+      {# Optional quick stats if you pass a 'stats' dict: {'OPEN':x,'RESOLVED':y,'DISMISSED':z} #}
+      {% if stats %}
+      <div class="cz-pills">
+        <span class="cz-pill">Open: <strong>{{ stats.OPEN or 0 }}</strong></span>
+        <span class="cz-pill">Resolved: <strong>{{ stats.RESOLVED or 0 }}</strong></span>
+        <span class="cz-pill">Dismissed: <strong>{{ stats.DISMISSED or 0 }}</strong></span>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Tiny legend to decode colors -->
+    <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+      <span class="cz-subtle me-1">Legend:</span>
+      <span class="badge badge-chip bg-danger">Unknown Login</span>
+      <span class="badge badge-chip bg-warning text-dark">Suspicious Activity</span>
+      <span class="badge badge-chip bg-primary">Unrecognized Actions</span>
+      <span class="badge badge-chip bg-secondary">Other</span>
+    </div>
+  </div>
+
+  <!-- Sticky toolbar -->
+  <div class="cz-toolbar">
+    <div class="d-flex align-items-center justify-content-between">
+      <div class="cz-subtle">Showing:
+        <strong>{{ status_filter|title if status_filter else 'Open' }}</strong>
+      </div>
+
+      {% if status_filter is defined %}
+      <form class="d-flex align-items-center gap-2" method="get" action="{{ url_for('view_session_flags') }}">
+        <label class="fw-semibold">Status:</label>
+        <select name="status" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+          <option value="OPEN"      {{ 'selected' if status_filter=='OPEN' }}>Open</option>
+          <option value="RESOLVED"  {{ 'selected' if status_filter=='RESOLVED' }}>Resolved</option>
+          <option value="DISMISSED" {{ 'selected' if status_filter=='DISMISSED' }}>Dismissed</option>
+          <option value="ALL"       {{ 'selected' if status_filter=='ALL' }}>All</option>
+        </select>
+        <noscript><button class="btn btn-outline-dark btn-sm ms-1">Apply</button></noscript>
+      </form>
+      {% endif %}
+    </div>
   </div>
 
   {% if flags %}
   <div class="table-responsive">
-    <table class="table table-bordered table-striped align-middle table-flags">
+    <table class="table table-bordered table-striped align-middle table-flags table-sticky">
       <thead class="table-primary text-center">
         <tr>
           <th class="col-when">Flagged At (UTC)</th>
@@ -65,7 +149,6 @@
             ('table-success' if flag.status=='RESOLVED' else 'table-light') %}
         <tr class="{{ row_class }}">
           <td class="text-muted" style="white-space: nowrap;"><small>{{ flag.flagged_at }}</small></td>
-
           <td class="text-start">
             <div class="fw-bold">{{ flag.first_name }} {{ flag.last_name }}</div>
             <div class="text-muted small">{{ flag.email }}</div>
@@ -85,15 +168,11 @@
             {% endif %}
           </td>
 
-          <!-- REASON: button centered; expanded text left-aligned inside card -->
           <td class="col-reason">
             {% if flag.reason %}
               <button type="button" class="btn btn-warning btn-sm btn-chip"
-                      data-bs-toggle="collapse"
-                      data-bs-target="#reason{{ flag.id }}"
-                      aria-expanded="false">
-                View Reason
-              </button>
+                      data-bs-toggle="collapse" data-bs-target="#reason{{ flag.id }}"
+                      aria-expanded="false">View Reason</button>
               <div class="collapse mt-2" id="reason{{ flag.id }}">
                 <div class="card card-body text-start bg-light border collapse-card">
                   {{ flag.reason }}
@@ -110,9 +189,7 @@
             {% elif flag.status=='RESOLVED' %}
               <span class="badge badge-chip bg-success">Resolved</span>
               {% if flag.resolved_at %}
-                <div class="small text-muted mt-1">
-                  By {{ flag.resolver_first_name }} {{ flag.resolver_last_name }}<br>{{ flag.resolved_at }}
-                </div>
+                <div class="small text-muted mt-1">By {{ flag.resolver_first_name }} {{ flag.resolver_last_name }}<br>{{ flag.resolved_at }}</div>
               {% endif %}
               {% if flag.resolution_note %}
                 <div class="badge bg-success-subtle text-dark mt-1">{{ flag.resolution_note }}</div>
@@ -120,9 +197,7 @@
             {% else %}
               <span class="badge badge-chip bg-secondary">Dismissed</span>
               {% if flag.resolved_at %}
-                <div class="small text-muted mt-1">
-                  By {{ flag.resolver_first_name }} {{ flag.resolver_last_name }}<br>{{ flag.resolved_at }}
-                </div>
+                <div class="small text-muted mt-1">By {{ flag.resolver_first_name }} {{ flag.resolver_last_name }}<br>{{ flag.resolved_at }}</div>
               {% endif %}
               {% if flag.resolution_note %}
                 <div class="badge bg-secondary-subtle text-dark mt-1">{{ flag.resolution_note }}</div>
@@ -132,23 +207,17 @@
 
           <td class="col-view">
             <button class="btn btn-outline-dark btn-sm btn-chip"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#actionsRow{{ flag.id }}"
-                    aria-expanded="false">
-              View Actions
-            </button>
+                    data-bs-toggle="collapse" data-bs-target="#actionsRow{{ flag.id }}"
+                    aria-expanded="false">View Actions</button>
           </td>
 
-          <!-- ACTION: centered compact button group -->
           <td class="col-act">
             {% if flag.status == 'OPEN' %}
               <div class="d-flex justify-content-center gap-2 flex-wrap">
                 <button type="button" class="btn btn-success btn-sm btn-chip"
-                        data-bs-toggle="modal"
-                        data-bs-target="#resolveModal{{ flag.id }}">Resolve</button>
+                        data-bs-toggle="modal" data-bs-target="#resolveModal{{ flag.id }}">Resolve</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm btn-chip"
-                        data-bs-toggle="modal"
-                        data-bs-target="#dismissModal{{ flag.id }}">Dismiss</button>
+                        data-bs-toggle="modal" data-bs-target="#dismissModal{{ flag.id }}">Dismiss</button>
               </div>
             {% else %}
               <button type="button" class="btn btn-outline-dark btn-sm btn-chip" disabled>Closed</button>
@@ -156,7 +225,7 @@
           </td>
         </tr>
 
-        <!-- Actions timeline row (colspan 7 = total columns) -->
+        <!-- Actions timeline row -->
         <tr class="collapse" id="actionsRow{{ flag.id }}">
           <td colspan="7">
             <div class="accordion" id="accordionFlag{{ flag.id }}">
@@ -214,14 +283,14 @@
             </div>
           </td>
         </tr>
+
         {% endfor %}
       </tbody>
     </table>
   </div>
 
-  <!-- Modals OUTSIDE the table -->
+  <!-- Modals outside table -->
   {% for flag in flags %}
-  <!-- Resolve Modal -->
   <div class="modal fade" id="resolveModal{{ flag.id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
       <form method="POST" action="{{ url_for('admin_resolve_session_flag', flag_id=flag.id) }}" class="modal-content">
@@ -231,8 +300,7 @@
         </div>
         <div class="modal-body">
           <label class="form-label">Resolution note (optional)</label>
-          <input type="text" name="resolution_note" maxlength="255"
-                 class="form-control"
+          <input type="text" name="resolution_note" maxlength="255" class="form-control"
                  placeholder="e.g., Reviewed logs; no suspicious changes found">
         </div>
         <div class="modal-footer">
@@ -243,7 +311,6 @@
     </div>
   </div>
 
-  <!-- Dismiss Modal -->
   <div class="modal fade" id="dismissModal{{ flag.id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
       <form method="POST" action="{{ url_for('admin_dismiss_session_flag', flag_id=flag.id) }}" class="modal-content">
@@ -253,8 +320,7 @@
         </div>
         <div class="modal-body">
           <label class="form-label">Reason for dismissal (optional)</label>
-          <input type="text" name="resolution_note" maxlength="255"
-                 class="form-control"
+          <input type="text" name="resolution_note" maxlength="255" class="form-control"
                  placeholder="e.g., Duplicate report; already addressed">
         </div>
         <div class="modal-footer">
@@ -267,10 +333,10 @@
   {% endfor %}
 
   {% else %}
-    <div class="alert alert-warning text-center">No session flags found.</div>
+    <div class="alert alert-warning text-center mt-4">No session flags found.</div>
   {% endif %}
 
-  <div class="text-center mt-4">
+  <div class="text-center my-4">
     <a href="{{ url_for('activity_history') }}" class="btn btn-secondary btn-chip">Back to Session History</a>
   </div>
 </div>
@@ -285,20 +351,17 @@
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-
       <div class="modal-body">
         <div class="mb-2">
           <label class="form-label">To</label>
           <input class="form-control" value="{{ email_prompt.user_email }}" readonly>
           <div class="form-text">Recipient: {{ email_prompt.user_name }}</div>
         </div>
-
         <div class="mb-2">
           <label class="form-label">Subject</label>
           <input class="form-control" name="subject"
                  value="Update: Your flagged session was {{ email_prompt.status|lower }}">
         </div>
-
         <div class="mb-2">
           <label class="form-label">Message</label>
           <textarea class="form-control" name="message" rows="6">{% filter trim %}
@@ -315,11 +378,9 @@ If anything still looks off, reply to this email and we'll take another look.
 
 - Admin Team
 {% endfilter %}</textarea>
-
           <div class="form-text">Feel free to edit before sending.</div>
         </div>
       </div>
-
       <div class="modal-footer">
         <button type="submit" class="btn btn-primary btn-chip">Send Email</button>
         <button type="button" class="btn btn-secondary btn-chip" data-bs-dismiss="modal">Close</button>
