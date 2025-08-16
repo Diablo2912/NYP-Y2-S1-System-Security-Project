@@ -1,0 +1,2 @@
+ALTER TABLE accounts
+  ADD COLUMN is_password_set TINYINT(1) NOT NULL DEFAULT 0;

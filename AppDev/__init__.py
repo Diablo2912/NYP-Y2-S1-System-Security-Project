@@ -2078,13 +2078,12 @@ def sign_up():
     site_key = os.getenv("RECAPTCHA_SITE_KEY")
 
     if request.method == 'POST':
-        # recaptcha verification
+        # reCAPTCHA verification
         recaptcha_response = request.form.get('g-recaptcha-response')
-        r = requests.post("https://www.google.com/recaptcha/api/siteverify", data={
-            'secret': os.getenv("RECAPTCHA_SECRET_KEY"),
-            'response': recaptcha_response
-        })
-
+        r = requests.post(
+            "https://www.google.com/recaptcha/api/siteverify",
+            data={'secret': os.getenv("RECAPTCHA_SECRET_KEY"), 'response': recaptcha_response}
+        )
         if not r.json().get('success'):
             flash("reCAPTCHA verification failed. Please try again.", "danger")
             return render_template('/accountPage/signUp.html', form=sign_up_form, site_key=site_key)
@@ -2092,57 +2091,62 @@ def sign_up():
         if sign_up_form.validate():
             cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
-            # Check if email or phone number already exists
-            cursor.execute("SELECT * FROM accounts WHERE email = %s OR phone_number = %s",
-                           (sign_up_form.email.data, sign_up_form.number.data))
-            existing_user = cursor.fetchone()
-
-            first_name = sanitize_input(sign_up_form.first_name.data)
-            last_name = sanitize_input(sign_up_form.last_name.data)
-            gender = sanitize_input(sign_up_form.gender.data)
+            # Sanitize inputs
+            first_name   = sanitize_input(sign_up_form.first_name.data)
+            last_name    = sanitize_input(sign_up_form.last_name.data)
+            gender       = sanitize_input(sign_up_form.gender.data)
             phone_number = sanitize_input(sign_up_form.number.data)
-            email = sanitize_input(sign_up_form.email.data.lower())
+            email_clean  = sanitize_input(sign_up_form.email.data.lower())
 
+            # Check if email or phone number already exists
+            cursor.execute(
+                "SELECT * FROM accounts WHERE email = %s OR phone_number = %s",
+                (email_clean, sign_up_form.number.data)
+            )
+            existing_user = cursor.fetchone()
             if existing_user:
-                if existing_user['email'] == sign_up_form.email.data:
+                if existing_user['email'] == email_clean:
                     flash('Email is already registered. Please use a different email.', 'danger')
                 elif existing_user['phone_number'] == sign_up_form.number.data:
                     flash('Phone number is already registered. Please use a different number.', 'danger')
                 cursor.close()
                 return redirect(url_for('sign_up'))
 
-            # Determine status based on email domain
-            email = sign_up_form.email.data
-            status = 'admin' if email.endswith('@cropzy.com') else 'user'
+            # Determine status based on email domain (use sanitized email)
+            status = 'admin' if email_clean.endswith('@cropzy.com') else 'user'
 
-            # Hash the password before storing
-            hashed_password = hash_password(sign_up_form.pswd.data)
+            # Hash + score password
+            plaintext_pw   = sign_up_form.pswd.data
+            hashed_password = hash_password(plaintext_pw)
+            level, _        = _score_password_strength(plaintext_pw)   # 'weak' | 'medium' | 'strong'
 
-            # Get user IP (use real IP for deployment)
+            # Get user IP (prefer X-Forwarded-For)
             ip_address = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
-            # If testing locally, uncomment this line:
-            # ip_address = requests.get("https://api.ipify.org").text
-
-            # Get country code from IP
-
-            if ip_address.startswith("127.") or ip_address.startswith("192.") or ip_address.startswith(
-                    "10.") or ip_address.startswith("172."):
+            # If local/private, fall back to public IP fetcher
+            if ip_address.startswith(("127.", "192.", "10.", "172.")):
                 ip_address = get_public_ip()
 
             current_country = get_user_country(ip_address)
             print(f"User IP: {ip_address}, Country: {current_country}")
 
-            # Insert new user with hashed password
+            # Insert new user (now includes strength, last_changed, is_password_set)
             cursor.execute('''
-                INSERT INTO accounts (first_name, last_name, gender, phone_number, email, password, status, two_factor_status, countries) 
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO accounts (
+                    first_name, last_name, gender, phone_number, email,
+                    password, password_strength, password_last_changed,
+                    status, two_factor_status, countries, is_password_set
+                )
+                VALUES (%s, %s, %s, %s, %s,
+                        %s, %s, NOW(),
+                        %s, %s, %s, 1)
             ''', (
                 first_name,
                 last_name,
                 gender,
                 '+65' + str(phone_number),
-                email,
+                email_clean,
                 hashed_password,
+                level,
                 status,
                 'disabled',
                 current_country
@@ -2151,11 +2155,12 @@ def sign_up():
             user_id = cursor.lastrowid
 
             # Log registration
-            admin_log_activity(mysql, "User signed up successfully", category="Critical", user_id=user_id,
-                               status=status)
+            admin_log_activity(mysql, "User signed up successfully", category="Critical",
+                               user_id=user_id, status=status)
 
+            # Notify
             notify_user_action(
-                to_email=email,
+                to_email=email_clean,
                 action_type="Sign Up Successful",
                 item_name=f"Welcome to Cropzy, {first_name}! Your account has been successfully created."
             )
@@ -2165,6 +2170,8 @@ def sign_up():
 
             flash('Sign up successful! Please log in.', 'info')
             return redirect(url_for('complete_signUp'))
+
+    # GET or invalid POST
     return render_template('/accountPage/signUp.html', form=sign_up_form, site_key=site_key)
 
 
@@ -3446,59 +3453,75 @@ def change_dets(id):
 @app.route('/changePswd/<int:id>/', methods=['GET', 'POST'])
 @jwt_required
 def change_pswd(id):
-    change_pswd_form = ChangePswdForm(request.form)
-    user_id = g.user['user_id']  # ✅ Get from JWT
+    # Only allow the logged-in user to change their own password
+    if g.user['user_id'] != id:
+        flash("You can only change your own password.", "warning")
+        return redirect(url_for('accountInfo'))
 
-    user_id = session.get('user_id')
-    if not user_id or user_id != id:
-        flash("Unauthorized access.", "danger")
-        return redirect(url_for('login'))
+    form = ChangePswdForm(request.form)
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
-    user = cursor.fetchone()
+    try:
+        # Load current user row (for current hash + email + flag)
+        cursor.execute("SELECT id, email, password, is_password_set FROM accounts WHERE id = %s", (id,))
+        user = cursor.fetchone()
+        if not user:
+            flash("User not found!", "danger")
+            return redirect(url_for('accountInfo'))
 
-    if not user:
-        flash("User not found!", "danger")
+        if request.method == 'POST' and form.validate():
+            current_pswd = form.current_pswd.data
+            new_pswd     = form.new_pswd.data
+            confirm_pswd = form.confirm_pswd.data
+
+            # ✅ Verify current password against PBKDF2 hash
+            if not verify_password(current_pswd, user['password']):
+                flash("Incorrect current password.", "danger")
+                return redirect(url_for('change_pswd', id=id))
+
+            if new_pswd != confirm_pswd:
+                flash("New passwords do not match.", "danger")
+                return redirect(url_for('change_pswd', id=id))
+
+            # ✅ Hash and score the new password
+            new_hash = hash_password(new_pswd)
+            new_level, _ = _score_password_strength(new_pswd)  # 'weak'|'medium'|'strong'
+
+            # ✅ Update DB: password + strength + last_changed; ensure local password is marked as set
+            cursor.execute("""
+                UPDATE accounts
+                   SET password = %s,
+                       password_strength = %s,
+                       password_last_changed = NOW(),
+                       is_password_set = 1
+                 WHERE id = %s
+            """, (new_hash, new_level, id))
+            mysql.connection.commit()
+
+            # Optional: audit + notify (best-effort)
+            try:
+                log_user_action(g.user['user_id'], session.get('current_session_id'), "Changed password")
+            except Exception:
+                pass
+            try:
+                notify_user_action(
+                    to_email=user['email'],
+                    action_type="Password Change",
+                    item_name="Your password has been successfully changed. If this wasn't you, reset your password immediately."
+                )
+            except Exception:
+                pass
+
+            flash("Password changed successfully!", "success")
+            # Go to Security Settings as requested
+            return redirect(url_for('accountSecurity'))
+
+        # GET (or invalid form)
+        return render_template('/accountPage/changePswd.html', form=form, user=user)
+
+    finally:
         cursor.close()
-        return redirect(url_for('accountInfo'))
 
-    if request.method == 'POST' and change_pswd_form.validate():
-        current_pswd = change_pswd_form.current_pswd.data
-        new_pswd = change_pswd_form.new_pswd.data
-        confirm_pswd = change_pswd_form.confirm_pswd.data
-
-        # Using plaintext comparison (insecure; follow your current code pattern)
-        if user['password'] != current_pswd:
-            flash("Incorrect current password.", "danger")
-            cursor.close()
-            return redirect(url_for('change_pswd', id=id))
-
-        if new_pswd != confirm_pswd:
-            flash("New passwords do not match.", "danger")
-            cursor.close()
-            return redirect(url_for('change_pswd', id=id))
-
-        # Update new password in the DB (still plaintext)
-
-        mysql.connection.commit()
-        cursor.close()
-
-        # ✅ Log user action
-        log_user_action(user_id, session.get('current_session_id'), "Changed password")
-
-        notify_user_action(
-            to_email=user['email'],
-            action_type="Password Change",
-            item_name="Your password has been successfully changed. If this wasn't you, reset your password immediately."
-        )
-        # Update session value too
-        session['password'] = confirm_pswd
-
-        flash("Password changed successfully!", "success")
-        return redirect(url_for('accountInfo'))
-
-    return render_template('/accountPage/changePswd.html', form=change_pswd_form)
 
 
 @app.route('/deleteMyAccount/<int:id>', methods=['POST'])
@@ -4288,7 +4311,7 @@ def login_google():
 
 @app.route("/auth/google/callback")
 def google_callback():
-    import time, secrets, bcrypt
+    import time, secrets
     from datetime import datetime, timedelta
     import MySQLdb
     from flask import request, make_response
@@ -4297,7 +4320,6 @@ def google_callback():
         # Exchange code for tokens
         token = oauth.google.authorize_access_token()
         nonce = session.pop("oidc_nonce", None)
-        userinfo = None
         try:
             userinfo = oauth.google.parse_id_token(token, nonce=nonce)
         except Exception:
@@ -4325,11 +4347,21 @@ def google_callback():
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
-    # 1) Already linked
+    # 1) Already linked via google_sub?
     cursor.execute("SELECT * FROM accounts WHERE google_sub=%s", (sub,))
     user = cursor.fetchone()
 
-    # 2) Link existing by email if verified
+    # If already linked, sync Google's verification -> mark in DB too
+    if user and email_verified and not user.get("oauth_email_verified"):
+        cursor.execute(
+            "UPDATE accounts SET oauth_email_verified=1, email_verified=1 WHERE id=%s",
+            (user["id"],)
+        )
+        mysql.connection.commit()
+        cursor.execute("SELECT * FROM accounts WHERE id=%s", (user["id"],))
+        user = cursor.fetchone()
+
+    # 2) Not linked but Google email is verified -> link to existing account by email
     if not user and email and email_verified:
         cursor.execute("SELECT * FROM accounts WHERE email=%s", (email,))
         user = cursor.fetchone()
@@ -4339,37 +4371,47 @@ def google_callback():
                    SET google_sub=%s,
                        oauth_provider='google',
                        oauth_picture=%s,
-                       oauth_email_verified=%s
+                       oauth_email_verified=%s,
+                       email_verified=%s
                  WHERE id=%s
-            """, (sub, picture, int(email_verified), user["id"]))
+            """, (sub, picture, int(email_verified), int(email_verified), user["id"]))
             mysql.connection.commit()
+            # reload to reflect changes
+            cursor.execute("SELECT * FROM accounts WHERE id=%s", (user["id"],))
+            user = cursor.fetchone()
 
-    # 3) New account
+    # 3) Still no user -> create a new account as passwordless until they set one
     if not user:
         first = name.split(" ", 1)[0] if name else ""
         last  = name.split(" ", 1)[1] if (" " in name) else ""
 
-        rand_pw = secrets.token_urlsafe(24).encode("utf-8")
-        hashed_pw = bcrypt.hashpw(rand_pw, bcrypt.gensalt()).decode("utf-8")
+        # Store a random hash (never revealed). Use your app's hash_password helper (PBKDF2/etc.)
+        random_local_pw = secrets.token_urlsafe(24)
+        random_hash = hash_password(random_local_pw)
 
         cursor.execute("""
             INSERT INTO accounts
                 (first_name, last_name, email, password, status, two_factor_status,
-                 google_sub, oauth_provider, oauth_picture, oauth_email_verified)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                 google_sub, oauth_provider, oauth_picture, oauth_email_verified,
+                 is_password_set, password_strength, password_last_changed)
+            VALUES (%s,%s,%s,%s, %s,%s, %s,%s,%s,%s, 0, 'weak', NULL)
         """, (
-            first, last, email, hashed_pw, "user", "disabled",
-            sub, "google", picture, int(email_verified),
+            first, last, email, random_hash,
+            "user", "disabled",
+            sub, "google", picture, int(email_verified)
         ))
         mysql.connection.commit()
         cursor.execute("SELECT * FROM accounts WHERE google_sub=%s", (sub,))
         user = cursor.fetchone()
 
+    # Mark provider used for this login
     cursor.execute("UPDATE accounts SET last_login_provider='google' WHERE id=%s", (user["id"],))
     mysql.connection.commit()
     cursor.close()
 
-    # --- Handle 2FA ---
+    # -------------------------
+    # Two-Factor Authentication
+    # -------------------------
     if user.get("two_factor_status") == "enabled":
         if not user.get("email"):
             flash("Your account has 2FA enabled but no email is set. Contact support.", "danger")
@@ -4387,7 +4429,9 @@ def google_callback():
         flash("Enter the 6-digit code sent to your email to finish signing in.", "info")
         return redirect(url_for("verify_otp", id=user["id"]))
 
-    # --- Normal login (no 2FA) ---
+    # -------------------------
+    # Normal login (no 2FA)
+    # -------------------------
     session_id = log_session_activity(user['id'], user['status'], 'login')
 
     payload = {
@@ -4422,6 +4466,187 @@ def google_callback():
     flash("Signed in with Google.", "success")
     return resp
 
+#security review
+def _score_password_strength(pw: str) -> tuple[str, list[str]]:
+    if not pw:
+        return 'unknown', ["Password not available to assess."]
+    tips = []
+    length = len(pw)
+    has_lower = any(c.islower() for c in pw)
+    has_upper = any(c.isupper() for c in pw)
+    has_digit = any(c.isdigit() for c in pw)
+    has_sym   = any(not c.isalnum() for c in pw)
+    score = 0
+    if length >= 12: score += 2
+    elif length >= 8: score += 1
+    score += has_lower + has_upper + has_digit + has_sym
+    if score >= 5: level = 'strong'
+    elif score >= 3: level = 'medium'
+    else: level = 'weak'
+    if length < 12: tips.append("Use at least 12 characters.")
+    if not has_upper: tips.append("Add uppercase letters.")
+    if not has_lower: tips.append("Add lowercase letters.")
+    if not has_digit: tips.append("Add digits.")
+    if not has_sym:   tips.append("Add special characters (!@#...).")
+    return level, tips
+
+def build_security_checkup(user_row):
+    # Two-factor / email
+    twofa_ok = str((user_row or {}).get('two_factor_status', '')).lower() == 'enabled'
+    email_verified = bool((user_row or {}).get('oauth_email_verified') or (user_row or {}).get('email_verified'))
+
+    # ----- Face ID detection (robust) -----
+    # 1) If there's a boolean column on accounts (e.g., face_id_enrolled or face),
+    #    use it. Otherwise 2) look for a template row in a separate table.
+    face_enabled = False
+    try:
+        val = (user_row or {}).get('face_id_enrolled')
+        if val is None:
+            val = (user_row or {}).get('face')  # some projects store a blob/uuid here
+        face_enabled = bool(val)
+        if not face_enabled:
+            uid = (user_row or {}).get('id')
+            if uid:
+                cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+                # adjust table/column names if yours differ (e.g., face_templates)
+                cur.execute("SELECT 1 FROM face_id_templates WHERE user_id=%s LIMIT 1", (uid,))
+                face_enabled = cur.fetchone() is not None
+                cur.close()
+    except Exception:
+        face_enabled = False
+
+    # Password strength (stored at signup/change)
+    level = str((user_row or {}).get('password_strength') or 'unknown').lower()
+    if level not in ('weak','medium','strong','unknown'):
+        level = 'unknown'
+    tips = []
+    if level in ('weak','unknown'):
+        tips = ["Use 12+ characters with letters, numbers, and symbols.",
+                "Avoid reused passwords; consider a password manager."]
+    elif level == 'medium':
+        tips = ["Increase length to 12+ and add more variety of characters."]
+
+    # Recent activity (unchanged)
+    user_id = (user_row or {}).get('id')
+    last_login, suspicious = None, False
+    if user_id:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("""
+            SELECT ip_address, user_agent, login_time
+            FROM user_session_activity
+            WHERE user_id=%s
+            ORDER BY login_time DESC
+            LIMIT 5
+        """, (user_id,))
+        events = cur.fetchall() or []
+        cur.close()
+        if events:
+            ll = events[0]
+            try:
+                when_str = ll['login_time'].strftime("%Y-%m-%d %H:%M") if ll.get('login_time') else None
+            except Exception:
+                when_str = str(ll.get('login_time')) if ll.get('login_time') else None
+            last_login = {"when": when_str, "ip": ll.get('ip_address')}
+            ips = {e.get('ip_address') for e in events if e.get('ip_address')}
+            uas = {e.get('user_agent') for e in events if e.get('user_agent')}
+            suspicious = (len(ips) > 1) or (len(uas) > 1)
+
+    return {
+        "twofa": {"ok": twofa_ok},
+        "face": {"enabled": face_enabled},
+        "email": {"address": (user_row or {}).get('email'), "verified": email_verified},
+        "password": {
+            "level": level,
+            "tips": tips,
+            "last_changed": (user_row or {}).get('password_last_changed'),
+        },
+        "activity": {"last_login": last_login, "suspicious": suspicious},
+        "meta": {"is_password_set": int((user_row or {}).get('is_password_set') or 0)}
+    }
+
+
+# --- Security Review page ---
+@app.route('/account/security-review', methods=['GET'])
+@jwt_required
+def account_security_review():
+    user_id = g.user['user_id']
+
+    # Load the freshest user row from DB
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cur.execute("""
+        SELECT
+            id, first_name, last_name, email, gender, phone_number,
+            status, two_factor_status, face,
+            oauth_email_verified, email_verified,
+            is_password_set, password_strength, password_last_changed
+        FROM accounts
+        WHERE id = %s
+    """, (user_id,))
+    user_row = cur.fetchone()
+    cur.close()
+
+    if not user_row:
+        flash("User not found.", "danger")
+        return redirect(url_for('accountInfo'))
+
+    # Build the checkup payload (uses your helper)
+    checkup = build_security_checkup(user_row)
+
+    # Render the Security Review pane
+    return render_template(
+        "accountPage/securityrev_page.html",
+        user=user_row,        # Jinja can access dict keys with dot notation
+        checkup=checkup
+    )
+
+
+
+
+@app.route('/account/set-password', methods=['GET', 'POST'])
+@jwt_required
+def set_password():
+    user_id = g.user['user_id']
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cur.execute("SELECT id, email, is_password_set FROM accounts WHERE id=%s", (user_id,))
+    user = cur.fetchone()
+    if not user:
+        cur.close()
+        flash("User not found.", "danger")
+        return redirect(url_for('account_security_review'))
+
+    if int(user.get('is_password_set') or 0) == 1:
+        cur.close()
+        return redirect(url_for('change_pswd', id=user_id))
+
+    if request.method == 'POST':
+        new_pw = request.form.get('new_pw', '')
+        confirm = request.form.get('confirm_pw', '')
+        if len(new_pw) < 8:
+            flash("Use at least 8 characters.", "danger")
+            return render_template('accountPage/set_password.html')
+        if new_pw != confirm:
+            flash("Passwords do not match.", "danger")
+            return render_template('accountPage/set_password.html')
+
+        new_hash = hash_password(new_pw)
+        level, _ = _score_password_strength(new_pw)
+
+        cur.execute("""
+          UPDATE accounts
+             SET password = %s,
+                 is_password_set = 1,
+                 password_strength = %s,
+                 password_last_changed = NOW()
+           WHERE id = %s
+        """, (new_hash, level, user_id))
+        mysql.connection.commit()
+        cur.close()
+
+        flash("Password set successfully!", "success")
+        return redirect(url_for('accountSecurity'))
+
+    cur.close()
+    return render_template('accountPage/set_password.html')
 
 
 @app.route('/freeze_account/<int:user_id>', methods=['POST'])
