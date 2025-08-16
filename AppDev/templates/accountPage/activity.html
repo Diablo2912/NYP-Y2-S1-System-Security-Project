@@ -1,239 +1,345 @@
 {% extends "base.html" %}
-
 {% block content %}
-<div class="container mt-4">
-    <h2 class="mb-4 text-center">Session Activity History</h2>
 
-    {% if time_left %}
-    <div class="alert alert-info text-center fw-bold">
-        Time remaining to view session history:
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="container mt-3">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+{% set u = user or current_user %}
+
+<style>
+  :root{
+    --mint-50:#f7fbf9; --mint-100:#eef7f2; --mint-150:#e7f2ec; --mint-200:#dceee4;
+  }
+  /* Top profile header */
+  .profile-header.card{ border:0; border-radius:20px; box-shadow:0 10px 24px rgba(16,98,61,.08); }
+  .profile-header .avatar{
+    width:64px;height:64px;border-radius:50%;background:#eaf6ef;
+    display:inline-flex;align-items:center;justify-content:center;
+  }
+  .profile-tabs .nav-link{
+    border-radius:999px; padding:.45rem .9rem; white-space:nowrap;
+  }
+  .profile-tabs .nav-link.active{
+    background:#198754; color:#fff;
+  }
+  .profile-tabs{ gap:.5rem; overflow:auto; }
+  .profile-tabs::-webkit-scrollbar{ height:6px } /* tiny bar for overflow */
+
+  /* Activity panel */
+  .cz-mint-panel{
+    background: linear-gradient(180deg,var(--mint-200),var(--mint-100)) !important;
+    border: 1px solid #cfe7db; border-radius: 20px;
+    box-shadow: 0 8px 20px rgba(16,98,61,.08);
+  }
+  .cz-banner{
+    background:#dcf2ff; border:1px solid #bfe6ff; color:#084d6e;
+    border-radius: 12px; padding:.85rem 1rem;
+  }
+
+  /* Table polish */
+  .session-table-wrap { border-radius: 16px; overflow: hidden; }
+  .session-table{
+    background:#fff; border:1px solid #e9efec; margin-bottom:0;
+    box-shadow: 0 6px 16px rgba(17,94,60,.06);
+  }
+  .session-table thead th{
+    background:#eaf6ef; color:#0d5132; font-weight:600;
+    text-transform:uppercase; font-size:.85rem; letter-spacing:.02em;
+    border-bottom:1px solid #dcebe3;
+  }
+  .session-table th, .session-table td{ padding:.9rem 1rem; vertical-align:middle; }
+  .session-table tbody tr:hover{ background:#f8fbfa; }
+  .w-18{width:18%} .w-22{width:22%} .w-28{width:28%} .w-12{width:12%}
+
+  .ua-box{
+    font: .9rem/1.25 ui-monospace, SFMono-Regular, Menlo, monospace;
+    background:#f6f8f7; border:1px solid #e6eeea; border-radius:.5rem;
+    padding:.5rem .6rem; max-height:4.75rem; overflow:auto; text-align:left;
+  }
+  .badge-soft-success{ background:#e8f6ee; color:#0f5132; border:1px solid #cfe9da; }
+  .act-btns .btn{ border-radius:999px; padding:.35rem .75rem }
+
+  /* Accordion styling for details */
+  .session-accordion .accordion-item{ border:0; }
+  .session-accordion .accordion-button{
+    background:#f7fbf8; border-radius:.75rem; box-shadow: inset 0 0 0 1px #e5efe9;
+  }
+  .session-accordion .accordion-button:not(.collapsed){
+    background:#eef8f3; color:#0f5132; box-shadow: inset 0 0 0 1px #cfe7db;
+  }
+</style>
+
+<div class="container my-3">
+  {% if u %}
+  <!-- TOP PROFILE HEADER (replaces left sidebar) -->
+  <div class="card profile-header p-2 mb-3">
+    <div class="card-body">
+      <div class="d-flex align-items-center gap-3">
+        <div class="avatar">
+          <img src="{{ url_for('static', filename='assets/person.svg') }}" width="36" height="36" alt="">
+        </div>
+        <div class="flex-grow-1">
+          <h5 class="mb-0">{{ u.first_name }}</h5>
+          <div class="text-body-secondary small">{{ u.email }}</div>
+        </div>
+      </div>
+
+      <!-- Horizontal pills, scrollable on small screens -->
+      <ul class="nav nav-pills profile-tabs mt-3">
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint=='accountInfo' %}active{% endif %}" href="{{ url_for('accountInfo') }}">Your Info</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint=='accountSecurity' %}active{% endif %}" href="{{ url_for('accountSecurity') }}">Security Settings</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint=='accountHist' %}active{% endif %}" href="{{ url_for('accountHist') }}">Purchase History</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link active" href="{{ url_for('activity_history') }}">Session Activity</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint=='account_security_review' %}active{% endif %}" href="{{ url_for('account_security_review') }}">Security Review</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- FULL-WIDTH ACTIVITY PANEL -->
+  <div class="card cz-mint-panel border-0 rounded-4">
+    <div class="card-body">
+      <h2 class="mb-3">Session Activity History</h2>
+
+      {% if time_left %}
+      <div class="cz-banner d-flex justify-content-center mb-3">
+        <strong class="me-1">Time remaining to view session history:</strong>
         <span id="countdown">{{ time_left }}</span> seconds
-    </div>
-    {% endif %}
-
-    <div class="text-center mb-4">
-        <a href="{{ url_for('export_activity_pdf', filter=selected_filter) }}" class="btn btn-outline-dark">
-            🧾 Export to PDF
-        </a>
-    </div>
-
-    {% if security_banner %}
-    <div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-      <div>
-        <strong>We have recorded your report.</strong>
-        If you did not authorize changes from the flagged session, you can take action now.
       </div>
-      <div class="d-flex gap-2">
-        <a class="btn btn-sm btn-outline-dark"
-           href="{{ url_for('reset_password_request') }}">
-          Reset Password
-        </a>
-        <a class="btn btn-sm btn-danger" href="{{ url_for('security_actions', session_id=security_banner.session_id) }}">Freeze Account</a>
-      </div>
-    </div>
-    {% endif %}
+      {% endif %}
 
-    <form method="GET" action="{{ url_for('activity_history') }}" class="text-center mb-4">
-        <label for="filter" class="me-2 fw-bold">Filter:</label>
-        <select name="filter" id="filter" onchange="this.form.submit()" class="form-select d-inline w-auto">
+      <div class="d-flex justify-content-between flex-wrap gap-2 mb-3">
+        <form method="GET" action="{{ url_for('activity_history') }}" class="d-flex align-items-center gap-2">
+          <label for="filter" class="fw-semibold mb-0">Filter:</label>
+          <select name="filter" id="filter" onchange="this.form.submit()" class="form-select form-select-sm w-auto">
             <option value="all" {{ 'selected' if selected_filter == 'all' }}>All Sessions</option>
             <option value="active" {{ 'selected' if selected_filter == 'active' }}>Active Sessions</option>
             <option value="revoked" {{ 'selected' if selected_filter == 'revoked' }}>Revoked Sessions</option>
             <option value="last_3" {{ 'selected' if selected_filter == 'last_3' }}>Last 3 Sessions</option>
             <option value="last_5" {{ 'selected' if selected_filter == 'last_5' }}>Last 5 Sessions</option>
             <option value="last_10" {{ 'selected' if selected_filter == 'last_10' }}>Last 10 Sessions</option>
-        </select>
-    </form>
+          </select>
+        </form>
 
-    {% if sessions %}
-    <div class="table-responsive">
-        <table class="table table-bordered table-striped text-center align-middle">
-            <thead class="table-primary">
-                <tr>
-                    <th>Login Time (UTC)</th>
-                    <th>Logout Time (UTC)</th>
-                    <th>IP Address</th>
-                    <th>Device Info</th>
-                    <th>Action</th>
-                </tr>
+        <a href="{{ url_for('export_activity_pdf', filter=selected_filter) }}" class="btn btn-outline-dark">
+          🧾 Export to PDF
+        </a>
+      </div>
+
+      {% if security_banner %}
+      <div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+          <strong>We have recorded your report.</strong>
+          If you did not authorize changes from the flagged session, you can take action now.
+        </div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-sm btn-outline-dark" href="{{ url_for('reset_password_request') }}">Reset Password</a>
+          <a class="btn btn-sm btn-danger" href="{{ url_for('security_actions', session_id=security_banner.session_id) }}">Freeze Account</a>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if sessions %}
+      <div class="session-table-wrap">
+        <div class="table-responsive">
+          <table class="table session-table table-hover align-middle">
+            <thead>
+              <tr>
+                <th class="w-18 text-center">Login Time (UTC)</th>
+                <th class="w-18 text-center">Logout Time (UTC)</th>
+                <th class="w-12 text-center">IP Address</th>
+                <th class="w-28 text-center">Device Info</th>
+                <th class="w-18 text-center">Action</th>
+              </tr>
             </thead>
             <tbody>
-                {% for session in sessions %}
+              {% for session in sessions %}
                 {% set is_flagged = flagged_session_ids and (session.id in flagged_session_ids) %}
                 <tr>
-                    <td>{{ session.login_time or 'N/A' }}</td>
-                    <td>
-                        {% if session.logout_time %}
-                            {{ session.logout_time }}
-                            {% if session.revoked_by %}
-                                <br>
-                                <small class="text-muted">
-                                    Revoked by:
-                                    {% if session.revoked_by == 'self' %}
-                                        You
-                                    {% else %}
-                                        {{ session.revoked_by|capitalize }} (User ID: {{ session.revoked_by_id }})
-                                    {% endif %}
-                                    <br>
-                                    at {{ session.revoked_at }}
-                                </small>
-                            {% endif %}
-                        {% else %}
-                            <span class="badge bg-success">Active Now</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ session.ip_address }}</td>
-                    <td style="max-width: 300px; word-break: break-word;">
-                        {{ session.user_agent }}
-                    </td>
-                    <td>
-                        {% if not session.logout_time %}
-                        <!-- Revoke button now opens a confirmation modal -->
-                        <form id="revokeForm{{ session.id }}" method="POST" action="{{ url_for('revoke_session', session_id=session.id) }}" style="display:inline-block;">
-                            <button type="button"
-                                    class="btn btn-danger btn-sm"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#confirmRevokeModal"
-                                    data-form-id="revokeForm{{ session.id }}"
-                                    data-session-info="Login: {{ session.login_time }} • IP: {{ session.ip_address }}">
-                                Revoke
-                            </button>
+                  <td class="text-center text-nowrap">{{ session.login_time or 'N/A' }}</td>
+                  <td class="text-center">
+                    {% if session.logout_time %}
+                      <div class="text-nowrap">{{ session.logout_time }}</div>
+                      {% if session.revoked_by %}
+                        <small class="text-muted d-block mt-1">
+                          Revoked by:
+                          {% if session.revoked_by == 'self' %}You{% else %}{{ session.revoked_by|capitalize }} (ID: {{ session.revoked_by_id }}){% endif %}
+                          · {{ session.revoked_at }}
+                        </small>
+                      {% endif %}
+                    {% else %}
+                      <span class="badge badge-soft-success px-3 py-2">Active Now</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace;">{{ session.ip_address }}</span>
+                  </td>
+                  <td><div class="ua-box">{{ session.user_agent }}</div></td>
+                  <td class="text-center">
+                    <div class="act-btns d-inline-flex gap-2">
+                      {% if not session.logout_time %}
+                        <form id="revokeForm{{ session.id }}" method="POST" action="{{ url_for('revoke_session', session_id=session.id) }}">
+                          <button type="button"
+                                  class="btn btn-danger btn-sm"
+                                  data-bs-toggle="modal"
+                                  data-bs-target="#confirmRevokeModal"
+                                  data-form-id="revokeForm{{ session.id }}"
+                                  data-session-info="Login: {{ session.login_time }} • IP: {{ session.ip_address }}">
+                            Revoke
+                          </button>
                         </form>
-                        {% else %}
+                      {% else %}
                         <button class="btn btn-secondary btn-sm" disabled>Revoked</button>
-                        {% endif %}
+                      {% endif %}
 
-                        <!-- Flag button / state -->
-                        {% if is_flagged %}
-                            <span class="badge bg-warning text-dark ms-1">Flagged</span>
-                            <button type="button" class="btn btn-outline-warning btn-sm ms-1" disabled title="This session has already been flagged.">
-                                🚩 Flagged
-                            </button>
-                        {% else %}
-                            <button type="button" class="btn btn-warning btn-sm ms-1" data-bs-toggle="modal" data-bs-target="#flagModal{{ session.id }}">
-                                🚩 Flag
-                            </button>
-                        {% endif %}
-                    </td>
+                      {% if is_flagged %}
+                        <span class="badge bg-warning text-dark align-self-center">Flagged</span>
+                      {% else %}
+                        <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#flagModal{{ session.id }}">
+                          🚩 Flag
+                        </button>
+                      {% endif %}
+                    </div>
+                  </td>
                 </tr>
+
+                <!-- Details row -->
                 <tr>
-                    <td colspan="5">
-                        <div class="accordion" id="accordionSession{{ loop.index }}">
-                            <div class="accordion-item">
-                                <h2 class="accordion-header" id="heading{{ loop.index }}">
-                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                                            data-bs-target="#collapse{{ loop.index }}" aria-expanded="false" aria-controls="collapse{{ loop.index }}">
-                                        📝 {{ session.login_time }} — Session Actions
-                                    </button>
-                                </h2>
-                                <div id="collapse{{ loop.index }}" class="accordion-collapse collapse"
-                                     aria-labelledby="heading{{ loop.index }}" data-bs-parent="#accordionSession{{ loop.index }}">
-                                    <div class="accordion-body">
-                                        {% if session.actions %}
-                                        <table class="table table-sm table-hover align-middle">
-                                            <thead class="table-light">
-                                                <tr>
-                                                    <th>Timestamp</th>
-                                                    <th>Activity</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {% for action in session.actions %}
-                                                <tr>
-                                                    <td class="text-muted" style="white-space: nowrap;">{{ action.timestamp }}</td>
-                                                    <td>
-                                                        {% if 'login' in action.action.lower() %}
-                                                            <span class="text-success">🔓 {{ action.action }}</span>
-                                                        {% elif 'logout' in action.action.lower() %}
-                                                            <span class="text-secondary">🔒 {{ action.action }}</span>
-                                                        {% elif 'added to cart' in action.action.lower() %}
-                                                            <span class="text-primary">🛒 {{ action.action }}</span>
-                                                        {% elif 'deleted' in action.action.lower() %}
-                                                            <span class="text-danger">❌ {{ action.action }}</span>
-                                                        {% elif 'created' in action.action.lower() %}
-                                                            <span class="text-success">🆕 {{ action.action }}</span>
-                                                        {% elif 'updated' in action.action.lower() %}
-                                                            <span class="text-info">✏️ {{ action.action }}</span>
-                                                        {% else %}
-                                                            {{ action.action }}
-                                                        {% endif %}
-                                                    </td>
-                                                </tr>
-                                                {% endfor %}
-                                            </tbody>
-                                        </table>
-                                        {% else %}
-                                        <p class="text-muted">No actions recorded for this session.</p>
-                                        {% endif %}
-                                    </div>
-                                </div>
+                  <td colspan="5">
+                    <div class="session-accordion accordion" id="accordionSession{{ loop.index }}">
+                      <div class="accordion-item">
+                        <h2 class="accordion-header" id="heading{{ loop.index }}">
+                          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                  data-bs-target="#collapse{{ loop.index }}" aria-expanded="false" aria-controls="collapse{{ loop.index }}">
+                            📝 {{ session.login_time }} — Session Actions
+                          </button>
+                        </h2>
+                        <div id="collapse{{ loop.index }}" class="accordion-collapse collapse"
+                             aria-labelledby="heading{{ loop.index }}" data-bs-parent="#accordionSession{{ loop.index }}">
+                          <div class="accordion-body">
+                            {% if session.actions %}
+                            <div class="table-responsive">
+                              <table class="table table-sm table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                  <tr>
+                                    <th style="width:26%">Timestamp</th>
+                                    <th>Activity</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {% for action in session.actions %}
+                                  <tr>
+                                    <td class="text-muted text-nowrap">{{ action.timestamp }}</td>
+                                    <td>
+                                      {% if 'login' in action.action.lower() %}
+                                        <span class="text-success">🔓 {{ action.action }}</span>
+                                      {% elif 'logout' in action.action.lower() %}
+                                        <span class="text-secondary">🔒 {{ action.action }}</span>
+                                      {% elif 'added to cart' in action.action.lower() %}
+                                        <span class="text-primary">🛒 {{ action.action }}</span>
+                                      {% elif 'deleted' in action.action.lower() %}
+                                        <span class="text-danger">❌ {{ action.action }}</span>
+                                      {% elif 'created' in action.action.lower() %}
+                                        <span class="text-success">🆕 {{ action.action }}</span>
+                                      {% elif 'updated' in action.action.lower() %}
+                                        <span class="text-info">✏️ {{ action.action }}</span>
+                                      {% else %}
+                                        {{ action.action }}
+                                      {% endif %}
+                                    </td>
+                                  </tr>
+                                  {% endfor %}
+                                </tbody>
+                              </table>
                             </div>
+                            {% else %}
+                              <p class="text-muted mb-0">No actions recorded for this session.</p>
+                            {% endif %}
+                          </div>
                         </div>
-                    </td>
+                      </div>
+                    </div>
+                  </td>
                 </tr>
-                {% endfor %}
+              {% endfor %}
             </tbody>
-        </table>
-    </div>
-    {% else %}
-    <div class="alert alert-warning text-center">No session activity found.</div>
-    {% endif %}
+          </table>
+        </div>
+      </div>
+      {% else %}
+        <div class="alert alert-warning text-center mb-0">No session activity found.</div>
+      {% endif %}
 
-    <div class="text-center mt-4">
+      <div class="text-center mt-4">
         <a href="{{ url_for('accountInfo') }}" class="btn btn-secondary">Back to Account</a>
+      </div>
     </div>
+  </div>
+  {% else %}
+    <div class="alert alert-warning mt-4">Please sign in to view your activity history.</div>
+  {% endif %}
 </div>
 
-<!-- All modals placed outside the table -->
+<!-- Flag modals -->
 {% for session in sessions %}
 <div class="modal fade" id="flagModal{{ session.id }}" tabindex="-1" aria-labelledby="flagModalLabel{{ session.id }}" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <!-- add class flag-form for JS targeting -->
-            <form class="flag-form" method="POST" action="{{ url_for('flag_session', session_id=session.id) }}" novalidate>
-                <div class="modal-header">
-                    <h5 class="modal-title" id="flagModalLabel{{ session.id }}">🚩 Flag Session</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="details{{ session.id }}" class="form-label">Select a reason type:</label>
-                        <select name="details" id="details{{ session.id }}" class="form-select mb-2">
-                            <option value="unknown_login">Unknown Login</option>
-                            <option value="suspicious_activity">Suspicious Activity</option>
-                            <option value="unrecognized_actions">Actions Not Recognized</option>
-                            <option value="other">Other</option>
-                        </select>
-
-                        <label for="reason{{ session.id }}" class="form-label">Additional details:</label>
-                        <textarea
-                            id="reason{{ session.id }}"
-                            class="form-control reason-input"
-                            name="reason"
-                            placeholder="Describe why you are flagging this session..."
-                            rows="3"
-                            maxlength="255"
-                            minlength="10"
-                            required
-                        ></textarea>
-                        <small class="form-text text-muted">
-                            <span id="charCount{{ session.id }}">0</span>/255 characters used.
-                        </small>
-                        <!-- per-textarea feedback -->
-                        <div id="reasonFeedback{{ session.id }}" class="invalid-feedback"></div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn btn-warning">Submit Flag</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                </div>
-            </form>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form class="flag-form" method="POST" action="{{ url_for('flag_session', session_id=session.id) }}" novalidate>
+        <div class="modal-header">
+          <h5 class="modal-title" id="flagModalLabel{{ session.id }}">🚩 Flag Session</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="details{{ session.id }}" class="form-label">Select a reason type:</label>
+            <select name="details" id="details{{ session.id }}" class="form-select mb-2">
+              <option value="unknown_login">Unknown Login</option>
+              <option value="suspicious_activity">Suspicious Activity</option>
+              <option value="unrecognized_actions">Actions Not Recognized</option>
+              <option value="other">Other</option>
+            </select>
+
+            <label for="reason{{ session.id }}" class="form-label">Additional details:</label>
+            <textarea id="reason{{ session.id }}" class="form-control reason-input" name="reason"
+                      placeholder="Describe why you are flagging this session..." rows="3"
+                      maxlength="255" minlength="10" required></textarea>
+            <small class="form-text text-muted">
+              <span id="charCount{{ session.id }}">0</span>/255 characters used.
+            </small>
+            <div id="reasonFeedback{{ session.id }}" class="invalid-feedback"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-warning">Submit Flag</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        </div>
+      </form>
     </div>
+  </div>
 </div>
 {% endfor %}
 
-<!-- Revoke confirmation modal (single, reused by all Revoke buttons) -->
+<!-- Revoke confirmation modal -->
 <div class="modal fade" id="confirmRevokeModal" tabindex="-1" aria-labelledby="confirmRevokeLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -255,115 +361,52 @@
 
 {% if time_left %}
 <script>
-    let countdown = {{ time_left }};
-    const countdownEl = document.getElementById('countdown');
-
-    const timer = setInterval(() => {
-        countdown--;
-        countdownEl.innerText = countdown;
-
-        if (countdown <= 0) {
-            clearInterval(timer);
-            alert("Your access to session activity has expired. Please re-verify.");
-            window.location.href = "{{ url_for('verify_before_activity') }}";
-        }
-    }, 1000);
+  let countdown = {{ time_left }};
+  const countdownEl = document.getElementById('countdown');
+  const timer = setInterval(() => {
+    countdown--;
+    countdownEl.innerText = countdown;
+    if (countdown <= 0) {
+      clearInterval(timer);
+      alert("Your access to session activity has expired. Please re-verify.");
+      window.location.href = "{{ url_for('verify_before_activity') }}";
+    }
+  }, 1000);
 </script>
 {% endif %}
 
-<!-- Character Counter + Reason Validation / Sanitization -->
+<!-- Reason validation & submit guard -->
 <script>
 (function () {
-  // Allowed characters: letters, digits, spaces, and basic punctuation .,'’?!()-
   const STRIP_DISALLOWED = /[^A-Za-z0-9\s\.\,\'’\?\!\(\)\-]/g;
-
-  function updateCounter(textarea) {
-    const countEl = document.getElementById('charCount' + textarea.id.replace('reason',''));
-    if (countEl) countEl.textContent = textarea.value.length;
+  function updateCounter(ta){ const el=document.getElementById('charCount'+ta.id.replace('reason','')); if(el) el.textContent=ta.value.length; }
+  function setValidity(el, ok, msg){
+    const fb=document.getElementById('reasonFeedback'+el.id.replace('reason',''));
+    if(ok){ el.classList.remove('is-invalid'); el.classList.add('is-valid'); if(fb) fb.textContent=''; }
+    else{ el.classList.remove('is-valid'); el.classList.add('is-invalid'); if(fb) fb.textContent=msg||'Please enter a valid explanation.'; }
   }
-
-  function setValidity(el, ok, msg) {
-    const feedback = document.getElementById('reasonFeedback' + el.id.replace('reason',''));
-    if (ok) {
-      el.classList.remove('is-invalid');
-      el.classList.add('is-valid');
-      if (feedback) feedback.textContent = '';
-    } else {
-      el.classList.remove('is-valid');
-      el.classList.add('is-invalid');
-      if (feedback) feedback.textContent = msg || 'Please enter a valid explanation.';
-    }
+  function isValidReason(t){
+    t=t.trim();
+    if(t.length<10) return {ok:false,msg:'Please enter at least 10 characters.'};
+    if(!/^[A-Za-z0-9\s\.\,\'’\?\!\(\)\-]+$/.test(t)) return {ok:false,msg:"Only letters, numbers, spaces, and basic punctuation (.,'’?!()-) are allowed."};
+    if(!/[A-Za-z]/.test(t)) return {ok:false,msg:'Include some letters (not just numbers/punctuation).'};
+    if(/(.)\1{3,}/.test(t)) return {ok:false,msg:'Avoid repeating the same character 4+ times in a row.'};
+    if((t.match(/[A-Za-z0-9]/g)||[]).length<5) return {ok:false,msg:'Please provide a bit more meaningful detail.'};
+    return {ok:true};
   }
-
-  function isValidReason(text) {
-    const t = text.trim();
-
-    // length
-    if (t.length < 10) {
-      return { ok: false, msg: 'Please enter at least 10 characters.' };
-    }
-    // allowed charset only
-    if (!/^[A-Za-z0-9\s\.\,\'’\?\!\(\)\-]+$/.test(t)) {
-      return { ok: false, msg: "Only letters, numbers, spaces, and basic punctuation (.,'’?!()-) are allowed." };
-    }
-    // must include at least one letter
-    if (!/[A-Za-z]/.test(t)) {
-      return { ok: false, msg: 'Include some letters (not just numbers/punctuation).' };
-    }
-    // avoid 4+ repeated same char
-    if (/(.)\1{3,}/.test(t)) {
-      return { ok: false, msg: 'Avoid repeating the same character 4+ times in a row.' };
-    }
-    // require at least 5 alphanumeric characters total
-    const alnumCount = (t.match(/[A-Za-z0-9]/g) || []).length;
-    if (alnumCount < 5) {
-      return { ok: false, msg: 'Please provide a bit more meaningful detail.' };
-    }
-    return { ok: true };
-  }
-
-  // Wire up all reason textareas
-  document.querySelectorAll('.reason-input').forEach(function (ta) {
-    // live sanitize
-    ta.addEventListener('input', function () {
-      const before = ta.value;
-      // strip disallowed symbols
-      ta.value = before.replace(STRIP_DISALLOWED, '');
-      updateCounter(ta);
-
-      // live validity hint (soft)
-      const res = isValidReason(ta.value);
-      // Only show invalid if user typed something
-      if (ta.value.trim().length > 0) {
-        setValidity(ta, res.ok, res.msg);
-      } else {
-        ta.classList.remove('is-valid', 'is-invalid');
-      }
+  document.querySelectorAll('.reason-input').forEach(ta=>{
+    ta.addEventListener('input',()=>{
+      ta.value=ta.value.replace(STRIP_DISALLOWED,''); updateCounter(ta);
+      const res=isValidReason(ta.value); if(ta.value.trim()) setValidity(ta,res.ok,res.msg); else ta.classList.remove('is-valid','is-invalid');
     });
-
-    // hard check on blur
-    ta.addEventListener('blur', function () {
-      const res = isValidReason(ta.value);
-      setValidity(ta, res.ok, res.msg);
-    });
-
-    // init counter
+    ta.addEventListener('blur',()=>{ const res=isValidReason(ta.value); setValidity(ta,res.ok,res.msg); });
     updateCounter(ta);
   });
-
-  // Block submit if invalid
-  document.querySelectorAll('form.flag-form').forEach(function (frm) {
-    frm.addEventListener('submit', function (e) {
-      const ta = frm.querySelector('.reason-input');
-      if (!ta) return;
-      const res = isValidReason(ta.value);
-      if (!res.ok) {
-        e.preventDefault();
-        e.stopPropagation();
-        setValidity(ta, false, res.msg);
-        // focus the textarea for correction
-        ta.focus();
-      }
+  document.querySelectorAll('form.flag-form').forEach(frm=>{
+    frm.addEventListener('submit',e=>{
+      const ta=frm.querySelector('.reason-input'); if(!ta) return;
+      const res=isValidReason(ta.value);
+      if(!res.ok){ e.preventDefault(); e.stopPropagation(); setValidity(ta,false,res.msg); ta.focus(); }
     });
   });
 })();
@@ -372,76 +415,24 @@
 <!-- Revoke modal wiring -->
 <script>
 (function () {
-  let targetFormId = null;
-  const modalEl = document.getElementById('confirmRevokeModal');
-  const infoEl  = document.getElementById('revokeSessionInfo');
-  const confirmBtn = document.getElementById('confirmRevokeBtn');
+  let targetFormId=null;
+  const modalEl=document.getElementById('confirmRevokeModal');
+  const infoEl=document.getElementById('revokeSessionInfo');
+  const confirmBtn=document.getElementById('confirmRevokeBtn');
 
-  modalEl.addEventListener('show.bs.modal', function (event) {
-    const triggerBtn = event.relatedTarget;
-    targetFormId = triggerBtn?.getAttribute('data-form-id');
-    const info = triggerBtn?.getAttribute('data-session-info') || '';
-    if (infoEl) infoEl.textContent = info;
+  modalEl.addEventListener('show.bs.modal', e=>{
+    const btn=e.relatedTarget;
+    targetFormId=btn?.getAttribute('data-form-id');
+    const info=btn?.getAttribute('data-session-info')||'';
+    if(infoEl) infoEl.textContent=info;
   });
 
-  confirmBtn.addEventListener('click', function () {
-    if (!targetFormId) return;
-    const form = document.getElementById(targetFormId);
-    if (form) form.submit();
+  confirmBtn.addEventListener('click', ()=>{
+    if(!targetFormId) return;
+    const form=document.getElementById(targetFormId);
+    if(form) form.submit();
   });
 })();
 </script>
-
-{% if review_changes %}
-<!-- Review Changes Modal -->
-<div class="modal fade" id="reviewChangesModal" tabindex="-1" aria-labelledby="reviewChangesModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-warning-subtle">
-        <h5 class="modal-title" id="reviewChangesModalLabel">Heads up: important changes in this session</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-
-      <div class="modal-body">
-        <p class="mb-3">
-          We found the following sensitive changes made during the flagged session.
-          Would you like to review them now?
-        </p>
-
-        <ul class="list-group">
-          {% for item in review_changes %}
-          <li class="list-group-item d-flex justify-content-between align-items-center">
-            <div>
-              {% if item.category == 'Security' %}
-                <span class="badge bg-warning text-dark me-2">Security</span>
-              {% else %}
-                <span class="badge bg-info text-dark me-2">Profile</span>
-              {% endif %}
-              {{ item.label }}
-            </div>
-            <a href="{{ url_for(item.endpoint) }}" class="btn btn-sm btn-outline-dark">Review</a>
-          </li>
-          {% endfor %}
-        </ul>
-      </div>
-
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        <a href="{{ url_for('accountInfo') }}" class="btn btn-outline-dark">Go to Profile</a>
-        <a href="{{ url_for('accountSecurity') }}" class="btn btn-outline-dark">Go to Security</a>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    var el = document.getElementById('reviewChangesModal');
-    if (el && typeof bootstrap !== 'undefined') {
-      new bootstrap.Modal(el).show();
-    }
-  });
-</script>
-{% endif %}
 
 {% endblock %}

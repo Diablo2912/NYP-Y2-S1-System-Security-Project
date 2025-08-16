@@ -3,7 +3,7 @@
 
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
-    <div class="container">
+    <div class="container mt-3">
       {% for category, message in messages %}
         <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
           {{ message }}
@@ -14,61 +14,69 @@
   {% endif %}
 {% endwith %}
 
+<style>
+  /* Reusable left account nav (same as accountInfo/accountSecurity) */
+  .account-side .list-group-item{border:0;border-radius:0;padding:.9rem 1.25rem}
+  .account-side .list-group-item:hover{background:#f3f8f5}
+  .account-side .list-group-item.active{background:#198754;border-color:#198754;color:#fff}
+  .account-side .avatar{
+    width:60px;height:60px;border-radius:50%;background:#eaf6ef;
+    display:inline-flex;align-items:center;justify-content:center;
+  }
+</style>
+
 <div class="container">
   <div class="row">
     {% if user %}
 
-    <!-- LEFT: keep exactly like accountInfo -->
+    <!-- LEFT: unified account sidebar -->
     <div class="col-lg-4 p-3">
-      <div class="card d-flex mb-3 m-3">
-        <div class="card-body pb-0">
-          <div class="d-flex mb-3">
-            <img class="flex" src="{{ url_for('static', filename='assets/person.svg') }}" width="60" height="60" alt="User">
-            <div class="flex-grow-1 ms-3">
-              <h2 class="card-title mb-1">{{ user.first_name }}</h2>
-              <h6 class="card-subtitle text-body-secondary">{{ user.email }}</h6>
+      <div class="card shadow-sm border-0 rounded-4 account-side m-3">
+        <div class="card-body pb-3">
+          <div class="d-flex align-items-center">
+            <div class="avatar">
+              <img src="{{ url_for('static', filename='assets/person.svg') }}" width="34" height="34" alt="">
+            </div>
+            <div class="ms-3">
+              <h5 class="mb-0">{{ user.first_name }}</h5>
+              <div class="text-body-secondary small">{{ user.email }}</div>
             </div>
           </div>
+        </div>
 
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <a href="{{ url_for('accountInfo') }}" class="link-underline link-underline-opacity-0">
-                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" alt="">
-                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity:.5">Your Info</span>
-              </a>
-            </li>
-            <li class="list-group-item">
-              <a href="{{ url_for('accountSecurity') }}" class="link-underline link-underline-opacity-0">
-                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" alt="">
-                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity:.5">Security Settings</span>
-              </a>
-            </li>
-            <li class="list-group-item">
-              <a href="{{ url_for('accountHist') }}" class="link-underline link-underline-opacity-0">
-                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" alt="">
-                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity:.5">Purchase History</span>
-              </a>
-            </li>
-            <li class="list-group-item">
-              <a href="{{ url_for('activity_history') }}" class="link-underline link-underline-opacity-0">
-                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" alt="">
-                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity:.5">Session Activity</span>
-              </a>
-            </li>
-            <li class="list-group-item">
-              <a href="{{ url_for('account_security_review') }}" class="link-underline link-underline-opacity-0">
-                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" alt="">
-                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity:.5">Security Review</span>
-              </a>
-            </li>
-          </ul>
+        <div class="list-group list-group-flush">
+          <a href="{{ url_for('accountInfo') }}"
+             class="list-group-item list-group-item-action d-flex align-items-center {% if request.endpoint=='accountInfo' %}active{% endif %}">
+            <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="22" height="22" alt="">
+            Your Info
+          </a>
+          <a href="{{ url_for('accountSecurity') }}"
+             class="list-group-item list-group-item-action d-flex align-items-center {% if request.endpoint=='accountSecurity' %}active{% endif %}">
+            <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="22" height="22" alt="">
+            Security Settings
+          </a>
+          <a href="{{ url_for('accountHist') }}"
+             class="list-group-item list-group-item-action d-flex align-items-center {% if request.endpoint=='accountHist' %}active{% endif %}">
+            <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="22" height="22" alt="">
+            Purchase History
+          </a>
+          <a href="{{ url_for('activity_history') }}"
+             class="list-group-item list-group-item-action d-flex align-items-center {% if request.endpoint=='activity_history' %}active{% endif %}">
+            <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="22" height="22" alt="">
+            Session Activity
+          </a>
+          <a href="{{ url_for('account_security_review') }}"
+             class="list-group-item list-group-item-action d-flex align-items-center {% if request.endpoint=='account_security_review' %}active{% endif %}">
+            <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="22" height="22" alt="">
+            Security Review
+          </a>
         </div>
       </div>
     </div>
 
-    <!-- RIGHT: boxes styled like your screenshot -->
+    <!-- RIGHT: Security Review content -->
     <div class="col-lg-8 p-3">
-      <div class="card d-flex mb-3 m-3 bg-success-subtle">
+      <div class="card d-flex mb-3 m-3 bg-success-subtle border-0 rounded-4">
         <div class="card-body">
           <h1 class="card-title">Security Review</h1>
 
@@ -85,7 +93,7 @@
 
           <div class="row g-4">
 
-            <!-- Two-Factor Authentication (RED) - top-left -->
+            <!-- Two-Factor Authentication -->
             <div class="col-md-6">
               <div class="card h-100 border-danger">
                 <div class="card-header bg-danger text-white">
@@ -114,7 +122,7 @@
               </div>
             </div>
 
-            <!-- Email (GREEN) - top-right -->
+            <!-- Email -->
             <div class="col-md-6">
               <div class="card h-100 border-success">
                 <div class="card-header bg-success text-white">
@@ -137,7 +145,7 @@
               </div>
             </div>
 
-            <!-- Password (YELLOW) - bottom-left -->
+            <!-- Password -->
             <div class="col-md-6">
               <div class="card h-100 border-{{ pwd_color if has_pw else 'warning' }}">
                 <div class="card-header bg-{{ pwd_color if has_pw else 'warning' }} {{ 'text-dark' if (pwd_color == 'warning' or not has_pw) else 'text-white' }}">
@@ -173,7 +181,7 @@
               </div>
             </div>
 
-            <!-- Recent Activity (GREEN) - bottom-right -->
+            <!-- Recent Activity -->
             <div class="col-md-6">
               <div class="card h-100 border-success">
                 <div class="card-header bg-success text-white">
