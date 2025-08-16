@@ -144,11 +144,11 @@ app.config['MYSQL_PORT'] = 3306
 # app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-app.config['MYSQL_DB'] = 'sspCropzy'
-#
+# app.config['MYSQL_HOST'] = 'localhost'
+# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+# app.config['MYSQL_DB'] = 'sspCropzy'
+# #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
 # app.config['MYSQL_HOST'] = '127.0.0.1'
@@ -259,6 +259,24 @@ def jwt_required(f):
         return f(*args, **kwargs)
 
     return decorated_function
+
+def normalize_ip(ip_str: str) -> str | None:
+    """Return a canonical IP string (IPv4/IPv6) or None if invalid."""
+    if not ip_str:
+        return None
+    ip_str = ip_str.strip()
+    try:
+        return ipaddress.ip_address(ip_str).compressed  # canonical form
+    except ValueError:
+        return None
+
+def is_routable_ip(ip_str: str) -> bool:
+    """Optional: reject private/loopback/link-local to avoid self-bans."""
+    try:
+        ip_obj = ipaddress.ip_address(ip_str)
+        return not (ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local)
+    except ValueError:
+        return False
 
 def is_valid_date(s):
     try:
@@ -1403,6 +1421,89 @@ def dashboard():
         selected_roles=selected_roles
     )
 
+@app.route('/ip_management')
+@jwt_required
+def ip_management():
+    jwt_user = g.user
+    if jwt_user['status'] not in ['admin']:
+        return render_template('404glen.html')
+
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute("""
+        SELECT 
+               ip,
+               reason,
+               created_by,
+               created_at
+        FROM ip_blocklist
+        ORDER BY created_at DESC
+    """)
+    blocked_ips = cursor.fetchall()
+
+    return render_template(
+        'ip_management.html',
+        blocked_ips=blocked_ips,   # <-- matches template below
+        jwt_user=jwt_user          # <-- so you can show email/name if you want
+    )
+
+@app.post('/ip_management/block')
+@jwt_required
+def ipmgmt_block_ip():
+    # Admin guard
+    if g.user.get("status") != "admin":
+        flash("Only admins can block IPs.", "danger")
+        return redirect(url_for("ip_management"))
+
+    raw_ip = (request.form.get("ip") or "").strip()
+    reason = (request.form.get("reason") or "Manual block via IP Management").strip()
+
+    ip_norm = normalize_ip(raw_ip)
+    if not ip_norm:
+        flash("Invalid IP address.", "warning")
+        return redirect(url_for("ip_management"))
+
+    user_id = g.user.get("user_id")
+
+    cur = mysql.connection.cursor()
+    try:
+        # Upsert with created_by filled from current user
+        cur.execute(
+            """
+            INSERT INTO ip_blocklist (ip, reason, created_by)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                reason = VALUES(reason),
+                created_by = VALUES(created_by)
+            """,
+            (ip_norm, reason, user_id),
+        )
+        mysql.connection.commit()
+        flash(f"Blocked IP: {ip_norm}", "success")
+    except Exception as e:
+        mysql.connection.rollback()
+        flash(f"Failed to block IP ({ip_norm}): {e}", "danger")
+    finally:
+        cur.close()
+
+    return redirect(url_for("ip_management"))
+
+@app.post('/unblock_ip')
+@jwt_required
+def unblock_ip():
+    jwt_user = g.user
+    if jwt_user['status'] not in ['admin']:
+        return render_template('404glen.html')
+
+    ip = request.form.get('ip')
+    if not ip:
+        flash('Missing IP', 'danger')
+        return redirect(url_for('ip_management'))
+
+    cur = mysql.connection.cursor()
+    cur.execute("DELETE FROM ip_blocklist WHERE ip=%s", (ip,))
+    mysql.connection.commit()
+    flash(f'Unblocked {ip}', 'success')
+    return redirect(url_for('ip_management'))
 
 @app.route('/updateUserStatus/<int:id>', methods=['POST'])
 @jwt_required

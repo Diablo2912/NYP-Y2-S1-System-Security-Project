@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="container">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<div class="container">
+  <div class="row">
+
+    <!-- Left Panel -->
+    <div class="col-lg-4 p-3">
+      <div class="card mb-3 m-3">
+        <div class="card-body pb-0">
+          <div class="d-flex mb-3">
+            <div class="flex-grow-1 ms-3">
+              <h2 class="card-title mb-1">Admin Dashboard</h2>
+              {% if jwt_user and jwt_user.email %}
+                <h6 class="card-subtitle text-body-secondary">{{ jwt_user.email }}</h6>
+              {% endif %}
+            </div>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="/roleManagement" class="link-underline link-underline-opacity-0">
+                <img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" class="me-2">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Role Management</span>
+              </a>
+            </li>
+            <li class="list-group-item">
+              <a href="/createAdmin" class="link-underline link-underline-opacity-0">
+                <img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" class="me-2">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Create Admin</span>
+              </a>
+            </li>
+            <li class="list-group-item">
+              <a href="/logging" class="link-underline link-underline-opacity-0">
+                <img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" class="me-2">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Logs</span>
+              </a>
+            </li>
+            <li class="list-group-item">
+              <a href="/logging_analytics" class="link-underline link-underline-opacity-0">
+                <img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" class="me-2">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity: .5">Logging Analytics</span>
+              </a>
+            </li>
+            <li class="list-group-item">
+              <a href="/ip_management" class="link-underline link-underline-opacity-0">  <!-- FIXED -->
+                <img src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" class="me-2">
+                <span class="badge bg-success p-2 fs-5 align-middle">IP Management</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="col-lg-8 p-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h2 class="text-center mb-4">IP Management</h2>
+
+          <div class="mb-4">
+            <form class="row g-2" method="POST" action="{{ url_for('ipmgmt_block_ip') }}">
+              <div class="col-md-4">
+                <input name="ip" class="form-control" placeholder="e.g. 203.0.113.10" required>
+              </div>
+              <div class="col-md-4">
+                <input name="reason" class="form-control" placeholder="Reason" required>
+              </div>
+              <div class="col-md-1 d-grid">
+                <button type="submit" class="btn btn-outline-primary">Block</button>
+              </div>
+            </form>
+          </div>
+
+
+          <div class="table-responsive">
+            <table class="table table-bordered table-hover text-center align-middle">
+              <thead class="table-success">
+                <tr>
+                  <th>IP Address</th>
+                  <th>Reason</th>
+                  <th>Created By</th>
+                  <th>Created At</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for ip_row in blocked_ips %}
+                <tr>
+                  <td>{{ ip_row.ip }}</td>
+                  <td>{{ ip_row.reason }}</td>
+                  <td>{{ ip_row.created_by }}</td>
+                  <td>{{ ip_row.created_at }}</td>
+                  <td>
+                    <!-- Example Unblock button (wire this route in Flask) -->
+                    <form method="POST" action="{{ url_for('unblock_ip') }}" class="d-inline">
+                      <input type="hidden" name="ip" value="{{ ip_row.ip }}">
+                      <button type="submit" class="btn btn-sm btn-outline-danger">Unblock</button>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+
+            {% if blocked_ips|length == 0 %}
+              <p class="text-center mt-3">No blocked IPs.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
