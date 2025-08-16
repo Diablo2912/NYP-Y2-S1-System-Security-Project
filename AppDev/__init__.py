@@ -147,12 +147,12 @@ mail = Mail(app)
 # app.config['MYSQL_PORT'] = 3306
 
 # BRANDON SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'brandon'
-app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'brandon'
+# app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -163,10 +163,10 @@ app.config['MYSQL_PORT'] = 3306
 # app.config['MYSQL_PORT'] = 3306
 #
 # # #SACHIN SQL DB CONFIG
-# app.config['MYSQL_HOST'] = 'localhost'
-# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-# app.config['MYSQL_DB'] = 'sspCropzy'
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+app.config['MYSQL_DB'] = 'sspCropzy'
 # #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -5373,13 +5373,15 @@ def google_callback():
 
         cursor.execute("""
             INSERT INTO accounts
-                (first_name, last_name, email, password, status, two_factor_status,
+                (first_name, last_name, email, password, status, two_factor_status, countries,
                  google_sub, oauth_provider, oauth_picture, oauth_email_verified,
                  is_password_set, password_strength, password_last_changed)
-            VALUES (%s,%s,%s,%s, %s,%s, %s,%s,%s,%s, 0, 'weak', NULL)
+            VALUES (%s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s,
+                    0, 'weak', NULL)
         """, (
             first, last, email, random_hash,
-            "user", "disabled",
+            "user", "disabled", "SG",  # <- countries defaulted to "SG" here
             sub, "google", picture, int(email_verified)
         ))
         mysql.connection.commit()
