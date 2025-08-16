@@ -129,12 +129,12 @@ mail = Mail(app)
 # app.config['MYSQL_PORT'] = 3306
 
 # BRANDON SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'brandon'
-# app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
-# app.config['MYSQL_DB'] = 'ssp_db'
-# app.config['MYSQL_PORT'] = 3306
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'brandon'
+app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+app.config['MYSQL_DB'] = 'ssp_db'
+app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -145,10 +145,10 @@ mail = Mail(app)
 # app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-app.config['MYSQL_DB'] = 'sspCropzy'
+# app.config['MYSQL_HOST'] = 'localhost'
+# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+# app.config['MYSQL_DB'] = 'sspCropzy'
 # #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -2415,9 +2415,10 @@ def login():
                 return redirect(url_for('login'))
 
             if is_account_frozen(user['id']):
-                unfreeze_link = url_for('ajax_send_unfreeze_email', user_id=user['id'])
+                request_link = url_for('request_unfreeze', user_id=user['id'])
                 message = Markup(
-                    f"Account has been frozen. Send unfreeze email <a href='#' class='alert-link' onclick=\"sendUnfreezeRequest('{unfreeze_link}')\">here</a>.")
+                    f"Account has been frozen. Send unfreeze request <a href='{request_link}' class='alert-link'>here</a>."
+                )
                 flash(message, "danger")
                 return redirect(url_for('login'))
 
@@ -4901,7 +4902,13 @@ def reset_password_request():
         cursor.close()
 
         if user:
-            send_reset_pass(email, user[0])
+            user_id = user[0]
+            # Check if account is frozen
+            if is_account_frozen(user_id):
+                flash("Your account is frozen. You cannot reset your password at this time.", "danger")
+                return redirect(url_for('login'))
+
+            send_reset_pass(email, user_id)
 
         # Always show same message regardless
         flash("If an account with that email exists, a reset link has been sent.", "info")
@@ -4970,7 +4977,7 @@ def freeze_account(user_id):
     cursor.execute(
         "INSERT INTO frozen_account (user_id, reason, frozen_at, is_frozen) VALUES (%s, %s, NOW(), TRUE)",
         (user_id, 'Manual freeze by user'))
-
+    cursor.execute("UPDATE accounts SET frozen = 1 WHERE id = %s", (user_id,))
     mysql.connection.commit()
     cursor.close()
     session.clear()
@@ -4992,75 +4999,170 @@ def is_account_frozen(user_id):
     return freeze_entry and freeze_entry['is_frozen'] == True
 
 
-# Helper: Send Unfreeze Email
-def send_unfreeze_email(user_id, email):
-    try:
-        token = secrets.token_urlsafe(32)
-        expires_at = datetime.utcnow() + timedelta(minutes=1)
+# def send_unfreeze_email(user_id, email):
+#     try:
+#         token = secrets.token_urlsafe(32)
+#         expires_at = datetime.utcnow() + timedelta(minutes=1)
+#
+#         cursor = mysql.connection.cursor()
+#         cursor.execute("""
+#             INSERT INTO unfreeze_requests (user_id, token, expires_at)
+#             VALUES (%s, %s, %s)
+#         """, (user_id, token, expires_at))
+#         mysql.connection.commit()
+#
+#         unfreeze_url = url_for('unfreeze_account', token=token, _external=True)
+#         subject = "[Cropzy] Unfreeze Your Account"
+#         message = (
+#             f"Hi,\n\n"
+#             f"Your account was frozen. To unfreeze it, please click the link below:\n\n"
+#             f"{unfreeze_url}\n\n"
+#             f"This link will expire in 10 minutes.\n\n"
+#             f"Best,\nCropzy Support"
+#         )
+#         send_email(email, subject, message)
+#
+#     except Exception as e:
+#         print(f"[ERROR] Failed to send unfreeze email: {e}")
+#
+#
+# @app.route('/send_unfreeze_email', methods=['POST'])
+# def ajax_send_unfreeze_email():
+#     user_id = request.args.get('user_id')  # or from request.json
+#
+#     if not user_id:
+#         return jsonify({'status': 'error', 'message': 'User not logged in.'}), 403
+#
+#     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+#     cursor.execute("SELECT email FROM accounts WHERE id = %s", (user_id,))
+#     user = cursor.fetchone()
+#     cursor.close()
+#
+#     if not user:
+#         return jsonify({'status': 'error', 'message': 'User not found.'}), 404
+#
+#     send_unfreeze_email(user_id, user['email'])
+#     return jsonify({'status': 'success', 'message': 'Unfreeze email sent.'})
 
-        cursor = mysql.connection.cursor()
-        cursor.execute("""
-            INSERT INTO unfreeze_requests (user_id, token, expires_at)
-            VALUES (%s, %s, %s)
-        """, (user_id, token, expires_at))
-        mysql.connection.commit()
+@app.route('/freezeAccountDetails', methods=['GET', 'POST'])
+@jwt_required
+def freezeAccountDetails():
+    search_query = request.args.get('search', '')
 
-        unfreeze_url = url_for('unfreeze_account', token=token, _external=True)
-        subject = "[Cropzy] Unfreeze Your Account"
-        message = (
-            f"Hi,\n\n"
-            f"Your account was frozen. To unfreeze it, please click the link below:\n\n"
-            f"{unfreeze_url}\n\n"
-            f"This link will expire in 10 minutes.\n\n"
-            f"Best,\nCropzy Support"
-        )
-        send_email(email, subject, message)
-
-    except Exception as e:
-        print(f"[ERROR] Failed to send unfreeze email: {e}")
-
-
-@app.route('/unfreeze/<token>')
-def unfreeze_account(token):
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cursor.execute("SELECT * FROM unfreeze_requests WHERE token = %s", (token,))
-    request_row = cursor.fetchone()
 
-    if not request_row:
-        flash("Invalid or expired unfreeze link.", "danger")
-        return redirect(url_for('login'))
+    if search_query:
+        cursor.execute("""
+                SELECT id, email,
+                       CASE 
+                           WHEN frozen = 1 THEN 'Frozen'
+                           ELSE 'Active'
+                       END AS frozen
+                FROM accounts
+                WHERE id = %s OR email LIKE %s
+                ORDER BY id ASC
+            """, (search_query, f"%{search_query}%"))
+    else:
+        cursor.execute("""
+                SELECT id, email,
+                       CASE 
+                           WHEN frozen = 1 THEN 'Frozen'
+                           ELSE 'Active'
+                       END AS frozen
+                FROM accounts
+                ORDER BY id ASC
+            """)
 
-    if datetime.utcnow() > request_row['expires_at']:
-        flash("This unfreeze link has expired.", "danger")
-        return redirect(url_for('login'))
+    users = cursor.fetchall()
+    cursor.execute("""
+            SELECT user_id, full_name, email, phone_number, details, token, expires_at
+            FROM unfreeze_requests
+            ORDER BY id DESC
+        """)
+    unfreeze_requests = cursor.fetchall()
+    cursor.close()
 
-    user_id = request_row['user_id']
-    cursor.execute("UPDATE frozen_account SET is_frozen = FALSE WHERE user_id = %s", (user_id,))
-    cursor.execute("DELETE FROM unfreeze_requests WHERE token = %s", (token,))
+    return render_template("freeze_account.html", users=users, unfreeze_requests=unfreeze_requests, search_query=search_query)
+
+@app.route('/admin_freeze_account/<int:user_id>', methods=['POST'])
+def admin_freeze_account(user_id):
+    cursor = mysql.connection.cursor()
+    cursor.execute(
+        "INSERT INTO frozen_account (user_id, frozen_at, is_frozen) VALUES (%s, NOW(), TRUE)",
+        (user_id,))
+    cursor.execute("UPDATE accounts SET frozen = 1 WHERE id = %s", (user_id,))
     mysql.connection.commit()
     cursor.close()
 
-    flash("Your account has been unfrozen. You can now log in.", "success")
-    return redirect(url_for('login'))
+    flash("Account has been frozen.", "danger")
+    return redirect(url_for('freezeAccountDetails'))
 
 
-@app.route('/send_unfreeze_email', methods=['POST'])
-def ajax_send_unfreeze_email():
-    user_id = request.args.get('user_id')  # or from request.json
-
+@app.route('/unfreeze_account', methods=['POST'])
+def manual_unfreeze_account():
+    user_id = request.form.get('user_id')
     if not user_id:
-        return jsonify({'status': 'error', 'message': 'User not logged in.'}), 403
+        flash("No user ID provided.", "danger")
+        return redirect(url_for('freezeAccountDetails'))
 
+    cursor = mysql.connection.cursor()
+    cursor.execute("UPDATE frozen_account SET is_frozen = FALSE WHERE user_id = %s", (user_id,))
+    cursor.execute("UPDATE accounts SET frozen = 0 WHERE id = %s", (user_id,))
+    mysql.connection.commit()
+    cursor.close()
+
+    flash("Account has been manually unfrozen.", "success")
+    return redirect(url_for('freezeAccountDetails'))
+
+
+@app.route('/request_unfreeze/<int:user_id>', methods=['GET', 'POST'])
+def request_unfreeze(user_id):
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cursor.execute("SELECT email FROM accounts WHERE id = %s", (user_id,))
+    cursor.execute("SELECT * FROM accounts WHERE id = %s", (user_id,))
     user = cursor.fetchone()
     cursor.close()
 
     if not user:
-        return jsonify({'status': 'error', 'message': 'User not found.'}), 404
+        flash("User not found.", "danger")
+        return redirect(url_for('login'))
 
-    send_unfreeze_email(user_id, user['email'])
-    return jsonify({'status': 'success', 'message': 'Unfreeze email sent.'})
+    if request.method == 'POST':
+        full_name = request.form.get('full_name')
+        email = request.form.get('email')
+        phone_number = request.form.get('phone_number')
+        details = request.form.get('details')
+        password = request.form.get('password')
+
+        # Validate password
+        stored_password_hash = user['password']
+        if not verify_password(password, stored_password_hash):
+            flash("Incorrect password. Cannot submit unfreeze request.", "danger")
+            return redirect(url_for('request_unfreeze', user_id=user_id))
+
+        # Optional 2FA check
+        if user.get('two_factor_status') == 'enabled':
+            send_otp_email(user['email'], user['id'], user['first_name'], user['last_name'])
+            session['pending_2fa_user_id'] = user['id']
+            session['pending_2fa_started_at'] = time.time()
+            session['pending_2fa_attempts'] = 0
+            flash("2FA required. Check your email for OTP.", "info")
+            return redirect(url_for('verify_otp', id=user['id']))
+
+        # Insert unfreeze request (no email sending)
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(minutes=10)
+
+        cursor = mysql.connection.cursor()
+        cursor.execute("""
+            INSERT INTO unfreeze_requests (user_id, token, expires_at, full_name, email, phone_number, details)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (user_id, token, expires_at, full_name, email, phone_number, details))
+        mysql.connection.commit()
+        cursor.close()
+        flash("Unfreeze request submitted. Admin will review it.", "success")
+        return redirect(url_for('login'))
+
+    return render_template('/accountPage/request_unfreeze.html', user=user)
 
 
 @app.errorhandler(429)
