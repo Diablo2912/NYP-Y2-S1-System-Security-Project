@@ -9,10 +9,10 @@
         {% for product in cart.values() %}
         <div class="list-group-item d-flex justify-content-between align-items-center">
             <!-- Product Image -->
-            <img src="{{ product['image'] }}" width="70" class="rounded border">
-            <div>
-                <h5 class="text-success">{{ product['name'] }}</h5>
-                <p>${{ "%.2f"|format(product['price']) }} x {{ product['quantity'] }} = ${{ "%.2f"|format(product['price'] * product['quantity']) }}</p>
+            <img src="{{ product['image'] }}" width="70" class="rounded border" alt="{{ product['name'] }}">
+            <div class="ms-2">
+                <h5 class="text-success mb-1">{{ product['name'] }}</h5>
+                <p class="mb-0">${{ "%.2f"|format(product['price']) }} x {{ product['quantity'] }} = ${{ "%.2f"|format(product['price'] * product['quantity']) }}</p>
             </div>
         </div>
         {% endfor %}
@@ -25,33 +25,98 @@
     <!-- Customer Details Form -->
     <div class="card p-4 mt-4">
         <h3 class="text-success">Customer Information</h3>
-        <form id="autoDestructForm" method="POST" action="{{ url_for('create_checkout_session') }}">
+        <form id="autoDestructForm" class="needs-validation" novalidate method="POST" action="{{ url_for('create_checkout_session') }}">
+            <!-- Full Name -->
             <div class="mb-3">
                 <label for="name" class="form-label">Full Name</label>
-                <input type="text" class="form-control" id="name" name="name" required>
+                <input
+                    type="text"
+                    class="form-control"
+                    id="name"
+                    name="name"
+                    autocomplete="name"
+                    inputmode="text"
+                    maxlength="60"
+                    placeholder="e.g. Glen Loo"
+                    required>
+                <div class="form-text">Letters, spaces, hyphens and apostrophes only (2–60 chars).</div>
+                <div class="invalid-feedback" id="nameFeedback">Please enter a valid full name.</div>
             </div>
+
+            <!-- Phone -->
             <div class="mb-3">
                 <label for="phone" class="form-label">Phone Number</label>
-                <input type="text" class="form-control" id="phone" name="phone" required>
+                <input
+                    type="tel"
+                    class="form-control"
+                    id="phone"
+                    name="phone"
+                    autocomplete="tel"
+                    inputmode="numeric"
+                    pattern="^[689]\d{7}$"
+                    maxlength="8"
+                    placeholder="e.g. 91234567"
+                    required>
+                <div class="form-text">Singapore number, 8 digits, starting with 6/8/9.</div>
+                <div class="invalid-feedback" id="phoneFeedback">Enter an 8-digit SG number starting with 6/8/9.</div>
             </div>
+
+            <!-- Email -->
             <div class="mb-3">
                 <label for="email" class="form-label">Email Address</label>
-                <input type="email" class="form-control" id="email" name="email" required>
+                <input
+                    type="email"
+                    class="form-control"
+                    id="email"
+                    name="email"
+                    autocomplete="email"
+                    maxlength="254"
+                    placeholder="e.g. name@example.com"
+                    required>
+                <div class="invalid-feedback" id="emailFeedback">Please enter a valid email address.</div>
             </div>
+
+            <!-- Address -->
             <div class="mb-3">
                 <label for="address_line1" class="form-label">Address</label>
-                <input type="text" class="form-control" id="address_line1" name="address_line1" required>
+                <input
+                    type="text"
+                    class="form-control"
+                    id="address_line1"
+                    name="address_line1"
+                    autocomplete="address-line1"
+                    maxlength="120"
+                    placeholder="Block/Street, Unit (optional)"
+                    required>
+                <div class="form-text">At least 5 characters; include letters or numbers.</div>
+                <div class="invalid-feedback" id="addressFeedback">Please enter a valid address.</div>
             </div>
+
+            <!-- Postal Code -->
             <div class="mb-3">
                 <label for="postal_code" class="form-label">Postal Code</label>
-                <input type="text" class="form-control" id="postal_code" name="postal_code" pattern="\d{6}" title="Postal Code must be 6 digits" required>
+                <input
+                    type="text"
+                    class="form-control"
+                    id="postal_code"
+                    name="postal_code"
+                    autocomplete="postal-code"
+                    inputmode="numeric"
+                    pattern="^\d{6}$"
+                    maxlength="6"
+                    placeholder="e.g. 123456"
+                    required>
+                <div class="invalid-feedback" id="postalFeedback">Postal Code must be exactly 6 digits.</div>
             </div>
+
             <button type="submit" class="btn btn-success w-100 mt-3">Proceed to Payment</button>
         </form>
+
         <a href="{{ url_for('buy_product') }}" class="btn btn-outline-success w-100 mt-3">Continue Shopping</a>
     </div>
-    <div id="timer-container" style="margin-bottom: 1rem;">
-    ⏳ This form will auto-destruct in <span id="countdown">60</span> seconds.
+
+    <div id="timer-container" class="mt-2 mb-4 text-center">
+      ⏳ This form will auto-destruct in <span id="countdown">60</span> seconds.
     </div>
 
     {% else %}
@@ -60,23 +125,148 @@
 </div>
 
 <script>
-    let secondsLeft = 60;
-    const countdownEl = document.getElementById('countdown');
-    const form = document.getElementById('autoDestructForm');
+// === Utility helpers ===
+function normalizeText(s) { return (s || "").replace(/\s+/g, " ").trim(); }
+function onlyDigits(s) { return (s || "").replace(/\D+/g, ""); }
 
-    const timer = setInterval(() => {
-        secondsLeft--;
-        countdownEl.textContent = secondsLeft;
+// === Field validators ===
+const validators = {
+  name(value) {
+    const v = normalizeText(value);
+    // Allowed: letters, spaces, hyphens, apostrophes. Must contain at least 2 letters.
+    if (!v) return { ok:false, msg:"Name is required." };
+    if (!/^[A-Za-z' -]+$/.test(v)) return { ok:false, msg:"Use letters, spaces, hyphens or apostrophes only." };
+    if ((v.match(/[A-Za-z]/g) || []).length < 2) return { ok:false, msg:"Please include at least two letters." };
+    if (v.length < 2 || v.length > 60) return { ok:false, msg:"Name must be 2–60 characters." };
+    if (/(.)\1{3,}/.test(v)) return { ok:false, msg:"Name looks repetitive—please check." };
+    return { ok:true };
+  },
 
-        if (secondsLeft <= 0) {
-            clearInterval(timer);
-            // Option 1: Disable all form inputs
-            Array.from(form.elements).forEach(input => input.disabled = true);
+  phone(value) {
+    const v = onlyDigits(value);
+    if (!v) return { ok:false, msg:"Phone is required." };
+    if (!/^[689]\d{7}$/.test(v)) return { ok:false, msg:"Enter an 8-digit SG number starting with 6/8/9." };
+    return { ok:true, transform:v };
+  },
 
-            // Option 2: Optional message
-            document.getElementById('timer-container').innerHTML = "<strong>⛔ Time's up! Form disabled.</strong>";
-        }
-    }, 1000);
+  email(value) {
+    const v = normalizeText(value);
+    if (!v) return { ok:false, msg:"Email is required." };
+    // Let the browser do most checks; add a quick sanity check:
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) return { ok:false, msg:"Enter a valid email address." };
+    return { ok:true, transform:v.toLowerCase() };
+  },
+
+  address_line1(value) {
+    const v = normalizeText(value);
+    if (!v) return { ok:false, msg:"Address is required." };
+    if (v.length < 5) return { ok:false, msg:"Address must be at least 5 characters." };
+    if (!/[A-Za-z0-9]/.test(v)) return { ok:false, msg:"Address must include letters or numbers." };
+    return { ok:true, transform:v };
+  },
+
+  postal_code(value) {
+    const v = onlyDigits(value);
+    if (!/^\d{6}$/.test(v)) return { ok:false, msg:"Postal Code must be exactly 6 digits." };
+    return { ok:true, transform:v };
+  }
+};
+
+// === Wiring / Live validation ===
+(function () {
+  const form = document.getElementById('autoDestructForm');
+  if (!form) return;
+
+  const fields = {
+    name: document.getElementById('name'),
+    phone: document.getElementById('phone'),
+    email: document.getElementById('email'),
+    address_line1: document.getElementById('address_line1'),
+    postal_code: document.getElementById('postal_code')
+  };
+
+  function setValidity(el, valid, msgId, msg) {
+    const msgEl = document.getElementById(msgId);
+    if (valid) {
+      el.classList.remove('is-invalid');
+      el.classList.add('is-valid');
+      if (msgEl) msgEl.textContent = '';
+      el.setCustomValidity('');
+    } else {
+      el.classList.remove('is-valid');
+      el.classList.add('is-invalid');
+      if (msgEl) msgEl.textContent = msg || 'Invalid value.';
+      el.setCustomValidity(msg || 'Invalid.');
+    }
+  }
+
+  function runValidate(key) {
+    const el = fields[key];
+    const { ok, msg, transform } = validators[key](el.value);
+    if (transform !== undefined) el.value = transform;
+    setValidity(el, ok, key + 'Feedback', msg);
+    return ok;
+  }
+
+  // Live listeners
+  fields.name.addEventListener('input', () => {
+    // Strip disallowed characters live
+    fields.name.value = fields.name.value.replace(/[^A-Za-z' -]+/g, '');
+    runValidate('name');
+  });
+
+  fields.phone.addEventListener('input', () => {
+    fields.phone.value = onlyDigits(fields.phone.value).slice(0, 8);
+    runValidate('phone');
+  });
+
+  fields.email.addEventListener('input', () => runValidate('email'));
+
+  fields.address_line1.addEventListener('input', () => {
+    // Soft-trim multiple spaces
+    fields.address_line1.value = fields.address_line1.value.replace(/\s{2,}/g, ' ');
+    runValidate('address_line1');
+  });
+
+  fields.postal_code.addEventListener('input', () => {
+    fields.postal_code.value = onlyDigits(fields.postal_code.value).slice(0, 6);
+    runValidate('postal_code');
+  });
+
+  // Validate on blur too (helps on desktop)
+  Object.keys(fields).forEach(k => fields[k].addEventListener('blur', () => runValidate(k)));
+
+  // Final gate on submit
+  form.addEventListener('submit', (e) => {
+    let allGood = true;
+    Object.keys(fields).forEach(k => { if (!runValidate(k)) allGood = false; });
+    if (!allGood) {
+      e.preventDefault();
+      e.stopPropagation();
+      // Focus first invalid
+      const firstInvalid = form.querySelector('.is-invalid');
+      if (firstInvalid) firstInvalid.focus();
+    }
+  });
+})();
+
+// === Auto-destruct timer (unchanged, just robust) ===
+(function () {
+  let secondsLeft = 60;
+  const countdownEl = document.getElementById('countdown');
+  const form = document.getElementById('autoDestructForm');
+  const timer = setInterval(() => {
+    secondsLeft--;
+    if (countdownEl) countdownEl.textContent = secondsLeft;
+    if (secondsLeft <= 0) {
+      clearInterval(timer);
+      if (form) {
+        Array.from(form.elements).forEach(input => input.disabled = true);
+      }
+      const tc = document.getElementById('timer-container');
+      if (tc) tc.innerHTML = "<strong>⛔ Time's up! Form disabled.</strong>";
+    }
+  }, 1000);
+})();
 </script>
-
 {% endblock %}
