@@ -1,10 +1,12 @@
 {% extends "base.html" %}
+{% block title %}Home - Cropzy{% endblock %}
 
 {% block content %}
 
+{# Global flash messages #}
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
-    <div class="container">
+    <div class="container mt-3">
       {% for category, message in messages %}
         <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
           {{ message }}
@@ -15,221 +17,269 @@
   {% endif %}
 {% endwith %}
 
-<h1 class="text-center my-4">{{ welcome_message if welcome_message else "Home" }}</h1>
-<div class="container">
-    <header class="mb-4">
-        <div class="row align-items-center">
-            <div class="col-lg-6 text-center text-lg-start">
-                <h1 class="fw-bold text-success">Cropzy: Cultivating Growth, Harvesting Excellence.</h1>
-                <p class="text-muted">
-                    Cropzy is an innovative agricultural solutions company dedicated to empowering farmers with advanced tools and technologies
-                    to maximize crop yields, ensure sustainability, and drive efficiency from seed to harvest.
-                </p>
-                <a href="/aboutUs" class="btn btn-success">About Us</a>
-            </div>
-            <div class="col-lg-6 text-center">
-                <img src="{{ url_for('static', filename='assets/crops-growing-in-thailand.jpg') }}" alt="Placeholder Image" class="img-fluid rounded shadow">
-            </div>
+{# ===== HERO (full-bleed, dark overlay, taller) ===== #}
+<div class="position-relative" style="left:50%;transform:translateX(-50%);width:100vw;">
+  <section
+    class="position-relative text-white overflow-hidden"
+    style="
+      background:
+        linear-gradient(180deg, rgba(0,0,0,.45), rgba(0,0,0,.25) 40%, rgba(0,0,0,.55)),
+        url('{{ url_for('static', filename='assets/crops-growing-in-thailand.jpg') }}') center/cover no-repeat;
+      min-height: 70vh;">
+    <div class="container">
+      <div class="row align-items-center" style="min-height:70vh">
+        <div class="col-lg-8 py-5">
+          <span class="badge bg-success rounded-pill mb-3">Cropzy</span>
+          <h1 class="display-5 fw-bold mb-3">
+            {{ welcome_message if welcome_message else "Cultivating Growth, Harvesting Excellence." }}
+          </h1>
+          <p class="lead mb-4">
+            Empowering farmers with tools and technology to boost yields, strengthen sustainability,
+            and drive efficiency from seed to harvest.
+          </p>
+          <a href="/aboutUs" class="btn btn-success btn-lg me-2">About Us</a>
+          <a href="#seasonal-updates" class="btn btn-outline-light btn-lg">Seasonal Updates</a>
         </div>
-    </header>
-
-    <!-- Featured Articles Section -->
-    <section class="mb-4">
-        <div class="card p-4 shadow">
-            <h2 class="text-success mb-3">Featured Articles</h2>
-            <div id="articles-carousel" class="carousel slide" data-bs-ride="carousel">
-                <!-- Carousel Indicators -->
-                <div class="carousel-indicators">
-                    {% for article in articles %}
-                    <button type="button" style="background-color: black" data-bs-target="#articles-carousel" data-bs-slide-to="{{ loop.index0 }}"
-                            {% if loop.index == 1 %}class="active"{% endif %} aria-current="true" aria-label="Slide {{ loop.index }}">
-                    </button>
-                    {% endfor %}
-                </div>
-
-                <!-- Carousel Inner -->
-                <div class="carousel-inner">
-                    {% if articles %}
-                        {% for article in articles %}
-                        <div class="carousel-item {% if loop.index == 1 %}active{% endif %}">
-                            <div class="text-center">
-                                <img src="{{ article.urlToImage or 'default-image.jpg' }}"
-                                     class="d-block w-50 mx-auto"
-                                     alt="Image for {{ article.title }}">
-                                <div class="mt-3">
-                                    <h3>{{ article.title }}</h3>
-                                    <p>{{ article.description or 'No description available.' }}</p>
-                                    <a href="{{ article.url }}" target="_blank" class="btn btn-primary">Read More</a>
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <p>No articles available at the moment.</p>
-                    {% endif %}
-                </div>
-
-                <!-- Carousel Controls -->
-                <br><br><br>
-                <button class="carousel-control-prev" type="button" data-bs-target="#articles-carousel" data-bs-slide="prev">
-                    <span class="carousel-control-prev-icon" aria-hidden="true" style="background-color: white; border-radius: 50%;"></span>
-                    <span class="visually-hidden">Previous</span>
-                </button>
-                <button class="carousel-control-next" type="button" data-bs-target="#articles-carousel" data-bs-slide="next">
-                    <span class="carousel-control-next-icon" aria-hidden="true" style="background-color: white; border-radius: 50%;"></span>
-                    <span class="visually-hidden">Next</span>
-                </button>
-
-            </div>
-        </div>
-    </section>
-
-    <!-- Seasonal Updates Section -->
-    <section class="mb-4">
-        <div class="card p-4 shadow">
-            <h2 class="text-success mb-3">Seasonal Updates</h2>
-            <a href="{{ url_for('create_update') }}" class="btn btn-primary mb-3">Create a Seasonal Update</a>
-
-            <!-- Flash Messages -->
-            <div class="text-center">
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                            <div class="alert alert-{{ category }} text-center">
-                                {{ message }}
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                {% endwith %}
-            </div>
-
-            <!-- Updates Table -->
-            <div class="table-responsive">
-                <style>
-                  .cell-content { max-width: 420px; }
-                  .text-truncate-2 {
-                    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-                    overflow: hidden;
-                  }
-                </style>
-
-                <table class="table table-striped align-middle">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Title</th>
-                            <th class="cell-content">Content</th>
-                            <th>Date</th>
-                            <th>Season</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if updates %}
-                            {% for update in updates %}
-                                {% set is_admin = current_user and current_user.status == 'admin' %}
-                                {# owner_id may not exist on older entries; handle safely #}
-                                {% set is_owner = current_user and (update.get('owner_id') == current_user.user_id) %}
-                                {% set can_manage = is_admin or is_owner %}
-
-                                <tr>
-                                    <td>{{ loop.index }}</td>
-
-                                    <td>
-                                      <div class="fw-semibold">{{ update.title }}</div>
-                                      {% if is_owner %}
-                                        <span class="badge bg-success-subtle text-success mt-1">You</span>
-                                      {% elif is_admin %}
-                                        <span class="badge bg-secondary-subtle text-secondary mt-1">Admin</span>
-                                      {% endif %}
-                                    </td>
-
-                                    <td class="cell-content">
-                                      <div class="text-truncate-2" title="{{ update.content }}">{{ update.content }}</div>
-                                    </td>
-
-                                    <td>{{ update.date }}</td>
-
-                                    <td>
-                                      {% set season = (update.season or '')|lower %}
-                                      {% if season == 'spring' %}
-                                        <span class="badge bg-success">Spring</span>
-                                      {% elif season == 'summer' %}
-                                        <span class="badge bg-warning text-dark">Summer</span>
-                                      {% elif season == 'autumn' %}
-                                        <span class="badge bg-secondary">Autumn</span>
-                                      {% elif season == 'winter' %}
-                                        <span class="badge bg-info text-dark">Winter</span>
-                                      {% else %}
-                                        <span class="badge bg-light text-dark">{{ update.season }}</span>
-                                      {% endif %}
-                                    </td>
-
-                                    <td>
-                                      {% if can_manage %}
-                                        <a href="{{ url_for('edit_update', index=loop.index0) }}" class="btn btn-sm btn-outline-primary me-1">Edit</a>
-                                        <a href="{{ url_for('request_delete', index=loop.index0) }}" class="btn btn-sm btn-outline-danger">Delete</a>
-                                      {% else %}
-                                        <button type="button"
-                                                class="btn btn-sm btn-outline-secondary"
-                                                disabled
-                                                data-bs-toggle="tooltip"
-                                                data-bs-title="Only the creator or an admin can manage this update">
-                                          Edit / Delete
-                                        </button>
-                                      {% endif %}
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr>
-                                <td colspan="6" class="text-center">No seasonal updates available at the moment.</td>
-                            </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </section>
-
-    <!-- Improved CO2 Emissions Chart Section -->
-    <section>
-        <div class="card p-4 shadow">
-            <h2 class="text-success mb-3">CO₂ Emissions Insights</h2>
-
-            <!-- co2 emissions per product -->
-            <div class="text-center">
-                <h4>CO₂ Emissions by Product</h4>
-                {% if chart1_data %}
-                    <img src="data:image/png;base64,{{ chart1_data }}" class="img-fluid rounded shadow">
-                {% else %}
-                    <p>No products available to display the chart.</p>
-                {% endif %}
-            </div>
-
-            <!-- co2 emission for category -->
-            <div class="text-center mt-4">
-                <h4>CO₂ Emissions by Product Category</h4>
-                {% if chart2_data %}
-                    <img src="data:image/png;base64,{{ chart2_data }}" class="img-fluid rounded shadow">
-                {% else %}
-                    <p>No product category data available.</p>
-                {% endif %}
-            </div>
-
-            <!-- 3rd chart -->
-            <div class="text-center mt-4">
-                <h4>Highest vs. Lowest CO₂ Emission Products</h4>
-                {% if chart3_data %}
-                    <img src="data:image/png;base64,{{ chart3_data }}" class="img-fluid rounded shadow">
-                {% else %}
-                    <p>No emission comparison data available.</p>
-                {% endif %}
-            </div>
-        </div>
-    </section>
+      </div>
+    </div>
+  </section>
 </div>
 
+{# ===== PAGE CANVAS (soft background) ===== #}
+<div class="bg-body-tertiary">
+
+  {# Quick tiles #}
+  <section class="py-4 py-lg-5">
+    <div class="container">
+      <div class="row g-3 g-lg-4">
+        <div class="col-12 col-md-4">
+          <a href="#featured-articles" class="text-decoration-none">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body">
+                <h3 class="h5 mb-1">Featured Articles</h3>
+                <p class="text-muted mb-3">Latest stories and insights.</p>
+                <span class="btn btn-sm btn-outline-primary">Explore</span>
+              </div>
+            </div>
+          </a>
+        </div>
+        <div class="col-12 col-md-4">
+          <a href="{{ url_for('create_update') }}" class="text-decoration-none">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body">
+                <h3 class="h5 mb-1">Create Seasonal Update</h3>
+                <p class="text-muted mb-3">Share what’s happening this season.</p>
+                <span class="btn btn-sm btn-outline-primary">Get started</span>
+              </div>
+            </div>
+          </a>
+        </div>
+        <div class="col-12 col-md-4">
+          <a href="#co2-insights" class="text-decoration-none">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body">
+                <h3 class="h5 mb-1">CO₂ Insights</h3>
+                <p class="text-muted mb-3">Visualize product and category impact.</p>
+                <span class="btn btn-sm btn-outline-primary">View charts</span>
+              </div>
+            </div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {# ===== FEATURED ARTICLES (cards grid) ===== #}
+  <section id="featured-articles" class="pb-2 pb-lg-4">
+    <div class="container">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body p-4 p-lg-5">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <h2 class="h4 text-success m-0">Featured Articles</h2>
+            {% if articles %}<span class="text-muted small">{{ articles|length }} items</span>{% endif %}
+          </div>
+
+          {% if articles %}
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+              {% for article in articles %}
+              <div class="col">
+                <div class="card h-100 border-0 shadow-sm">
+                  <div class="ratio ratio-16x9">
+                    <img src="{{ article.urlToImage or 'default-image.jpg' }}"
+                         alt="Image for {{ article.title }}"
+                         class="w-100 h-100" style="object-fit:cover;">
+                  </div>
+                  <div class="card-body">
+                    <h3 class="h6 mb-2">{{ article.title }}</h3>
+                    <p class="text-muted mb-3" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">
+                      {{ article.description or 'No description available.' }}
+                    </p>
+                    <a href="{{ article.url }}" target="_blank" class="btn btn-primary btn-sm">Read More</a>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-center text-muted py-4">No articles available at the moment.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SEASONAL UPDATES (clean, compact cards) ===== -->
+<section id="seasonal-updates" class="py-4 py-lg-5">
+  <div class="container">
+
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+      <h2 class="h4 text-success m-0">Seasonal Updates</h2>
+      <a href="{{ url_for('create_update') }}" class="btn btn-primary">Create a Seasonal Update</a>
+    </div>
+
+    {# Section-specific flash (kept) #}
+    <div class="text-center">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} d-inline-block text-start">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+    </div>
+
+    {% if updates %}
+      <div class="row row-cols-1 row-cols-md-2 g-4">
+        {% for update in updates %}
+          {% set is_admin = current_user and current_user.status == 'admin' %}
+          {% set is_owner = current_user and (update.get('owner_id') == current_user.user_id) %}
+          {% set can_manage = is_admin or is_owner %}
+          {% set season = (update.season or '')|lower %}
+
+          <div class="col">
+            <div class="card h-100 border-0 shadow-sm">
+              <div class="card-body d-flex flex-column py-3">
+
+                <!-- Header: title + date + small role badge -->
+                <div class="d-flex align-items-start gap-2">
+                  <h3 class="h6 mb-0 flex-grow-1">{{ update.title }}</h3>
+                  <span class="small text-muted text-nowrap">{{ update.date }}</span>
+                </div>
+                <div class="mt-1">
+                  {% if is_owner %}
+                    <span class="badge rounded-pill text-bg-success">You</span>
+                  {% elif is_admin %}
+                    <span class="badge rounded-pill text-bg-secondary">Admin</span>
+                  {% endif %}
+                </div>
+
+                <!-- Content -->
+                <p class="text-muted my-3" title="{{ update.content }}"
+                   style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">
+                  {{ update.content }}
+                </p>
+
+                <hr class="my-2">
+
+                <!-- Footer: season chip + actions (always aligned bottom) -->
+                <div class="mt-auto d-flex align-items-center justify-content-between">
+                  <div>
+                    {% if season == 'spring' %}
+                      <span class="badge rounded-pill text-bg-success">Spring</span>
+                    {% elif season == 'summer' %}
+                      <span class="badge rounded-pill text-bg-warning text-dark">Summer</span>
+                    {% elif season == 'autumn' %}
+                      <span class="badge rounded-pill text-bg-secondary">Autumn</span>
+                    {% elif season == 'winter' %}
+                      <span class="badge rounded-pill text-bg-info text-dark">Winter</span>
+                    {% else %}
+                      <span class="badge rounded-pill text-bg-light text-dark">{{ update.season }}</span>
+                    {% endif %}
+                  </div>
+
+                  <div class="d-flex gap-2">
+                    {% if can_manage %}
+                      <a href="{{ url_for('edit_update', index=loop.index0) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                      <a href="{{ url_for('request_delete', index=loop.index0) }}" class="btn btn-sm btn-outline-danger">Delete</a>
+                    {% else %}
+                      <button type="button" class="btn btn-sm btn-outline-secondary" disabled
+                              data-bs-toggle="tooltip"
+                              data-bs-title="Only the creator or an admin can manage this update">
+                        Edit / Delete
+                      </button>
+                    {% endif %}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center text-muted py-4">No seasonal updates available at the moment.</div>
+      </div>
+    {% endif %}
+
+  </div>
+</section>
+
+
+  {# ===== CO₂ INSIGHTS (3 cards) ===== #}
+  <section id="co2-insights" class="pb-5">
+    <div class="container">
+      <h2 class="h4 text-success mb-3">CO₂ Emissions Insights</h2>
+      <div class="row row-cols-1 row-cols-md-3 g-4">
+        <div class="col">
+          <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+              <h4 class="h6 text-muted mb-3 text-center">CO₂ Emissions by Product</h4>
+              <div class="text-center">
+                {% if chart1_data %}
+                  <img src="data:image/png;base64,{{ chart1_data }}" class="img-fluid rounded" alt="CO₂ by Product">
+                {% else %}
+                  <p class="text-muted mb-0">No products available to display the chart.</p>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+              <h4 class="h6 text-muted mb-3 text-center">CO₂ Emissions by Product Category</h4>
+              <div class="text-center">
+                {% if chart2_data %}
+                  <img src="data:image/png;base64,{{ chart2_data }}" class="img-fluid rounded" alt="CO₂ by Category">
+                {% else %}
+                  <p class="text-muted mb-0">No product category data available.</p>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+              <h4 class="h6 text-muted mb-3 text-center">Highest vs. Lowest CO₂ Emission Products</h4>
+              <div class="text-center">
+                {% if chart3_data %}
+                  <img src="data:image/png;base64,{{ chart3_data }}" class="img-fluid rounded" alt="CO₂ High vs Low">
+                {% else %}
+                  <p class="text-muted mb-0">No emission comparison data available.</p>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div> {# /bg-body-tertiary canvas #}
+
+{# Local script just for this page #}
 <script>
   // enable Bootstrap tooltips if present
   document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
