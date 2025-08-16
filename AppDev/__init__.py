@@ -1609,6 +1609,8 @@ def ipmgmt_block_ip():
 
     raw_ip = (request.form.get("ip") or "").strip()
     reason = (request.form.get("reason") or "Manual block via IP Management").strip()
+    # Optional expiry from form (expects datetime-local or ISO-8601; empty means no expiry)
+    expires_raw = (request.form.get("expiry_date") or "").strip()
 
     ip_norm = normalize_ip(raw_ip)
     if not ip_norm:
@@ -1617,28 +1619,61 @@ def ipmgmt_block_ip():
 
     user_id = g.user.get("user_id")
 
+    # Parse expires_at if provided; store as Python None if blank or parse fails
+    expires_dt = None
+    if expires_raw:
+        try:
+            from datetime import datetime, timedelta
+            # Parse the date
+            expires_dt = datetime.strptime(expires_raw, "%Y-%m-%d")
+            # Set to start of that date (00:00) + 24 hours
+            expires_dt = expires_dt.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=24)
+        except ValueError:
+            expires_dt = None  # Treat unparseable input as "no expiry"
+
     cur = mysql.connection.cursor()
     try:
-        # Upsert with a 24-hour expiry from now (refreshes on duplicate)
-        cur.execute(
-            """
-            INSERT INTO ip_blocklist (ip, reason, created_by, expires_at)
-            VALUES (%s, %s, %s, NOW() + INTERVAL 24 HOUR)
-            ON DUPLICATE KEY UPDATE
-                reason = VALUES(reason),
-                created_by = VALUES(created_by),
-                expires_at = NOW() + INTERVAL 24 HOUR
-            """,
-            (ip_norm, reason, user_id),
-        )
-        mysql.connection.commit()
-        flash(f"Blocked IP for 24h: {ip_norm}", "success")
-        admin_log_activity(
-            mysql,
-            f'Admin {user_id} blocked {ip_norm} (expires in 24h) — reason: {reason}',
-            category="Info",
-            user_id=g.user["user_id"]
-        )
+        if expires_dt is None:
+            # Insert with NULL expiry; on duplicate, do not change existing expires_at
+            cur.execute(
+                """
+                INSERT INTO ip_blocklist (ip, reason, created_by, expires_at)
+                VALUES (%s, %s, %s, NULL)
+                ON DUPLICATE KEY UPDATE
+                    reason = VALUES(reason),
+                    created_by = VALUES(created_by)
+                """,
+                (ip_norm, reason, user_id),
+            )
+            mysql.connection.commit()
+            flash(f"Blocked IP (no expiry): {ip_norm}", "success")
+            admin_log_activity(
+                mysql,
+                f'Admin {user_id} blocked {ip_norm} — reason: {reason} (no expiry)',
+                category="Info",
+                user_id=user_id
+            )
+        else:
+            # Insert with provided expiry; on duplicate, overwrite with the provided expiry
+            cur.execute(
+                """
+                INSERT INTO ip_blocklist (ip, reason, created_by, expires_at)
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    reason = VALUES(reason),
+                    created_by = VALUES(created_by),
+                    expires_at = VALUES(expires_at)
+                """,
+                (ip_norm, reason, user_id, expires_dt.strftime("%Y-%m-%d %H:%M:%S")),
+            )
+            mysql.connection.commit()
+            flash(f"Blocked IP until {expires_dt:%Y-%m-%d %H:%M}: {ip_norm}", "success")
+            admin_log_activity(
+                mysql,
+                f'Admin {user_id} blocked {ip_norm} (expires {expires_dt:%Y-%m-%d %H:%M}) — reason: {reason}',
+                category="Info",
+                user_id=user_id
+            )
     except Exception as e:
         mysql.connection.rollback()
         flash(f"Failed to block IP ({ip_norm}): {e}", "danger")
