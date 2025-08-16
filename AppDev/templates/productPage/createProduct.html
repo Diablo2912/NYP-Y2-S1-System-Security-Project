@@ -5,75 +5,187 @@
 {% from "includes/_formHelper.html" import render_field %}
 
 <div class="container mt-5">
-    <h1 class="display-4 text-center text-success">Create a New Product</h1>
+  <h1 class="display-4 text-center text-success">Create a New Product</h1>
 
-    <div class="card shadow-lg p-4 mt-4">
-        <form method="POST" action="" enctype="multipart/form-data">
-            {{ form.hidden_tag() }}
+  <div class="card shadow-lg p-4 mt-4">
+    <form id="createProductForm" method="POST" action="" enctype="multipart/form-data" novalidate>
+      {{ form.hidden_tag() }}
 
-            <!-- Product Image Upload -->
-            <div class="form-group mb-3">
-                <label for="product_image" class="form-label">Product Image</label>
-                <input type="file" class="form-control" id="product_image" name="product_image" accept="image/*">
-            </div>
+      <!-- Product Image Upload -->
+      <div class="form-group mb-3">
+        <label for="product_image" class="form-label">Product Image</label>
+        {{ form.product_image(id="product_image", class="form-control", accept="image/*") }}
+        <div class="invalid-feedback">Only JPG/PNG up to 2 MB.</div>
+      </div>
 
-            <!-- Product Name -->
-            <div class="form-group mb-3">
-                <label for="product_name">Product Name</label>
-                {{ form.product_name(class="form-control", placeholder="e.g. Organic Wheat Seeds") }}
-            </div>
+      <!-- Product Name -->
+      <div class="form-group mb-3">
+        <label for="product_name">Product Name</label>
+        {{ form.product_name(
+            id="product_name",
+            class="form-control",
+            minlength="1",
+            maxlength="150",
+            pattern="^[A-Za-z0-9][A-Za-z0-9 \-_'’(),.&/]{0,149}$",
+            placeholder="e.g. Organic Wheat Seeds",
+            required=True
+        ) }}
+        <div class="invalid-feedback">1–150 chars. Letters/numbers/spaces and - _ ’ ( ) , . & / allowed.</div>
+      </div>
 
-            <!-- Quantity -->
-            <div class="form-group mb-3">
-                <label for="quantity">Quantity</label>
-                {{ form.quantity(class="form-control", type="number", min="0", placeholder="e.g. 10") }}
-            </div>
+      <!-- Quantity -->
+      <div class="form-group mb-3">
+        <label for="quantity">Quantity</label>
+        {{ form.quantity(
+            id="quantity",
+            class="form-control",
+            type="number",
+            min="0",
+            step="1",
+            placeholder="e.g. 10",
+            required=True
+        ) }}
+        <div class="invalid-feedback">Quantity must be 0 or more.</div>
+      </div>
 
-            <!-- Category Dropdown -->
-            <div class="form-group mb-3">
-                <label for="category">Category</label>
-                <select class="form-control" id="category" name="category">
-                    {% for value, label in form.category.choices %}
-                        <option value="{{ value }}" {% if form.category.data == value %}selected{% endif %}>
-                            {{ label }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
+      <!-- Category Dropdown -->
+      <div class="form-group mb-3">
+        <label for="category">Category</label>
+        {{ form.category(id="category", class="form-select", required=True) }}
+        <div class="invalid-feedback">Please select a category.</div>
+      </div>
 
-            <!-- Price -->
-            <div class="form-group mb-3">
-                <label for="price">Price ($)</label>
-                {{ form.price(class="form-control", type="number", min="0", step="0.01", placeholder="e.g. 10.00") }}
-            </div>
+      <!-- Price -->
+      <div class="form-group mb-3">
+        <label for="price">Price ($)</label>
+        {{ form.price(
+            id="price",
+            class="form-control",
+            type="number",
+            min="0",
+            step="0.01",
+            placeholder="e.g. 10.00",
+            required=True
+        ) }}
+        <div class="invalid-feedback">Enter a non-negative amount with ≤ 2 decimal places.</div>
+      </div>
 
-            <!-- CO₂ Emissions -->
-            <div class="form-group mb-3">
-                <label for="co2">CO₂ Emissions (kg)</label>
-                {{ form.co2(class="form-control", type="number", min="0", step="0.01", placeholder="e.g. 2.5") }}
-            </div>
+      <!-- CO₂ Emissions -->
+      <div class="form-group mb-3">
+        <label for="co2">CO₂ Emissions (kg)</label>
+        {{ form.co2(
+            id="co2",
+            class="form-control",
+            type="number",
+            min="0",
+            step="0.01",
+            placeholder="e.g. 2.5"
+        ) }}
+        <div class="invalid-feedback">Must be 0 or more (≤ 2 decimal places).</div>
+      </div>
 
-            <!-- Product Description -->
-            <div class="form-group mb-3">
-                <label for="product_description">Product Description</label>
-                {{ form.product_description(class="form-control", rows="3", placeholder="Provide details about the product") }}
-            </div>
+      <!-- Product Description -->
+      <div class="form-group mb-3">
+        <label for="product_description">Product Description</label>
+        {{ form.product_description(
+            id="product_description",
+            class="form-control",
+            rows="3",
+            maxlength="1000",
+            placeholder="Provide details about the product"
+        ) }}
+        <div class="form-text">{{ form.product_description.data|length if form.product_description.data else 0 }}/1000</div>
+      </div>
 
-            <div class="form-group mb-3">
-                <div class="g-recaptcha" data-sitekey="{{ site_key }}"></div>
-            </div>
+      <div class="form-group mb-3">
+        <div class="g-recaptcha" data-sitekey="{{ site_key }}"></div>
+      </div>
 
-            <!-- Submit Button -->
-            <button type="submit" class="btn btn-success w-100">Create Product</button>
-        </form>
-    </div>
+      <!-- Submit Button -->
+      <button type="submit" class="btn btn-success w-100">Create Product</button>
+    </form>
+  </div>
 
-    <div class="text-center mt-4">
-        <a href="{{ url_for('manageProduct') }}" class="btn btn-outline-secondary">Manage Products</a>
-        <a href="{{ url_for('buy_product') }}" class="btn btn-outline-primary">Back to Shop</a>
-    </div>
+  <div class="text-center mt-4">
+    <a href="{{ url_for('manageProduct') }}" class="btn btn-outline-secondary">Manage Products</a>
+    <a href="{{ url_for('buy_product') }}" class="btn btn-outline-primary">Back to Shop</a>
+  </div>
 </div>
 
-<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<script>
+(function () {
+  const form = document.getElementById('createProductForm');
+  const fields = [
+    'product_image', 'product_name', 'quantity', 'category', 'price', 'co2', 'product_description'
+  ].map(id => document.getElementById(id)).filter(Boolean);
 
+  // File size + type guard for image (mirrors server check)
+  const img = document.getElementById('product_image');
+  if (img) {
+    img.addEventListener('change', function () {
+      const file = this.files && this.files[0];
+      let valid = true;
+      if (file) {
+        const okType = /image\/(jpeg|jpg|png)/i.test(file.type);
+        const okSize = file.size <= 2 * 1024 * 1024;
+        valid = okType && okSize;
+      }
+      toggleState(this, valid);
+    });
+  }
+
+  function toggleState(el, pass = null) {
+    // For selects, empty string is invalid when required
+    const isValid = (pass === null) ? el.checkValidity() : pass;
+    // Only show invalid if user has typed/selected something, except for required
+    const hasValue = (el.type === 'file') ? (el.files && el.files.length > 0) : String(el.value).trim() !== '';
+
+    el.classList.toggle('is-valid', isValid && hasValue);
+    el.classList.toggle('is-invalid', !isValid && (hasValue || el.required));
+  }
+
+  // Attach live validation
+  fields.forEach(el => {
+    const evt = (el.tagName === 'SELECT') ? 'change' : 'input';
+    el.addEventListener(evt, () => toggleState(el));
+    el.addEventListener('blur', () => toggleState(el));
+  });
+
+  // Price & CO2: clamp to 2 dp visually
+  ['price', 'co2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('change', () => {
+      if (el.value) {
+        const n = Number(el.value);
+        if (!Number.isNaN(n)) el.value = n.toFixed( Math.min(2, (el.value.split('.')[1] || '').length) );
+      }
+      toggleState(el);
+    });
+  });
+
+  // Description character counter (optional)
+  const desc = document.getElementById('product_description');
+  if (desc) {
+    const help = desc.nextElementSibling;
+    desc.addEventListener('input', () => {
+      if (help && help.classList.contains('form-text')) {
+        help.textContent = `${desc.value.length}/1000`;
+      }
+    });
+  }
+
+  form.addEventListener('submit', function (e) {
+    // Trigger validation on all
+    fields.forEach(el => toggleState(el));
+    if (!form.checkValidity()) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    form.classList.add('was-validated');
+  });
+})();
+</script>
+
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
 {% endblock %}

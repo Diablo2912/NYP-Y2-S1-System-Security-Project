@@ -21,8 +21,7 @@
     <div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
       <div>
         <strong>We have recorded your report.</strong>
-        If you did not authorize changes from the flagged session
-        , you can take action now.
+        If you did not authorize changes from the flagged session, you can take action now.
       </div>
       <div class="d-flex gap-2">
         <a class="btn btn-sm btn-outline-dark"
@@ -33,7 +32,6 @@
       </div>
     </div>
     {% endif %}
-
 
     <form method="GET" action="{{ url_for('activity_history') }}" class="text-center mb-4">
         <label for="filter" class="me-2 fw-bold">Filter:</label>
@@ -191,7 +189,8 @@
 <div class="modal fade" id="flagModal{{ session.id }}" tabindex="-1" aria-labelledby="flagModalLabel{{ session.id }}" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="POST" action="{{ url_for('flag_session', session_id=session.id) }}">
+            <!-- add class flag-form for JS targeting -->
+            <form class="flag-form" method="POST" action="{{ url_for('flag_session', session_id=session.id) }}" novalidate>
                 <div class="modal-header">
                     <h5 class="modal-title" id="flagModalLabel{{ session.id }}">🚩 Flag Session</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -214,11 +213,14 @@
                             placeholder="Describe why you are flagging this session..."
                             rows="3"
                             maxlength="255"
+                            minlength="10"
                             required
                         ></textarea>
                         <small class="form-text text-muted">
                             <span id="charCount{{ session.id }}">0</span>/255 characters used.
                         </small>
+                        <!-- per-textarea feedback -->
+                        <div id="reasonFeedback{{ session.id }}" class="invalid-feedback"></div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -269,14 +271,102 @@
 </script>
 {% endif %}
 
-<!-- Character Counter Script -->
+<!-- Character Counter + Reason Validation / Sanitization -->
 <script>
-document.querySelectorAll('.reason-input').forEach(function(textarea) {
+(function () {
+  // Allowed characters: letters, digits, spaces, and basic punctuation .,'’?!()-
+  const STRIP_DISALLOWED = /[^A-Za-z0-9\s\.\,\'’\?\!\(\)\-]/g;
+
+  function updateCounter(textarea) {
     const countEl = document.getElementById('charCount' + textarea.id.replace('reason',''));
-    textarea.addEventListener('input', function() {
-        countEl.textContent = textarea.value.length;
+    if (countEl) countEl.textContent = textarea.value.length;
+  }
+
+  function setValidity(el, ok, msg) {
+    const feedback = document.getElementById('reasonFeedback' + el.id.replace('reason',''));
+    if (ok) {
+      el.classList.remove('is-invalid');
+      el.classList.add('is-valid');
+      if (feedback) feedback.textContent = '';
+    } else {
+      el.classList.remove('is-valid');
+      el.classList.add('is-invalid');
+      if (feedback) feedback.textContent = msg || 'Please enter a valid explanation.';
+    }
+  }
+
+  function isValidReason(text) {
+    const t = text.trim();
+
+    // length
+    if (t.length < 10) {
+      return { ok: false, msg: 'Please enter at least 10 characters.' };
+    }
+    // allowed charset only
+    if (!/^[A-Za-z0-9\s\.\,\'’\?\!\(\)\-]+$/.test(t)) {
+      return { ok: false, msg: "Only letters, numbers, spaces, and basic punctuation (.,'’?!()-) are allowed." };
+    }
+    // must include at least one letter
+    if (!/[A-Za-z]/.test(t)) {
+      return { ok: false, msg: 'Include some letters (not just numbers/punctuation).' };
+    }
+    // avoid 4+ repeated same char
+    if (/(.)\1{3,}/.test(t)) {
+      return { ok: false, msg: 'Avoid repeating the same character 4+ times in a row.' };
+    }
+    // require at least 5 alphanumeric characters total
+    const alnumCount = (t.match(/[A-Za-z0-9]/g) || []).length;
+    if (alnumCount < 5) {
+      return { ok: false, msg: 'Please provide a bit more meaningful detail.' };
+    }
+    return { ok: true };
+  }
+
+  // Wire up all reason textareas
+  document.querySelectorAll('.reason-input').forEach(function (ta) {
+    // live sanitize
+    ta.addEventListener('input', function () {
+      const before = ta.value;
+      // strip disallowed symbols
+      ta.value = before.replace(STRIP_DISALLOWED, '');
+      updateCounter(ta);
+
+      // live validity hint (soft)
+      const res = isValidReason(ta.value);
+      // Only show invalid if user typed something
+      if (ta.value.trim().length > 0) {
+        setValidity(ta, res.ok, res.msg);
+      } else {
+        ta.classList.remove('is-valid', 'is-invalid');
+      }
     });
-});
+
+    // hard check on blur
+    ta.addEventListener('blur', function () {
+      const res = isValidReason(ta.value);
+      setValidity(ta, res.ok, res.msg);
+    });
+
+    // init counter
+    updateCounter(ta);
+  });
+
+  // Block submit if invalid
+  document.querySelectorAll('form.flag-form').forEach(function (frm) {
+    frm.addEventListener('submit', function (e) {
+      const ta = frm.querySelector('.reason-input');
+      if (!ta) return;
+      const res = isValidReason(ta.value);
+      if (!res.ok) {
+        e.preventDefault();
+        e.stopPropagation();
+        setValidity(ta, false, res.msg);
+        // focus the textarea for correction
+        ta.focus();
+      }
+    });
+  });
+})();
 </script>
 
 <!-- Revoke modal wiring -->
@@ -345,7 +435,6 @@ document.querySelectorAll('.reason-input').forEach(function(textarea) {
 </div>
 
 <script>
-  // Auto-open the review modal after redirect from flagging
   document.addEventListener('DOMContentLoaded', function () {
     var el = document.getElementById('reviewChangesModal');
     if (el && typeof bootstrap !== 'undefined') {

@@ -63,85 +63,79 @@
         <div class="card-body">
           <h1 class="text-center mb-4">Create Staff Account</h1>
 
-          <form method="POST" action="" class="row g-3">
-          {{ form.hidden_tag() }}  <!-- ✅ CSRF token is inserted here -->
+          <form id="createStaffForm" method="POST" action="" class="row g-3" novalidate>
+            {{ form.hidden_tag() }}  <!-- CSRF -->
 
             <div class="form-group col-md-6">
               {{ form.first_name.label(class="form-label") }}
-              {{ form.first_name(class="form-control") }}
-              {% for error in form.first_name.errors %}
-                <div class="text-danger">{{ error }}</div>
-              {% endfor %}
+              {{ form.first_name(class="form-control", id="first_name", maxlength="150", autocomplete="off") }}
+              <div class="invalid-feedback"></div>
+              {% for error in form.first_name.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
             </div>
 
             <div class="form-group col-md-6">
               {{ form.last_name.label(class="form-label") }}
-              {{ form.last_name(class="form-control") }}
-              {% for error in form.last_name.errors %}
-                <div class="text-danger">{{ error }}</div>
-              {% endfor %}
+              {{ form.last_name(class="form-control", id="last_name", maxlength="150", autocomplete="off") }}
+              <div class="invalid-feedback"></div>
+              {% for error in form.last_name.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
             </div>
 
             <!-- Gender -->
             <div class="form-group col-md-6">
               {{ form.gender.label(class="form-label") }}
-              {{ form.gender(class="form-select") }}
-              {% for error in form.gender.errors %}
-                <div class="text-danger">{{ error }}</div>
-              {% endfor %}
+              {{ form.gender(class="form-select", id="gender") }}
+              <div class="invalid-feedback"></div>
+              {% for error in form.gender.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
             </div>
 
             <!-- Role -->
             <div class="form-group col-md-6">
               {{ form.status.label(class="form-label") }}
-              {{ form.status(class="form-select") }}
-              {% for error in form.status.errors %}
-                <div class="text-danger">{{ error }}</div>
-              {% endfor %}
+              {{ form.status(class="form-select", id="status") }}
+              <div class="invalid-feedback"></div>
+              {% for error in form.status.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
             </div>
 
             <div class="form-group col-md-6">
               {{ form.number.label(class="form-label") }}
-              {{ form.number(class="form-control") }}
-              {% for error in form.number.errors %}
-                <div class="text-danger">{{ error }}</div>
-              {% endfor %}
+              {{ form.number(class="form-control", id="phone", inputmode="numeric", maxlength="15", autocomplete="off", placeholder="8–15 digits") }}
+              <div class="form-text">Digits only, 8–15 characters.</div>
+              <div class="invalid-feedback"></div>
+              {% for error in form.number.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
             </div>
 
             <div class="form-group col-md-12">
               {{ form.email.label(class="form-label") }}
-              {{ form.email(class="form-control") }}
-              {% for error in form.email.errors %}
-                <div class="text-danger">{{ error }}</div>
-              {% endfor %}
+              {{ form.email(class="form-control", id="email", inputmode="email", autocomplete="off") }}
+              <div class="invalid-feedback"></div>
+              {% for error in form.email.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
             </div>
 
             <!-- Password -->
             <div class="form-group col-md-12">
               {{ form.pswd.label(class="form-label") }}
               <div class="input-group">
-                {{ form.pswd(class="form-control ms-1", id="passwordField") }}
+                {{ form.pswd(class="form-control ms-1", id="passwordField", autocomplete="new-password") }}
                 <button type="button" class="btn btn-outline-success btn-sm" onclick="togglePassword('passwordField', 'eyeIcon1')">
                   <i id="eyeIcon1" class="fa-solid fa-eye"></i>
                 </button>
               </div>
-              {% for error in form.pswd.errors %}
-                <div class="text-danger">{{ error }}</div>
-              {% endfor %}
+              <div class="form-text">At least 8 chars, incl. upper, lower, number & symbol.</div>
+              <div class="invalid-feedback"></div>
+              {% for error in form.pswd.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
             </div>
 
             <!-- Confirm Password -->
             <div class="form-group col-md-12">
               {{ form.cfm_pswd.label(class="form-label") }}
               <div class="input-group">
-                {{ form.cfm_pswd(class="form-control ms-1", id="confirmPasswordField") }}
+                {{ form.cfm_pswd(class="form-control ms-1", id="confirmPasswordField", autocomplete="new-password") }}
                 <button type="button" class="btn btn-outline-success btn-sm" onclick="togglePassword('confirmPasswordField', 'eyeIcon2')">
                   <i id="eyeIcon2" class="fa-solid fa-eye"></i>
                 </button>
               </div>
-              {% for error in form.cfm_pswd.errors %}
-                <div class="text-danger">{{ error }}</div>
-              {% endfor %}
+              <div class="invalid-feedback"></div>
+              {% for error in form.cfm_pswd.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
             </div>
 
             <div class="g-recaptcha mb-3" data-sitekey="{{ site_key }}"></div>
@@ -163,7 +157,6 @@
   function togglePassword(passwordFieldId, eyeIconId) {
     const passwordField = document.getElementById(passwordFieldId);
     const eyeIcon = document.getElementById(eyeIconId);
-
     if (passwordField.type === "password") {
       passwordField.type = "text";
       eyeIcon.classList.remove("fa-eye");
@@ -174,8 +167,146 @@
       eyeIcon.classList.add("fa-eye");
     }
   }
+
+  (function () {
+    // Helpers
+    const nameSanitizer = /[^A-Za-z \-']/g; // letters, space, hyphen, apostrophe
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+    function setValidity(el, ok, msg) {
+      const fb = el.parentElement.querySelector('.invalid-feedback') || el.closest('.form-group')?.querySelector('.invalid-feedback');
+      if (ok) {
+        el.classList.remove('is-invalid'); el.classList.add('is-valid');
+        if (fb) fb.textContent = '';
+      } else {
+        el.classList.remove('is-valid'); el.classList.add('is-invalid');
+        if (fb) fb.textContent = msg || 'Please correct this field.';
+      }
+    }
+
+    // Fields
+    const firstName = document.getElementById('first_name');
+    const lastName  = document.getElementById('last_name');
+    const phone     = document.getElementById('phone');
+    const email     = document.getElementById('email');
+    const pass1     = document.getElementById('passwordField');
+    const pass2     = document.getElementById('confirmPasswordField');
+    const gender    = document.getElementById('gender');
+    const statusSel = document.getElementById('status');
+    const form      = document.getElementById('createStaffForm');
+
+    // Name validation
+    function validateName(el) {
+      const before = el.value;
+      el.value = before.replace(nameSanitizer, '');
+      const v = el.value.trim();
+      if (v.length < 2) return setValidity(el, false, 'Enter at least 2 characters.');
+      if (!/^[A-Za-z]/.test(v)) return setValidity(el, false, 'Must start with a letter.');
+      if (/--|''|\s{2,}/.test(v)) return setValidity(el, false, 'No repeated punctuation or double spaces.');
+      return setValidity(el, true);
+    }
+    if (firstName) {
+      firstName.addEventListener('input', () => validateName(firstName));
+      firstName.addEventListener('blur', () => validateName(firstName));
+    }
+    if (lastName) {
+      lastName.addEventListener('input', () => validateName(lastName));
+      lastName.addEventListener('blur', () => validateName(lastName));
+    }
+
+    // Phone validation (digits only, 8–15)
+    function validatePhone() {
+      // keep only digits
+      phone.value = phone.value.replace(/\D/g, '');
+      const len = phone.value.length;
+      if (len === 0) return setValidity(phone, false, 'Phone is required.');
+      if (len < 8)   return setValidity(phone, false, 'Minimum 8 digits.');
+      if (len > 15)  return setValidity(phone, false, 'Maximum 15 digits.');
+      return setValidity(phone, true);
+    }
+    if (phone) {
+      phone.addEventListener('input', validatePhone);
+      phone.addEventListener('blur', validatePhone);
+    }
+
+    // Email validation
+    function validateEmail() {
+      const v = email.value.trim();
+      if (!emailRegex.test(v)) return setValidity(email, false, 'Enter a valid email address.');
+      return setValidity(email, true);
+    }
+    if (email) {
+      email.addEventListener('input', validateEmail);
+      email.addEventListener('blur', validateEmail);
+    }
+
+    // Password validation
+    function validatePass1() {
+      const v = pass1.value;
+      const okLen = v.length >= 8;
+      const hasU  = /[A-Z]/.test(v);
+      const hasL  = /[a-z]/.test(v);
+      const hasD  = /\d/.test(v);
+      const hasS  = /[^A-Za-z0-9]/.test(v);
+      const ok = okLen && hasU && hasL && hasD && hasS;
+      const msg = 'Min 8 chars incl. upper, lower, number & symbol.';
+      setValidity(pass1, ok, msg);
+      // also validate confirm if typed
+      if (pass2.value.length) validatePass2();
+      return ok;
+    }
+    function validatePass2() {
+      const ok = pass2.value === pass1.value && pass2.value.length > 0;
+      setValidity(pass2, ok, ok ? '' : 'Passwords do not match.');
+      return ok;
+    }
+    if (pass1) {
+      pass1.addEventListener('input', validatePass1);
+      pass1.addEventListener('blur', validatePass1);
+    }
+    if (pass2) {
+      pass2.addEventListener('input', validatePass2);
+      pass2.addEventListener('blur', validatePass2);
+    }
+
+    // Selects validation (must choose a non-empty value if your form uses an empty default)
+    function validateSelect(el) {
+      if (!el) return true;
+      const ok = el.value && el.value !== '';
+      setValidity(el, ok, 'Please choose an option.');
+      return ok;
+    }
+    if (gender) {
+      gender.addEventListener('change', () => validateSelect(gender));
+      gender.addEventListener('blur', () => validateSelect(gender));
+    }
+    if (statusSel) {
+      statusSel.addEventListener('change', () => validateSelect(statusSel));
+      statusSel.addEventListener('blur', () => validateSelect(statusSel));
+    }
+
+    // Submit gate
+    form.addEventListener('submit', function (e) {
+      let ok = true;
+      if (firstName) ok = validateName(firstName) !== false && ok;
+      if (lastName)  ok = validateName(lastName)  !== false && ok;
+      if (phone)     ok = (validatePhone() !== false) && ok;
+      if (email)     ok = (validateEmail() !== false) && ok;
+      if (pass1)     ok = validatePass1() && ok;
+      if (pass2)     ok = validatePass2() && ok;
+      if (gender)    ok = validateSelect(gender) && ok;
+      if (statusSel) ok = validateSelect(statusSel) && ok;
+
+      if (!ok) {
+        e.preventDefault();
+        e.stopPropagation();
+        // focus first invalid
+        const firstInvalid = form.querySelector('.is-invalid');
+        if (firstInvalid) firstInvalid.focus();
+      }
+    });
+  })();
 </script>
 
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-
 {% endblock %}

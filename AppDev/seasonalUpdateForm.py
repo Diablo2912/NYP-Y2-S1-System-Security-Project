@@ -9,16 +9,72 @@ from datetime import date as dt_date
 nlp = spacy.load('en_core_web_sm')
 
 AGRICULTURE_KEYWORDS = [
+    # existing
     "crop", "harvest", "yield", "irrigation", "fertilizer", "soil",
-    "livestock", "organic farming", "sustainability", "pesticide", "climate change","Rain",
-    "Summer", "Dry", "Wet", "Weather", "Protect", "fruits", "Vegetables", "Hide", "Your"
+    "livestock", "organic farming", "sustainability", "pesticide", "climate change", "Rain",
+    "Summer", "Dry", "Wet", "Weather", "Protect", "fruits", "Vegetables", "Hide", "Your",
+
+    # general/agronomy
+    "farm", "farmer", "field", "greenhouse", "nursery", "orchard", "pasture",
+    "seed", "seedling", "germination", "sowing", "planting", "transplanting",
+    "pruning", "weeding", "mulch", "mulching", "tillage", "no-till", "cover crop",
+    "compost", "manure", "residue management",
+
+    # soil & nutrients
+    "nitrogen", "phosphorus", "potassium", "npk", "micronutrients", "soil ph", "salinity",
+    "loam", "clay", "silt", "sand", "soil moisture", "soil test", "cation exchange",
+
+    # water & weather
+    "drip irrigation", "sprinkler", "canal", "reservoir", "rainfall", "evapotranspiration",
+    "drought", "flood", "frost", "hail", "heatwave", "storm", "monsoon", "el niño", "la niña",
+    "humidity", "precipitation", "forecast",
+
+    # pests/diseases/weeds
+    "pest", "disease", "weed", "aphid", "locust", "borer", "mite", "nematode",
+    "blight", "mildew", "rust", "wilt", "leaf spot",
+    "insecticide", "herbicide", "fungicide", "biocontrol",
+    "ipm", "integrated pest management", "resistance management", "pheromone trap",
+
+    # machinery & storage
+    "tractor", "combine", "sprayer", "planter", "harvester",
+    "silo", "cold storage", "post-harvest", "grading", "packing", "cold chain",
+
+    # smart/precision ag
+    "precision agriculture", "satellite", "ndvi", "sensor", "drone", "iot", "vra", "mapping",
+
+    # sustainability
+    "agroforestry", "regenerative agriculture", "carbon sequestration", "buffer strip", "windbreak",
+
+    # livestock
+    "poultry", "dairy", "cattle", "goat", "sheep", "ruminant", "grazing", "forage", "silage", "beekeeping",
+
+    # crops/examples
+    "wheat", "rice", "maize", "corn", "soybean", "cotton", "sugarcane", "coffee", "tea",
+    "banana", "apple", "mango", "tomato", "potato", "onion", "chili", "pepper", "cucumber",
+    "lentil", "chickpea", "pulse", "grain", "oilseed",
+
+    # operations/market
+    "extension service", "cooperative", "subsidy", "farmgate price", "commodity price", "input cost"
 ]
 
 AGRICULTURE_ACTION_PHRASES = [
+    # existing
     "protect your crops", "improve soil quality", "rotate your crops", "use organic fertilizer",
     "reduce water usage", "install irrigation systems", "prevent soil erosion", "monitor crop health",
     "practice sustainable farming", "control pests", "increase crop yield", "plant drought-resistant crops",
-    "reduce greenhouse gases", "apply compost", "harvest at the right time", "store seeds properly"
+    "reduce greenhouse gases", "apply compost", "harvest at the right time", "store seeds properly",
+
+    # new actions
+    "apply mulch", "scout for pests", "set pheromone traps", "calibrate sprayer",
+    "calibrate irrigation schedule", "clean irrigation filters", "flush drip lines",
+    "test soil ph", "apply lime", "apply npk fertilizer", "top-dress nitrogen", "apply foliar feed",
+    "establish cover crops", "tarp and solarize soil", "check soil moisture before watering",
+    "install drip irrigation", "repair field drainage", "thin seedlings", "harden off seedlings",
+    "stake and trellis plants", "prune damaged branches", "sanitize tools",
+    "rotate grazing paddocks", "vaccinate livestock", "deworm livestock",
+    "service tractor and equipment", "pre-cool produce after harvest", "store grain in airtight silo",
+    "maintain the cold chain", "introduce beneficial insects", "apply biological control agents",
+    "update farm records", "back up farm data", "subscribe to weather alerts"
 ]
 
 ALL_AGRICULTURE_TERMS = AGRICULTURE_KEYWORDS + AGRICULTURE_ACTION_PHRASES

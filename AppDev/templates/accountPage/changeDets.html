@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block content %}
 {% from "includes/_formHelper.html" import render_field %}
 
@@ -16,42 +15,97 @@
   {% endif %}
 {% endwith %}
 
-<!-- Center the form -->
 <div class="d-flex justify-content-center align-items-center mt-3 p-3">
   <div class="card bg-success-subtle w-100" style="max-width: 500px;">
     <div class="card-body">
       <h1 class="text-center mb-4">Change Details</h1>
 
-      <form method="POST" action="" class="row g-3">
-        {{ form.hidden_tag() }}  <!-- ✅ CSRF token is inserted here -->
+      <!-- novalidate to avoid native popups; we handle styling via JS -->
+      <form id="changeDetailsForm" method="POST" action="" class="row g-3" novalidate>
+        {{ form.hidden_tag() }}
+
         <div class="form-group col-md-6">
-          {{ render_field(form.first_name, class="form-control") }}
+          {{ render_field(
+            form.first_name,
+            id="firstName",
+            class="form-control",
+            minlength="2",
+            maxlength="150",
+            pattern="^[A-Za-z][A-Za-z '\-]{1,149}$",
+            placeholder="e.g. Glen",
+            required=True
+          ) }}
+          <div class="invalid-feedback">Only letters, spaces, ’ and - (2–150 chars).</div>
         </div>
 
         <div class="form-group col-md-6">
-          {{ render_field(form.last_name, class="form-control") }}
+          {{ render_field(
+            form.last_name,
+            id="lastName",
+            class="form-control",
+            minlength="2",
+            maxlength="150",
+            pattern="^[A-Za-z][A-Za-z '\-]{1,149}$",
+            placeholder="e.g. Loo",
+            required=True
+          ) }}
+          <div class="invalid-feedback">Only letters, spaces, ’ and - (2–150 chars).</div>
         </div>
 
         <div class="form-group col-md-6">
-          {{ render_field(form.gender, class="form-control") }}
+          {{ render_field(
+            form.gender,
+            id="gender",
+            class="form-select",
+            required=True
+          ) }}
+          <div class="invalid-feedback">Please select your gender.</div>
         </div>
 
         <div class="form-group col-md-6">
-          {{ render_field(form.number, class="form-control") }}
+          {{ render_field(
+            form.number,
+            id="phone",
+            class="form-control",
+            inputmode="tel",
+            maxlength="16",
+            pattern="^(?:\+65\\s*)?(?:[3689]\\d{7})$",
+            placeholder="e.g. +65 98765432",
+            required=True
+          ) }}
+          <div class="invalid-feedback">Valid SG number: 8 digits (start 3/6/8/9), “+65” optional.</div>
         </div>
 
         <div class="form-group col-md-12">
-          {{ render_field(form.email, class="form-control") }}
+          {{ render_field(
+            form.email,
+            id="email",
+            class="form-control",
+            maxlength="254",
+            inputmode="email",
+            autocomplete="email",
+            placeholder="e.g. name@example.com",
+            required=True
+          ) }}
+          <div class="invalid-feedback">Please enter a valid email address.</div>
         </div>
 
         <div class="form-group col-md-12">
-  <!-- Input group for password field with the eye icon -->
           <div class="input-group">
-            {{ render_field(form.pswd, class="form-control ms-1", id="passwordField") }}
+            {{ render_field(
+              form.pswd,
+              id="passwordField",
+              class="form-control ms-1",
+              minlength="8",
+              autocomplete="current-password",
+              required=True
+            ) }}
             <button type="button" class="btn btn-outline-success btn-sm" onclick="togglePassword()">
               <i id="eye-icon" class="fa fa-eye"></i>
             </button>
           </div>
+          <div class="form-text">Enter your current password to confirm these changes.</div>
+          <div class="invalid-feedback d-block" id="passwordFeedback" style="display:none;">Password must be at least 8 characters.</div>
         </div>
 
         <input type="submit" value="Submit" class="btn btn-success mt-4"/>
@@ -65,7 +119,6 @@
   function togglePassword() {
     var passwordField = document.getElementById("passwordField");
     var eyeIcon = document.getElementById("eye-icon");
-
     if (passwordField.type === "password") {
       passwordField.type = "text";
       eyeIcon.classList.remove("fa-eye");
@@ -76,7 +129,50 @@
       eyeIcon.classList.add("fa-eye");
     }
   }
-</script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
+  // Live validation: turns fields red/green as user types/selects
+  (function () {
+    const form = document.getElementById('changeDetailsForm');
+    const fields = [
+      document.getElementById('firstName'),
+      document.getElementById('lastName'),
+      document.getElementById('gender'),
+      document.getElementById('phone'),
+      document.getElementById('email'),
+      document.getElementById('passwordField'),
+    ];
+
+    function applyState(el) {
+      // For select, empty value is invalid when required
+      const valid = el.checkValidity();
+      el.classList.toggle('is-valid', valid && el.value.trim() !== '');
+      el.classList.toggle('is-invalid', !valid && el.value.trim() !== '');
+      // Special hint for password length while typing
+      if (el.id === 'passwordField') {
+        const pf = document.getElementById('passwordFeedback');
+        if (pf) pf.style.display = (el.value.length > 0 && el.value.length < 8) ? 'block' : 'none';
+      }
+    }
+
+    fields.forEach(el => {
+      if (!el) return;
+      const evt = (el.tagName === 'SELECT') ? 'change' : 'input';
+      el.addEventListener(evt, () => applyState(el));
+      el.addEventListener('blur', () => applyState(el)); // also on blur
+    });
+
+    // On submit, show Bootstrap validation styling
+    form.addEventListener('submit', function (e) {
+      // Trigger validation on all fields
+      fields.forEach(el => el && applyState(el));
+      if (!form.checkValidity()) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      form.classList.add('was-validated');
+    });
+  })();
+</script>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 {% endblock %}
