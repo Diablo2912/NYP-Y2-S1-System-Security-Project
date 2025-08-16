@@ -16,6 +16,19 @@
   {% endif %}
 {% endwith %}
 
+    <a class="btn btn-outline-dark w-100 mb-3" href="{{ url_for('login_google') }}">
+      <img src="https://developers.google.com/identity/images/g-logo.png"
+           alt="" style="height:18px;vertical-align:middle;margin-right:8px;">
+      Continue with Google
+    </a>
+
+    <div class="d-flex align-items-center my-3">
+      <hr class="flex-grow-1">
+      <span class="px-2 text-muted">or</span>
+      <hr class="flex-grow-1">
+    </div>
+
+
 <!-- Center the form -->
 <div class="d-flex justify-content-center align-items-center mt-3 p-3">
   <div class="card bg-success-subtle w-100" style="max-width: 500px;">

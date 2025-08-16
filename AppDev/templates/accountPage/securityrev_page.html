@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="container">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<div class="container">
+  <div class="row">
+    {% if user %}
+
+    <!-- LEFT: keep exactly like accountInfo -->
+    <div class="col-lg-4 p-3">
+      <div class="card d-flex mb-3 m-3">
+        <div class="card-body pb-0">
+          <div class="d-flex mb-3">
+            <img class="flex" src="{{ url_for('static', filename='assets/person.svg') }}" width="60" height="60" alt="User">
+            <div class="flex-grow-1 ms-3">
+              <h2 class="card-title mb-1">{{ user.first_name }}</h2>
+              <h6 class="card-subtitle text-body-secondary">{{ user.email }}</h6>
+            </div>
+          </div>
+
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <a href="{{ url_for('accountInfo') }}" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" alt="">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity:.5">Your Info</span>
+              </a>
+            </li>
+            <li class="list-group-item">
+              <a href="{{ url_for('accountSecurity') }}" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" alt="">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity:.5">Security Settings</span>
+              </a>
+            </li>
+            <li class="list-group-item">
+              <a href="{{ url_for('accountHist') }}" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" alt="">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity:.5">Purchase History</span>
+              </a>
+            </li>
+            <li class="list-group-item">
+              <a href="{{ url_for('activity_history') }}" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" alt="">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity:.5">Session Activity</span>
+              </a>
+            </li>
+            <li class="list-group-item">
+              <a href="{{ url_for('account_security_review') }}" class="link-underline link-underline-opacity-0">
+                <img class="me-2" src="{{ url_for('static', filename='assets/right_arrow.svg') }}" width="40" height="40" alt="">
+                <span class="badge bg-success p-2 fs-5 align-middle" style="--bs-bg-opacity:.5">Security Review</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: boxes styled like your screenshot -->
+    <div class="col-lg-8 p-3">
+      <div class="card d-flex mb-3 m-3 bg-success-subtle">
+        <div class="card-body">
+          <h1 class="card-title">Security Review</h1>
+
+          {# helpers for password color logic #}
+          {% set has_pw = (user.is_password_set == 1) %}
+          {% set lvl = (checkup.password.level or 'unknown')|lower %}
+          {% set pwd_color = 'warning' if not has_pw
+                           else 'danger' if lvl == 'weak'
+                           else 'warning' if lvl == 'medium'
+                           else 'success' if lvl == 'strong'
+                           else 'secondary' %}
+          {% set pwd_badge = 'Not set' if not has_pw else (lvl|capitalize if lvl in ['weak','medium','strong'] else 'Unknown') %}
+          {% set pct = 0 if not has_pw else 33 if lvl == 'weak' else 67 if lvl == 'medium' else 100 if lvl == 'strong' else 0 %}
+
+          <div class="row g-4">
+
+            <!-- Two-Factor Authentication (RED) - top-left -->
+            <div class="col-md-6">
+              <div class="card h-100 border-danger">
+                <div class="card-header bg-danger text-white">
+                  <strong>Two-Factor Authentication</strong>
+                </div>
+                <div class="card-body">
+                  <p class="mb-1">
+                    Status:
+                    {% if checkup.twofa.ok %}
+                      <strong>Enabled ✅</strong>
+                    {% else %}
+                      <strong>Disabled</strong> <span class="text-white-50">❗</span>
+                    {% endif %}
+                  </p>
+                  <p class="mb-3">
+                    Face ID:
+                    <strong>{{ 'Enabled ✅' if checkup.face.enabled else 'Disabled' }}</strong>
+                  </p>
+                  {% if not checkup.twofa.ok %}
+                    <a href="{{ url_for('accountInfo') }}#your-info-section" class="btn btn-sm btn-primary">Enable 2FA</a>
+                  {% endif %}
+                  {% if not checkup.face.enabled %}
+                    <a href="{{ url_for('setup_face_id', id=user.id) }}" class="btn btn-sm btn-outline-secondary ms-1">Setup Face ID</a>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            <!-- Email (GREEN) - top-right -->
+            <div class="col-md-6">
+              <div class="card h-100 border-success">
+                <div class="card-header bg-success text-white">
+                  <strong>Email</strong>
+                </div>
+                <div class="card-body">
+                  <p class="mb-2">
+                    Email: <strong>{{ checkup.email.address }}</strong>
+                  </p>
+                  <p class="mb-0">
+                    Status:
+                    {% if checkup.email.verified %}
+                      <span class="badge bg-success">Verified</span>
+                    {% else %}
+                      <span class="badge bg-warning text-dark">Not Verified</span>
+                      <a href="{{ url_for('google_callback') }}" class="btn btn-sm btn-outline-warning ms-2">Verify with Google</a>
+                    {% endif %}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Password (YELLOW) - bottom-left -->
+            <div class="col-md-6">
+              <div class="card h-100 border-{{ pwd_color if has_pw else 'warning' }}">
+                <div class="card-header bg-{{ pwd_color if has_pw else 'warning' }} {{ 'text-dark' if (pwd_color == 'warning' or not has_pw) else 'text-white' }}">
+                  <strong>Password</strong>
+                </div>
+                <div class="card-body">
+                  <p class="mb-2">
+                    Status:
+                    <span class="badge bg-{{ pwd_color if has_pw else 'warning' }}">{{ pwd_badge }}</span>
+                  </p>
+
+                  <div class="progress mb-3" style="height:8px;">
+                    <div class="progress-bar bg-{{ pwd_color if has_pw else 'warning' }}" role="progressbar"
+                         style="width: {{ pct }}%;" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                  </div>
+
+                  {% if not has_pw %}
+                    <p class="text-muted mb-3">You signed in with Google and haven’t set a local password yet.</p>
+                    <a href="{{ url_for('set_password') }}" class="btn btn-sm btn-primary">Set password</a>
+                  {% else %}
+                    {% if checkup.password.tips and lvl != 'strong' %}
+                      <ul class="mb-3">
+                        {% for tip in checkup.password.tips %}
+                          <li>{{ tip }}</li>
+                        {% endfor %}
+                      </ul>
+                    {% else %}
+                      <p class="text-muted mb-3">Nice! Your password looks strong.</p>
+                    {% endif %}
+                    <a href="{{ url_for('accountSecurity') }}" class="btn btn-sm btn-outline-{{ pwd_color }}">Change password</a>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            <!-- Recent Activity (GREEN) - bottom-right -->
+            <div class="col-md-6">
+              <div class="card h-100 border-success">
+                <div class="card-header bg-success text-white">
+                  <strong>Recent Activity</strong>
+                </div>
+                <div class="card-body">
+                  {% if checkup.activity.last_login %}
+                    <p class="mb-1">Last login: {{ checkup.activity.last_login.when }}</p>
+                    <p class="mb-3">From IP: {{ checkup.activity.last_login.ip }}</p>
+                  {% else %}
+                    <p class="mb-3">No recent logins recorded.</p>
+                  {% endif %}
+                  {% if checkup.activity.suspicious %}
+                    <p class="text-danger mb-3">⚠️ Multiple devices or IPs detected recently.</p>
+                  {% endif %}
+                  <a href="{{ url_for('activity_history') }}" class="btn btn-sm btn-outline-secondary">View all sessions</a>
+                </div>
+              </div>
+            </div>
+
+          </div> <!-- /row -->
+        </div>
+      </div>
+    </div>
+
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
