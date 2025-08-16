@@ -81,20 +81,6 @@
     }
   }
 
-  function sendUnfreezeRequest(apiUrl) {
-    fetch(apiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({})
-    })
-    .then(response => response.json())
-    .then(data => { alert(data.message); })
-    .catch(error => {
-      alert("Failed to send unfreeze email.");
-      console.error(error);
-    });
-  }
-
   let secondsLeft = 300; // 5 minutes
   const countdownEl = document.getElementById('countdown');
   const form = document.getElementById('autoDestructForm');

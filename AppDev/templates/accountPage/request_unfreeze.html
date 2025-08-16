@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="container">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<div class="d-flex justify-content-center align-items-center mt-3 p-3">
+  <div class="card bg-success-subtle w-100" style="max-width: 800px;">
+    <div class="card-body">
+    <h2>Request Account Unfreeze</h2>
+    <p>Your account <strong>{{ user.email }}</strong> has been frozen. Please fill out the form below to submit an unfreeze request.</p>
+
+    <form method="POST">
+        <div class="mb-3">
+            <label for="full_name" class="form-label">Full Name</label>
+            <input type="text" class="form-control" id="full_name" name="full_name" placeholder="Your full name" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="email" class="form-label">Email</label>
+            <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="phone_number" class="form-label">Phone Number</label>
+            <input type="tel" class="form-control" id="phone_number" name="phone_number" placeholder="Your phone number" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="details" class="form-label">Additional Details</label>
+            <textarea class="form-control" id="details" name="details" rows="3" placeholder="Any extra information..."></textarea>
+        </div>
+
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#confirmPasswordModal">
+          Request Unfreeze
+        </button>
+
+        <!-- Confirm Password Modal -->
+        <div class="modal fade" id="confirmPasswordModal" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <form id="confirmPasswordForm" method="POST" action="{{ url_for('request_unfreeze', user_id=user.id) }}">
+                <!-- Hidden fields for user info -->
+                <input type="hidden" name="full_name" value="{{ user.first_name }} {{ user.last_name }}">
+                <input type="hidden" name="email" value="{{ user.email }}">
+                <input type="hidden" name="phone_number" value="{{ user.phone_number }}">
+                <input type="hidden" name="details" value="">
+                <div class="modal-header">
+                  <h5 class="modal-title">Confirm Your Password</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                  <div class="mb-3">
+                    <label for="password" class="form-label">Enter Password</label>
+                    <input type="password" class="form-control" id="password" name="password" required>
+                  </div>
+                </div>
+
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                  <button type="submit" class="btn btn-success">Submit Request</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+    </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+<script>
+document.getElementById('confirmPasswordForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const password = document.getElementById('password').value;
+
+    // Optional: you can send AJAX request to verify password
+    // For now, we just append it to the main form
+    const form = document.getElementById('unfreezeForm');
+
+    // Create hidden input for password
+    let input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'password';
+    input.value = password;
+    form.appendChild(input);
+
+    // Submit the main form
+    form.submit();
+});
+</script>
