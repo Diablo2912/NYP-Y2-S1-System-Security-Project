@@ -145,12 +145,12 @@ mail = Mail(app)
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'glen'
-# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-# app.config['MYSQL_DB'] = 'ssp_db'
-# app.config['MYSQL_PORT'] = 3306
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'glen'
+app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+app.config['MYSQL_DB'] = 'ssp_db'
+app.config['MYSQL_PORT'] = 3306
 
 # BRANDON SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -169,10 +169,10 @@ mail = Mail(app)
 # app.config['MYSQL_PORT'] = 3306
 #
 # # #SACHIN SQL DB CONFIG
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-app.config['MYSQL_DB'] = 'sspCropzy'
+# app.config['MYSQL_HOST'] = 'localhost'
+# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+# app.config['MYSQL_DB'] = 'sspCropzy'
 # #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -5868,7 +5868,6 @@ def request_unfreeze(user_id):
 
 @app.errorhandler(429)
 def ratelimit_handler(e):
-    admin_log_activity(mysql, "Too many request sent at once, ratelimit reached", category="Warning", user_id=g.user["user_id"])
     return render_template("errors/429.html", error=str(e)), 429
 
 
@@ -5912,10 +5911,19 @@ def _render_error(status_code, e):
 
 @app.errorhandler(HTTPException)
 def handle_http(e: HTTPException):
-    return _render_error(getattr(e, "code", 500) or 500, e)
+    user_id = getattr(g, "user", {}).get("id", None)
+    msg = f"HTTP {e.code} at {request.path} (method={request.method})"
+    if e.code in (401, 403, 404):
+        admin_log_activity(mysql, msg, "Warning", user_id)
+    else:
+        admin_log_activity(mysql, msg, "Error", user_id)
+    return _render_error(e.code, e)
 
 @app.errorhandler(CSRFError)
 def handle_csrf(e):
+    user_id = getattr(g, "user", {}).get("id", None)
+    msg = f"CSRF error at {request.path} (method={request.method}), ip={request.remote_addr}"
+    admin_log_activity(mysql, msg, "Error", user_id)
     return _render_error(400, e)
 
 @app.errorhandler(RequestEntityTooLarge)
@@ -5924,6 +5932,9 @@ def handle_413(e):
 
 @app.errorhandler(Exception)
 def handle_all(e):
+    user_id = getattr(g, "user", {}).get("id", None)
+    msg = f"Unhandled exception at {request.path} (method={request.method}): {type(e).__name__}: {e}"
+    admin_log_activity(mysql, msg, "Critical", user_id)
     return _render_error(500, e)
 
 
