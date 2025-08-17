@@ -71,6 +71,12 @@ import unicodedata
 from urllib.parse import urljoin, urlparse
 
 from authlib.integrations.flask_client import OAuth
+from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
+from flask_wtf.csrf import CSRFError
+try:
+    from flask_limiter.errors import RateLimitExceeded
+except Exception:
+    RateLimitExceeded = None
 
 
 app = Flask(__name__)
@@ -5869,6 +5875,57 @@ def ratelimit_handler(e):
 @app.route('/404_NOT_FOUND')
 def notfound():
     return render_template('404.html')
+
+GENERIC_ERROR_MSG = "Something went wrong or this page doesn’t exist. Please return to the homepage."
+
+def _home_url():
+    # Try common endpoints, fall back to root.
+    for endpoint in ("home", "index"):
+        try:
+            return url_for(endpoint)
+        except Exception:
+            continue
+    return "/"
+
+def _wants_json():
+    accept = (request.headers.get("Accept") or "").lower()
+    xrw = (request.headers.get("X-Requested-With") or "").lower()
+    return "application/json" in accept or xrw == "xmlhttprequest" or request.is_json
+
+def _log_ref(e, status_code):
+    ref = f"ERR-{uuid.uuid4().hex[:12].upper()}"
+    try:
+        admin_log_activity(mysql,
+                           f"{status_code} {request.method} {request.path} • {type(e).__name__} • ref={ref}",
+                           category="Error" if status_code >= 500 else "Warning")
+    except Exception:
+        pass
+    return ref
+
+def _render_error(status_code, e):
+    _log_ref(e, status_code)  # keep for diagnostics, not shown to user
+    if _wants_json():
+        return jsonify({"error": {"message": GENERIC_ERROR_MSG}}), status_code
+    return render_template("errors/error.html",
+                           message=GENERIC_ERROR_MSG,
+                           home_url=_home_url()), status_code
+
+@app.errorhandler(HTTPException)
+def handle_http(e: HTTPException):
+    return _render_error(getattr(e, "code", 500) or 500, e)
+
+@app.errorhandler(CSRFError)
+def handle_csrf(e):
+    return _render_error(400, e)
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_413(e):
+    return _render_error(413, e)
+
+@app.errorhandler(Exception)
+def handle_all(e):
+    return _render_error(500, e)
+
 
 if __name__ == "__main__":
     generate_self_signed_cert()
