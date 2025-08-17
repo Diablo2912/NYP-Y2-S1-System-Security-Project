@@ -145,20 +145,20 @@ mail = Mail(app)
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'glen'
-app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
-
-# BRANDON SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
 # app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'brandon'
-# app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+# app.config['MYSQL_USER'] = 'glen'
+# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
 # app.config['MYSQL_DB'] = 'ssp_db'
 # app.config['MYSQL_PORT'] = 3306
+
+# BRANDON SQL DB CONFIG
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'brandon'
+app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+app.config['MYSQL_DB'] = 'ssp_db'
+app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -2668,7 +2668,7 @@ def is_ip_blocked(mysql, client_ip: str) -> bool:
         return False
 
 @app.route('/login', methods=['GET', 'POST'])
-@limiter.limit("500 per 1 minutes")
+@limiter.limit("5 per 1 minutes")
 def login():
     def _is_safe_next(target: str) -> bool:
         if not target:
@@ -5742,51 +5742,6 @@ def is_account_frozen(user_id):
     return freeze_entry and freeze_entry['is_frozen'] == True
 
 
-# def send_unfreeze_email(user_id, email):
-#     try:
-#         token = secrets.token_urlsafe(32)
-#         expires_at = datetime.utcnow() + timedelta(minutes=1)
-#
-#         cursor = mysql.connection.cursor()
-#         cursor.execute("""
-#             INSERT INTO unfreeze_requests (user_id, token, expires_at)
-#             VALUES (%s, %s, %s)
-#         """, (user_id, token, expires_at))
-#         mysql.connection.commit()
-#
-#         unfreeze_url = url_for('unfreeze_account', token=token, _external=True)
-#         subject = "[Cropzy] Unfreeze Your Account"
-#         message = (
-#             f"Hi,\n\n"
-#             f"Your account was frozen. To unfreeze it, please click the link below:\n\n"
-#             f"{unfreeze_url}\n\n"
-#             f"This link will expire in 10 minutes.\n\n"
-#             f"Best,\nCropzy Support"
-#         )
-#         send_email(email, subject, message)
-#
-#     except Exception as e:
-#         print(f"[ERROR] Failed to send unfreeze email: {e}")
-#
-#
-# @app.route('/send_unfreeze_email', methods=['POST'])
-# def ajax_send_unfreeze_email():
-#     user_id = request.args.get('user_id')  # or from request.json
-#
-#     if not user_id:
-#         return jsonify({'status': 'error', 'message': 'User not logged in.'}), 403
-#
-#     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-#     cursor.execute("SELECT email FROM accounts WHERE id = %s", (user_id,))
-#     user = cursor.fetchone()
-#     cursor.close()
-#
-#     if not user:
-#         return jsonify({'status': 'error', 'message': 'User not found.'}), 404
-#
-#     send_unfreeze_email(user_id, user['email'])
-#     return jsonify({'status': 'success', 'message': 'Unfreeze email sent.'})
-
 @app.route('/freezeAccountDetails', methods=['GET', 'POST'])
 @jwt_required
 def freezeAccountDetails():
@@ -5908,15 +5863,6 @@ def request_unfreeze(user_id):
     return render_template('/accountPage/request_unfreeze.html', user=user)
 
 
-@app.errorhandler(429)
-def ratelimit_handler(e):
-    return render_template("errors/429.html", error=str(e)), 429
-
-
-@app.route('/404_NOT_FOUND')
-def notfound():
-    return render_template('404.html')
-
 GENERIC_ERROR_MSG = "Something went wrong or this page doesn’t exist. Please return to the homepage."
 
 def _home_url():
@@ -5979,6 +5925,22 @@ def handle_all(e):
     admin_log_activity(mysql, msg, "Critical", user_id)
     return _render_error(500, e)
 
+
+RATELIMIT_ERROR_MSG = "Too Many Request Made. Try Again Later"
+
+def _render_rate_limit(status_code, e):
+    _log_ref(e, status_code)  # keep for diagnostics, not shown to user
+    if _wants_json():
+        return jsonify({"error": {"message": RATELIMIT_ERROR_MSG}}), status_code
+    return render_template("errors/error.html",
+                           message=RATELIMIT_ERROR_MSG,
+                           home_url=_home_url()), status_code
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    user_id = getattr(g, "user", {}).get("id", None)
+    msg = f"CSRF error at {request.path} (method={request.method}), ip={request.remote_addr}"
+    admin_log_activity(mysql, msg, "Error", user_id)
+    return _render_rate_limit(429, e)
 
 if __name__ == "__main__":
     generate_self_signed_cert()
