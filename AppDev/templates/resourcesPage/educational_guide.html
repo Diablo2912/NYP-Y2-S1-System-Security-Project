@@ -1,113 +1,152 @@
 {% extends "base.html" %}
-
 {% block content %}
-<!--Edit here-->
+
+<!-- UI polish only – no logic changed -->
 <style>
-    .content-container {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 20px;
-    }
+  /* Page rhythm */
+  .guide-title{ letter-spacing:.3px }
 
-    .text-container {
-        width: 48%;
-        margin-left: 100px;
-        margin-top: 150px;
-    }
+  /* Hero (text + video) */
+  .guide-hero{
+    background: linear-gradient(180deg, #f8faf9 0%, #ffffff 100%);
+    border: 1px solid rgba(0,0,0,.05);
+    border-radius: 18px;
+    padding: 1.5rem;
+    box-shadow: 0 6px 18px rgba(0,0,0,.06);
+  }
+  .guide-hero h3{ margin-bottom:.25rem }
+  .guide-hero p{ color:#6c757d; margin:0 }
 
-    .video-container {
-        width: 48%;
-        margin-right: 100px;
-        margin-top: 50px;
-    }
+  /* Cards */
+  .guide-card{
+    border:1px solid rgba(0,0,0,.06);
+    border-radius:16px;
+    box-shadow:0 6px 18px rgba(0,0,0,.06);
+    overflow:hidden;
+    transition:transform .18s ease, box-shadow .18s ease;
+  }
+  .guide-card:hover{
+    transform:translateY(-4px);
+    box-shadow:0 10px 26px rgba(0,0,0,.1);
+  }
+  .guide-card .card-img-top{
+    height: 180px;
+    object-fit: cover;
+  }
+  .guide-card .card-body{
+    display:flex; flex-direction:column;
+  }
+  .guide-card .card-title{
+    line-height:1.25;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+    min-height: 3.2rem;
+  }
+  .guide-card .card-text{
+    color:#6c757d;
+    display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden;
+    margin-bottom: 1rem;
+  }
 
-    .card {
-        margin-top: 20px;
-    }
+  /* Buttons */
+  .guide-card .btn{ border-radius:10px }
 
-    .text-center {
-        margin-top: 20px;
-    }
-
-    .row {
-        margin-top: 150px;
-    }
+  /* Spacing on mobile */
+  @media (max-width: 991.98px){
+    .guide-hero{ padding:1rem }
+  }
 </style>
 
-<body>
+<div class="container py-4">
 
-<h1 class="text-center">Educational Guide</h1>
+  <h1 class="text-center guide-title mb-4">Educational Guide</h1>
 
-<!-- Video Description -->
-<div class="content-container">
-    <div class="text-container">
-        <h3>How to Start a Small Farm | Step-by-Step Guide</h3>
-        <p>Starting a small farm can be a rewarding venture, but it requires careful planning and strategy.<br>
-            In this video, we walk you through the essential steps to launch your own successful farm business.<br>
-            From budgeting and gaining hands-on experience to creating a business plan and considering alternatives.</p>
+  <!-- Hero: description + video -->
+  <div class="guide-hero mb-5">
+    <div class="row align-items-center g-4">
+      <div class="col-lg-6">
+        <h3 class="mb-2">How to Start a Small Farm | Step-by-Step Guide</h3>
+        <p>
+          Starting a small farm can be a rewarding venture, but it requires careful planning and strategy.
+          In this video, we walk you through the essential steps to launch your own successful farm business —
+          from budgeting and gaining hands-on experience to creating a business plan and considering alternatives.
+        </p>
+      </div>
+      <div class="col-lg-6">
+        <!-- 16:9 responsive video -->
+        <div class="ratio ratio-16x9">
+          <iframe
+            src="https://www.youtube.com/embed/heTxEsrPVdQ?si=B-zj8FTcnk4W3pM8"
+            title="How to Start a Small Farm | Step-by-Step Guide"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerpolicy="strict-origin-when-cross-origin"
+            allowfullscreen>
+          </iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resource cards -->
+  <div class="row g-4">
+    <!-- Card 1 -->
+    <div class="col-12 col-sm-6 col-lg-3 d-flex">
+      <div class="card guide-card w-100">
+        <img src="/static/assets/farming.jpg" class="card-img-top" alt="Beginner farming landscape">
+        <div class="card-body">
+          <h5 class="card-title">How to Start a Farm: 10 Farming Tips for Beginners</h5>
+          <p class="card-text">
+            A friendly guide offering essential advice for new farmers, from choosing land and crops to budgeting and learning key skills.
+          </p>
+          <a href="https://blog.agriapp.com/blog/smart-farming/how-to-start-a-farm-10-farming-tips-for-beginners/"
+             class="btn btn-success mt-auto" target="_blank" rel="noopener">View More</a>
+        </div>
+      </div>
     </div>
 
-    <!-- Video -->
-    <div class="video-container">
-        <iframe width="100%" height="400" src="https://www.youtube.com/embed/heTxEsrPVdQ?si=B-zj8FTcnk4W3pM8" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+    <!-- Card 2 -->
+    <div class="col-12 col-sm-6 col-lg-3 d-flex">
+      <div class="card guide-card w-100">
+        <img src="/static/assets/gardening.jpg" class="card-img-top" alt="Gardening tools on soil">
+        <div class="card-body">
+          <h5 class="card-title">Gardening for Beginners: Tips to get started</h5>
+          <p class="card-text">
+            Practical gardening advice for beginners in Singapore, focused on growing plants in a tropical climate.
+          </p>
+          <a href="https://thelivingcentre.sg/ecourses/gardening-for-beginners-in-singapore-tips-to-get-started/"
+             class="btn btn-success mt-auto" target="_blank" rel="noopener">View More</a>
+        </div>
+      </div>
     </div>
+
+    <!-- Card 3 -->
+    <div class="col-12 col-sm-6 col-lg-3 d-flex">
+      <div class="card guide-card w-100">
+        <img src="/static/assets/farmer.jpg" class="card-img-top" alt="Farmer inspecting soil">
+        <div class="card-body">
+          <h5 class="card-title">Types Of Soil In Agriculture To Grow Crops Efficiently</h5>
+          <p class="card-text">
+            Learn the six main soil types — sandy, clay, silt, chalk, peat, and loam — and how each affects plant growth.
+          </p>
+          <a href="https://eos.com/blog/types-of-soil/" class="btn btn-success mt-auto" target="_blank" rel="noopener">View More</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 4 -->
+    <div class="col-12 col-sm-6 col-lg-3 d-flex">
+      <div class="card guide-card w-100">
+        <img src="/static/assets/crops.jpg" class="card-img-top" alt="Freshly harvested vegetables">
+        <div class="card-body">
+          <h5 class="card-title">Easy Crops For Beginners: And How To Grow Them</h5>
+          <p class="card-text">
+            Beginner-friendly tips for growing easy crops like courgettes, tomatoes, potatoes, beans, and lettuce.
+          </p>
+          <a href="https://sowmuchmore.co.uk/2023/01/13/easy-crops-for-beginners-and-how-to-grow-them/"
+             class="btn btn-success mt-auto" target="_blank" rel="noopener">View More</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
-
-<div class="row d-flex justify-content-between">
-    <div class="col-12 col-md-3 mb-4 d-flex justify-content-center">
-        <!-- Card 1 -->
-        <div class="card" style="width: 18rem;">
-            <img src="/static/assets/farming.jpg" class="card-img-top" alt="...">
-            <div class="card-body">
-                <h5 class="card-title">How to Start a Farm: 10 Farming Tips for Beginners</h5>
-                <p class="card-text">A friendly guide offering essential tips for new farmers. It offers essential advice for new farmers, from choosing land and crops to budgeting and learning key skills.</p>
-                <a href="https://blog.agriapp.com/blog/smart-farming/how-to-start-a-farm-10-farming-tips-for-beginners/" class="btn btn-success" target="_blank">View More</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-12 col-md-3 mb-4 d-flex justify-content-center">
-        <!-- Card 2 -->
-        <div class="card" style="width: 18rem;">
-            <img src="/static/assets/gardening.jpg" class="card-img-top" alt="..." style="height: 200px; object-fit: cover;">
-            <div class="card-body">
-                <h5 class="card-title">Gardening for Beginners: Tips to get started</h5>
-                <p class="card-text">The article offers practical gardening advice for beginners in Singapore, focusing on how to get started with growing plants in a tropical climate. </p>
-                <a href="https://thelivingcentre.sg/ecourses/gardening-for-beginners-in-singapore-tips-to-get-started/" class="btn btn-success" target="_blank">View More</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-12 col-md-3 mb-4 d-flex justify-content-center">
-        <!-- Card 3 -->
-        <div class="card" style="width: 18rem;">
-            <img src="/static/assets/farmer.jpg" class="card-img-top" alt="..." style="height: 200px; object-fit: cover;"   >
-            <div class="card-body">
-                <h5 class="card-title">Types Of Soil In Agriculture To Grow Crops Efficiently</h5>
-                <p class="card-text">The article explains the six main types of soil used in agriculture: sandy, clay, silt, chalk, peat, and loam. It highlights how each soil type affects plant growth. </p>
-                <a href="https://eos.com/blog/types-of-soil/" class="btn btn-success" target="_blank">View More</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-12 col-md-3 mb-4 d-flex justify-content-center">
-        <!-- Card 4 -->
-        <div class="card" style="width: 18rem;">
-            <img src="/static/assets/crops.jpg" class="card-img-top" alt="..." style="height: 200px; object-fit: cover;">
-            <div class="card-body">
-                <h5 class="card-title">Easy Crops For Beginners: And How To Grow Them</h5>
-                <p class="card-text">The article provides beginner-friendly tips for growing easy crops like courgettes, tomatoes, potatoes, beans, and lettuce, with advice on sowing, care, and best practices. </p>
-                <a href="https://sowmuchmore.co.uk/2023/01/13/easy-crops-for-beginners-and-how-to-grow-them/" class="btn btn-success" target="_blank">View More</a>
-            </div>
-        </div>
-    </div>
-</div>
-
-
-
-
-
-<!--To here-->
-
 {% endblock %}
