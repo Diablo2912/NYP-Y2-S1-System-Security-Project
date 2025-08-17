@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
 
-<!--Commit-->
-
 <!-- Flash Messages -->
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
@@ -16,6 +14,55 @@
     </div>
   {% endif %}
 {% endwith %}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+<style>
+  /* Teal info pill for nicer tooltips */
+  /* Force black info-pill theme */
+  :root{
+    --tip-color:  #000;                 /* icon/text */
+    --tip-bg:     rgba(0,0,0,.08);      /* pill background */
+    --tip-border: rgba(0,0,0,.22);      /* subtle border */
+  }
+
+  /* In case your CSS doesn’t use the vars everywhere, hard-override too */
+  .cz-help{
+    color: var(--tip-color) !important;
+    background: var(--tip-bg) !important;
+    border-color: var(--tip-border) !important;
+  }
+  .cz-help:hover,
+  .cz-help:focus{
+    background: rgba(0,0,0,.14) !important;
+    color: var(--tip-color) !important;
+  }
+
+  .range-bubble {
+    position: absolute;
+    top: -15px;
+    background: #0d6efd;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    transform: translateX(-50%);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .bg-orange { background-color: #fd7e14 !important; }
+  .five-card-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+  }
+  .five-card-row .card-wrapper {
+    flex: 1 1 18%;
+    min-width: 180px;
+    max-width: 240px;
+  }
+</style>
 
 <div class="container-fluid pt-4">
   <div class="row">
@@ -48,143 +95,150 @@
         <h2 class="mb-3">Log Overview</h2>
         <p>Last Refresh Time: {{ current_time }}</p>
 
-        <!---->
         <a href="{{ url_for('logging_analytics') }}?start_date={{ today_str }}&end_date={{ today_str }}" class="btn btn-primary mb-3">
-            Show logs from today
+          Show logs from today
         </a>
-       <!-- Filters Row -->
-       <div class="row mb-4 g-3">
 
-         <!-- Filters Row (Smaller Version) -->
-         <div class="row mb-3 g-2 small">
-           <!-- Slider Control -->
-           <div class="col-lg-4">
-             <div class="border border-dark rounded p-2 h-100">
-               <label for="logRange" class="form-label mb-3"><strong>Logs From Past Days</strong></label>
-               <div class="position-relative" style="max-width: 200px;">
-                 <div id="rangeBubble" class="range-bubble">10</div>
-                 <input type="range" class="form-range mt-1" min="1" max="20" step="1" id="logRange"
-                        value="{{ num_days or 10 }}">
-               </div>
-               <p class="mb-1">Showing last <output id="rangeOutput">{{ num_days or 10 }}</output> day(s) including today</p>
-               {% if request.args.get('start_date') and request.args.get('end_date') %}
-                 <p class="mb-0 small">From <u>{{ request.args.get('start_date') }}</u> to <u>{{ request.args.get('end_date') }}</u></p>
-               {% else %}
-                 <p class="mb-0 small">From <u>{{ start_date }}</u> until <u>{{ current_day }}</u></p>
-               {% endif %}
-             </div>
-           </div>
+        <!-- Filters Row (Smaller Version) -->
+        <div class="row mb-3 g-2 small">
+          <!-- Slider Control -->
+          <div class="col-lg-4">
+            <div class="border border-dark rounded p-2 h-100">
+              <label for="logRange" class="form-label mb-3"><strong>Logs From Past Days</strong></label>
+              <div class="position-relative" style="max-width: 200px;">
+                <div id="rangeBubble" class="range-bubble">10</div>
+                <input type="range" class="form-range mt-1" min="1" max="20" step="1" id="logRange" value="{{ num_days or 10 }}">
+              </div>
+              <p class="mb-1">Showing last <output id="rangeOutput">{{ num_days or 10 }}</output> day(s) including today</p>
+              {% if request.args.get('start_date') and request.args.get('end_date') %}
+                <p class="mb-0 small">From <u>{{ request.args.get('start_date') }}</u> to <u>{{ request.args.get('end_date') }}</u></p>
+              {% else %}
+                <p class="mb-0 small">From <u>{{ start_date }}</u> until <u>{{ current_day }}</u></p>
+              {% endif %}
+            </div>
+          </div>
 
-           <!-- Date Range Filter -->
-           <div class="col-lg-4">
-             <div class="border border-dark rounded p-2 h-100">
-               <strong>Recent Logs Range</strong>
-               <p class="small mb-1"><i>Max range: 20 days</i></p>
-               <p class="mb-2 small">
-                 From <u>{{ request.args.get('start_date') or start_date }}</u>
-                 to <u>{{ request.args.get('end_date') or current_day }}</u>
-               </p>
-               <div class="d-flex flex-column flex-sm-row gap-2 align-items-end">
-                 <div>
-                   <label for="X-DATE" class="form-label small">Start</label>
-                   <input type="date" id="X-DATE" class="form-control form-control-sm">
-                 </div>
-                 <div>
-                   <label for="Y-DATE" class="form-label small">End</label>
-                   <input type="date" id="Y-DATE" class="form-control form-control-sm">
-                 </div>
-                 <div>
-                   <label class="form-label d-none d-sm-block invisible">Submit</label>
-                   <button id="dateSearchBtn" class="btn btn-sm btn-secondary w-100">Filter</button>
-                 </div>
-               </div>
-             </div>
-           </div>
+          <!-- Date Range Filter -->
+          <div class="col-lg-4">
+            <div class="border border-dark rounded p-2 h-100">
+              <strong>Recent Logs Range</strong>
+              <p class="small mb-1"><i>Max range: 20 days</i></p>
+              <p class="mb-2 small">
+                From <u>{{ request.args.get('start_date') or start_date }}</u>
+                to <u>{{ request.args.get('end_date') or current_day }}</u>
+              </p>
+              <div class="d-flex flex-column flex-sm-row gap-2 align-items-end">
+                <div>
+                  <label for="X-DATE" class="form-label small">Start</label>
+                  <input type="date" id="X-DATE" class="form-control form-control-sm">
+                </div>
+                <div>
+                  <label for="Y-DATE" class="form-label small">End</label>
+                  <input type="date" id="Y-DATE" class="form-control form-control-sm">
+                </div>
+                <div>
+                  <label class="form-label d-none d-sm-block invisible">Submit</label>
+                  <button id="dateSearchBtn" class="btn btn-sm btn-secondary w-100">Filter</button>
+                </div>
+              </div>
+            </div>
+          </div>
 
-           <!-- Date Filter For Login Activity-->
-           <div class="col-lg-3">
-             <div class="border border-dark rounded p-2 h-100">
-               <strong>Log Activity: Choose Date Range</strong>
-               <p class="small mb-1"><i>View Login Activity for Selected Date</i></p>
-               <p class="mb-2 small">Date: <u>{{ request.args.get('start_date') }}</u></p>
-               <div class="d-flex flex-column flex-sm-row gap-2 align-items-end">
-                 <div>
-                   <input type="date" id="loginDate" class="form-control form-control-sm"
-                      value="{{ request.args.get('login_date') or request.args.get('start_date') or today_str }}">
-                 </div>
-                 <div>
-                   <label class="form-label d-none d-sm-block invisible">Submit</label>
-                   <button id="SearchBtn" class="btn btn-sm btn-secondary w-100">Filter</button>
-                 </div>
-               </div>
-             </div>
-           </div>
-         </div>
+          <!-- Date Filter For Login Activity-->
+          <div class="col-lg-3">
+            <div class="border border-dark rounded p-2 h-100">
+              <strong>Log Activity: Choose Date Range</strong>
+              <p class="small mb-1"><i>View Login Activity for Selected Date</i></p>
+              <p class="mb-2 small">Date: <u>{{ request.args.get('start_date') }}</u></p>
+              <div class="d-flex flex-column flex-sm-row gap-2 align-items-end">
+                <div>
+                  <input type="date" id="loginDate" class="form-control form-control-sm"
+                         value="{{ request.args.get('login_date') or request.args.get('start_date') or today_str }}">
+                </div>
+                <div>
+                  <label class="form-label d-none d-sm-block invisible">Submit</label>
+                  <button id="SearchBtn" class="btn btn-sm btn-secondary w-100">Filter</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
-       <!-- Log Summary Cards (5 in a row) -->
-       <!-- Summary Cards -->
-       <h4>Application Incident Management:</h4>
-       <h5>Total Logs <i class="fa-solid fa-circle-info" title="The total number of events or activities recorded in the system."></i> :  <u>{{ logs_count }}</u> </h5>
-       <div class="five-card-row mt-3">
-         {% for category in ['Info', 'Warning', 'Error', 'Critical'] %}
-         <div class="card-wrapper">
-           <div class="card text-white
-             {% if category == 'Info' %} bg-success
-             {% elif category == 'Warning' %} bg-warning text-dark
-             {% elif category == 'Error' %} bg-orange
-             {% elif category == 'Critical' %} bg-danger
-             {% endif %}">
-             <div class="card-body py-2 px-2 text-center">
-               <h6 class="card-title mb-1">
-                 {{ category }}
-                 <i class="fa-solid fa-circle-info ms-1"
-                   title="{% if category == 'Info' %}
-                            Indicates routine operations or successful actions that require no intervention.
-                          {% elif category == 'Warning' %}
-                            Flags unusual or unexpected behavior that may need monitoring.
-                          {% elif category == 'Error' %}
-                            Represents failures that prevent a specific task from completing.
-                          {% elif category == 'Critical' %}
-                            Denotes severe issues that threaten system stability or security and need immediate action.
-                          {% endif %}">
-                 </i>
-               </h6>
-               <p class="card-text fs-6 mb-0">{{ category_summary[category] }}</p>
-             </div>
-           </div>
-         </div>
-         {% endfor %}
+        <!-- Summary -->
+        <h4>Application Incident Management:</h4>
+        <h5>
+          Total Logs
+          <span class="cz-help"
+                data-bs-toggle="tooltip"
+                data-bs-placement="top"
+                data-bs-container="body"
+                data-bs-title="The total number of events or activities recorded in the system.">
+            <i class="fa-solid fa-circle-info"></i>
+          </span>
+          :  <u>{{ logs_count }}</u>
+        </h5>
 
-         <!-- 5th Card -->
-         <div class="card-wrapper">
-           <div class="card bg-primary text-white">
-             <div class="card-body py-2 px-2 text-center">
-               <h6 class="card-title mb-1">
-                 Resolved
-                 <i class="fa-solid fa-circle-info" title="Issues that have been resolved or no further action is required"></i>
-               </h6>
-               <p class="card-text fs-6 mb-0">{{ closed_count }}</p>
-             </div>
-           </div>
-         </div>
-       </div>
+        <!-- Summary Cards -->
+        <div class="five-card-row mt-3">
+          {% for category in ['Info', 'Warning', 'Error', 'Critical'] %}
+          <div class="card-wrapper">
+            <div class="card text-white
+              {% if category == 'Info' %} bg-success
+              {% elif category == 'Warning' %} bg-warning text-dark
+              {% elif category == 'Error' %} bg-orange
+              {% elif category == 'Critical' %} bg-danger
+              {% endif %}">
+              <div class="card-body py-2 px-2 text-center">
+                <h6 class="card-title mb-1">
+                  {{ category }}
+                  <span class="cz-help"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                        data-bs-container="body"
+                        data-bs-title="{% if category == 'Info' %}Routine operations or successful actions (no intervention).
+{% elif category == 'Warning' %}Unusual or unexpected behavior that may need monitoring.
+{% elif category == 'Error' %}Failures that prevent a specific task from completing.
+{% elif category == 'Critical' %}Severe issues that threaten stability or security; immediate action needed.{% endif %}">
+                    <i class="fa-solid fa-circle-info"></i>
+                  </span>
+                </h6>
+                <p class="card-text fs-6 mb-0">{{ category_summary[category] }}</p>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
 
-        <!-- Pie Chart & 24-Hour Login Activity Side by Side -->
-       <div class="row mt-5 gx-3 d-flex align-items-stretch">
+          <!-- 5th Card -->
+          <div class="card-wrapper">
+            <div class="card bg-primary text-white">
+              <div class="card-body py-2 px-2 text-center">
+                <h6 class="card-title mb-1">
+                  Resolved
+                  <span class="cz-help"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                        data-bs-container="body"
+                        data-bs-title="Issues that have been resolved or no further action is required.">
+                    <i class="fa-solid fa-circle-info"></i>
+                  </span>
+                </h6>
+                <p class="card-text fs-6 mb-0">{{ closed_count }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
-         <!-- Pie Chart & Bar Chart Toggle Card -->
+        <!-- Pie/Bar + Login Activity -->
+        <div class="row mt-5 gx-3 d-flex align-items-stretch">
+          <!-- Pie/Bar -->
           <div class="col-lg-4 col-md-12 mb-3">
             <div class="h-100">
               <div class="card p-3 shadow-sm h-100" style="min-height: 400px;">
                 <h5 class="text-center mb-3">Log Category Distribution</h5>
-
-                <!-- Toggle Buttons -->
                 <div class="d-flex flex-column flex-sm-row gap-2 mb-3">
                   <button id="showPieChart" type="button" class="btn btn-primary w-100 w-sm-auto">Pie Chart</button>
                   <button id="showBarChart" type="button" class="btn btn-primary w-100 w-sm-auto opacity-50">Bar Chart</button>
                 </div>
-
-                <!-- Charts -->
                 <div id="pieChartWrapper">
                   <canvas id="pieChart" width="100%" height="250"></canvas>
                 </div>
@@ -195,176 +249,135 @@
             </div>
           </div>
 
-         <!-- Line Activity Chart -->
-         <div class="col-lg-8 col-md-12 mb-3">
-           <div class="h-100">
-             <div class="card p-3 shadow-sm h-100">
-               <h5 class="text-center mb-3">Login Activity for <u>{{ request.args.get('login_date') or request.args.get('start_date') or current_day }}</u></h5>
-               <canvas id="lineActivityChart" width="100%" height="50"></canvas>
-             </div>
-           </div>
-         </div>
-       </div>
-
-       <!-- Line Chart -->
-       <div class="mt-5">
-         <h4 class="mb-3">Log Category Trend</h4>
-         <p>Showing last <output id="range2Output">{{ num_days or 10 }}</output> day(s) including today</p>
-         {% if request.args.get('start_date') and request.args.get('end_date') %}
-           <p>Showing logs from <u>{{ request.args.get('start_date') }}</u> to <u>{{ request.args.get('end_date') }}</u></p>
-         {% else %}
-           <p>Showing logs from <u>{{ start_date }}</u> until today, <u>{{ current_day }}</u>.</p>
-         {% endif %}
-         <canvas id="lineChart" height="120"></canvas>
-       </div>
-
-      </div>
-         <!-- IP Geolocation Heatmap -->
-        <div class="row mt-4">
-          <div class="col-12">
-            <div class="card p-3 shadow-sm">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <h5 class="mb-0">IP Geolocation Heatmap</h5>
-                <div class="d-flex gap-2">
-                  <!-- Keep query params in sync -->
-                  <a class="btn btn-sm btn-outline-secondary"
-                     href="/ip_heatmap?start_date={{ request.args.get('start_date') }}&end_date={{ request.args.get('end_date') }}&days={{ request.args.get('days') or num_days or 10 }}"
-                     target="_blank">Open in new tab</a>
-                </div>
+          <!-- Login Activity -->
+          <div class="col-lg-8 col-md-12 mb-3">
+            <div class="h-100">
+              <div class="card p-3 shadow-sm h-100">
+                <h5 class="text-center mb-3">Login Activity for <u>{{ request.args.get('login_date') or request.args.get('start_date') or current_day }}</u></h5>
+                <canvas id="lineActivityChart" width="100%" height="50"></canvas>
               </div>
-              <iframe
-                id="ipHeatmapFrame"
-                src="/ip_heatmap?start_date={{ request.args.get('start_date') }}&end_date={{ request.args.get('end_date') }}&days={{ request.args.get('days') or num_days or 10 }}"
-                style="width: 100%; height: 520px; border: 0; border-radius: 8px; overflow: hidden;"
-                loading="lazy">
-              </iframe>
-              <p class="small text-muted mt-2 mb-0">
-                Uses ipwho.is for country/city/coordinates. Private and local IPs are excluded automatically.
-              </p>
             </div>
           </div>
         </div>
 
-        <!-- Logs Summary -->
-        <div class="container mt-5">
-          <div class="row">
-              <div class="col-lg-10 col-md-9 col-sm-12">
-                  <h4 class="mb-3">
-                      <i class="fa-solid fa-clock-rotate-left me-2" style="color: #d91717;"></i>
-                      Logs Summary from Past 10 Days
-                  </h4>
-                  <p>
-                      <i class="fa-solid fa-chart-simple me-1" style="color: #d91717;"></i> Summary:<br>
-                      <span style="white-space: pre-wrap;">{{ logs_summary or '---' }}</span>
-                  </p>
-              </div>
-          </div>
+        <!-- Line Chart -->
+        <div class="mt-5">
+          <h4 class="mb-3">Log Category Trend</h4>
+          <p>Showing last <output id="range2Output">{{ num_days or 10 }}</output> day(s) including today</p>
+          {% if request.args.get('start_date') and request.args.get('end_date') %}
+            <p>Showing logs from <u>{{ request.args.get('start_date') }}</u> to <u>{{ request.args.get('end_date') }}</u></p>
+          {% else %}
+            <p>Showing logs from <u>{{ start_date }}</u> until today, <u>{{ current_day }}</u>.</p>
+          {% endif %}
+          <canvas id="lineChart" height="120"></canvas>
+        </div>
 
-         <!-- Generate Report Button -->
-         <div class="d-flex justify-content-center my-3">
-            <button id="generateReportBtn" class="btn btn-primary px-3 py-2">Generate Report</button>
-         </div>
+      </div>
+
+      <!-- IP Geolocation Heatmap -->
+      <div class="row mt-4">
+        <div class="col-12">
+          <div class="card p-3 shadow-sm">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h5 class="mb-0">IP Geolocation Heatmap</h5>
+              <div class="d-flex gap-2">
+                <a class="btn btn-sm btn-outline-secondary"
+                   href="/ip_heatmap?start_date={{ request.args.get('start_date') }}&end_date={{ request.args.get('end_date') }}&days={{ request.args.get('days') or num_days or 10 }}"
+                   target="_blank">Open in new tab</a>
+              </div>
+            </div>
+            <iframe
+              id="ipHeatmapFrame"
+              src="/ip_heatmap?start_date={{ request.args.get('start_date') }}&end_date={{ request.args.get('end_date') }}&days={{ request.args.get('days') or num_days or 10 }}"
+              style="width: 100%; height: 520px; border: 0; border-radius: 8px; overflow: hidden;"
+              loading="lazy">
+            </iframe>
+            <p class="small text-muted mt-2 mb-0">
+              Uses ipwho.is for country/city/coordinates. Private and local IPs are excluded automatically.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Logs Summary + Report -->
+      <div class="container mt-5">
+        <div class="row">
+          <div class="col-lg-10 col-md-9 col-sm-12">
+            <h4 class="mb-3">
+              <i class="fa-solid fa-clock-rotate-left me-2" style="color: #d91717;"></i>
+              Logs Summary from Past 10 Days
+            </h4>
+            <p>
+              <i class="fa-solid fa-chart-simple me-1" style="color: #d91717;"></i> Summary:<br>
+              <span style="white-space: pre-wrap;">{{ logs_summary or '---' }}</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-center my-3">
+          <button id="generateReportBtn" class="btn btn-primary px-3 py-2">Generate Report</button>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
-
-<style>
-  .range-bubble {
-  position: absolute;
-  top: -15px;
-  background: #0d6efd;
-  color: white;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-  transform: translateX(-50%);
-  pointer-events: none;
-  white-space: nowrap;
-}
-  .bg-orange {
-  background-color: #fd7e14 !important; /* Bootstrap's orange-500 */
-  }
-    .five-card-row {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 1rem;
-  }
-  .five-card-row .card-wrapper {
-    flex: 1 1 18%; /* ~5 in a row */
-    min-width: 180px;
-    max-width: 240px;
-  }
-</style>
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-ywzG+YB8q1YQk... (shortened)" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
 <script>
   document.getElementById("generateReportBtn").addEventListener("click", function (e) {
-    e.preventDefault(); // stop default navigation for a moment
-
-    // Show the password info to the user
+    e.preventDefault();
     alert("PDF password: First Name + Phone Number (no spaces, case-sensitive)");
-
-    // Then continue with the download
     window.location.href = "/generate_pdf_report";
+  });
+
+  // Initialize Bootstrap tooltips (portaled to body to avoid clipping)
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+      new bootstrap.Tooltip(el, { container: 'body' });
+    });
   });
 
   //Pass login activity to JS
   const loginActivity = {{ login_activity | tojson }};
 
-  // Event listener for Log Category Distribtuion
+  // Toggle Pie/Bar
   document.getElementById("showPieChart").addEventListener("click", () => {
-  document.getElementById("pieChartWrapper").style.display = "block";
-  document.getElementById("barChartWrapper").style.display = "none";
-  document.getElementById("showPieChart").classList.remove("opacity-50");
-  document.getElementById("showBarChart").classList.add("opacity-50");
-});
-
-document.getElementById("showBarChart").addEventListener("click", () => {
-  document.getElementById("pieChartWrapper").style.display = "none";
-  document.getElementById("barChartWrapper").style.display = "block";
-  document.getElementById("showPieChart").classList.add("opacity-50");
-  document.getElementById("showBarChart").classList.remove("opacity-50");
-});
+    document.getElementById("pieChartWrapper").style.display = "block";
+    document.getElementById("barChartWrapper").style.display = "none";
+    document.getElementById("showPieChart").classList.remove("opacity-50");
+    document.getElementById("showBarChart").classList.add("opacity-50");
+  });
+  document.getElementById("showBarChart").addEventListener("click", () => {
+    document.getElementById("pieChartWrapper").style.display = "none";
+    document.getElementById("barChartWrapper").style.display = "block";
+    document.getElementById("showPieChart").classList.add("opacity-50");
+    document.getElementById("showBarChart").classList.remove("opacity-50");
+  });
 
   // Log Activity Filter
   document.getElementById("SearchBtn").addEventListener("click", function () {
-  const loginDate = document.getElementById("loginDate").value;
-  if (!loginDate) {
-    alert("Please select a date.");
-    return;
-  }
+    const loginDate = document.getElementById("loginDate").value;
+    if (!loginDate) { alert("Please select a date."); return; }
 
-  // Preserve existing filters if needed
-  const urlParams = new URLSearchParams(window.location.search);
-  const startDate = urlParams.get("start_date");
-  const endDate = urlParams.get("end_date");
-  const days = urlParams.get("days");
+    const urlParams = new URLSearchParams(window.location.search);
+    const startDate = urlParams.get("start_date");
+    const endDate = urlParams.get("end_date");
+    const days = urlParams.get("days");
 
-  // Rebuild the URL
-  let newUrl = `/logging_analytics?login_date=${loginDate}`;
-  if (startDate && endDate) {
-    newUrl += `&start_date=${startDate}&end_date=${endDate}`;
-  } else if (days) {
-    newUrl += `&days=${days}`;
-  }
+    let newUrl = `/logging_analytics?login_date=${loginDate}`;
+    if (startDate && endDate) newUrl += `&start_date=${startDate}&end_date=${endDate}`;
+    else if (days) newUrl += `&days=${days}`;
 
-  window.location.href = newUrl;
-});
+    window.location.href = newUrl;
+  });
 
-  // Prevent selecting future dates -  Date range
+  // Prevent future dates
   window.addEventListener("DOMContentLoaded", () => {
     const today = new Date().toISOString().split("T")[0];
     document.getElementById("X-DATE").setAttribute("max", today);
     document.getElementById("Y-DATE").setAttribute("max", today);
-  });
-
-  // Prevent selecting future dates -  Login Date Selector
-  window.addEventListener("DOMContentLoaded", () => {
-    const today = new Date().toISOString().split("T")[0];
     document.getElementById("loginDate").setAttribute("max", today);
   });
 
@@ -384,7 +397,7 @@ document.getElementById("showBarChart").addEventListener("click", () => {
     return colors[category] || '#000';
   }
 
-  // Line Chart
+  // Line Chart (Trend)
   const lineDatasets = categories.map(cat => ({
     label: cat,
     data: datesISO.map(date => chartData[date][cat]),
@@ -393,33 +406,14 @@ document.getElementById("showBarChart").addEventListener("click", () => {
     fill: false,
     tension: 0.3
   }));
-
   const lineCtx = document.getElementById('lineChart').getContext('2d');
   new Chart(lineCtx, {
     type: 'line',
-    data: {
-      labels: datesDisplay,
-      datasets: lineDatasets
-    },
+    data: { labels: datesDisplay, datasets: lineDatasets },
     options: {
       responsive: true,
-      plugins: {
-        title: {
-          display: true,
-          text: 'Number of Logs Per Category'
-        },
-        legend: {
-          position: 'top'
-        }
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: {
-            precision: 0
-          }
-        }
-      }
+      plugins: { title: { display: true, text: 'Number of Logs Per Category' }, legend: { position: 'top' } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
     }
   });
 
@@ -429,23 +423,9 @@ document.getElementById("showBarChart").addEventListener("click", () => {
     type: 'pie',
     data: {
       labels: categories,
-      datasets: [{
-        data: categories.map(cat => categorySummary[cat]),
-        backgroundColor: categories.map(cat => getColor(cat))
-      }]
+      datasets: [{ data: categories.map(cat => categorySummary[cat]), backgroundColor: categories.map(cat => getColor(cat)) }]
     },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: {
-          position: 'top',
-        },
-        title: {
-          display: true,
-          text: 'Log Category Distribution'
-        }
-      }
-    }
+    options: { responsive: true, plugins: { legend: { position: 'top' }, title: { display: true, text: 'Log Category Distribution' } } }
   });
 
   // Bar Chart
@@ -454,135 +434,65 @@ document.getElementById("showBarChart").addEventListener("click", () => {
     type: 'bar',
     data: {
       labels: categories,
-      datasets: [{
-        label: 'Log Count',
-        data: categories.map(cat => categorySummary[cat]),
-        backgroundColor: categories.map(cat => getColor(cat))
-      }]
+      datasets: [{ label: 'Log Count', data: categories.map(cat => categorySummary[cat]), backgroundColor: categories.map(cat => getColor(cat)) }]
     },
     options: {
       responsive: true,
-      plugins: {
-        legend: {
-          display: false // You can enable this if needed
-        },
-        title: {
-          display: true,
-          text: 'Log Category Distribution'
-        }
-      },
+      plugins: { legend: { display: false }, title: { display: true, text: 'Log Category Distribution' } },
       scales: {
         y: {
           beginAtZero: true,
-          ticks: {
-            stepSize: 1,
-            callback: function(value) {
-              if (Number.isInteger(value)) {
-                return value;
-              }
-            }
-          },
-          title: {
-            display: true,
-            text: 'Number of Logs'
-          }
+          ticks: { stepSize: 1, callback: v => Number.isInteger(v) ? v : null },
+          title: { display: true, text: 'Number of Logs' }
         },
-        x: {
-          title: {
-            display: true,
-            text: 'Category'
-          }
-        }
+        x: { title: { display: true, text: 'Category' } }
       }
     }
   });
 
-  // Generate 24-hour labels
+  // Login Activity (24h)
   const hours24 = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0') + ":00");
-
   const userData = [], managerData = [], adminData = [];
-
   for (let i = 0; i < 24; i++) {
     const hourData = loginActivity[i] || { user: 0, manager: 0, admin: 0 };
     userData.push(hourData.user || 0);
     managerData.push(hourData.manager || 0);
     adminData.push(hourData.admin || 0);
   }
+  new Chart(document.getElementById('lineActivityChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: hours24,
+      datasets: [
+        { label: "User",    data: userData,    backgroundColor: 'rgb(255, 99, 132)', tension: 0 },
+        { label: "Manager", data: managerData, backgroundColor: 'rgb(54, 162, 235)', tension: 0 },
+        { label: "Admin",   data: adminData,   backgroundColor: '#ffc107',           tension: 0 }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { title: { display: true, text: 'Login Activity Per Day' }, legend: { position: 'top' } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
 
-   // Login Activity Chart
-  const loginActivityData = {
-    labels: hours24,
-    datasets: [
-      {
-        label: "User",
-        data: userData,
-        backgroundColor: 'rgb(255, 99, 132)',
-        tension: 0
-      },
-      {
-        label: "Manager",
-        data: managerData,
-        backgroundColor: 'rgb(54, 162, 235)',
-        tension: 0
-      },
-      {
-        label: "Admin",
-        data: adminData,
-        backgroundColor: '#ffc107',
-        tension: 0
-      }
-    ]
-  };
-
- // Line Chart: Login Activity (Last 24 Hours)
- new Chart(document.getElementById('lineActivityChart').getContext('2d'), {
-   type: 'line',
-   data: loginActivityData,
-   options: {
-     responsive: true,
-     plugins: {
-       title: {
-         display: true,
-         text: 'Login Activity Per Day'
-       },
-       legend: {
-         position: 'top'
-       }
-     },
-     scales: {
-       y: {
-         beginAtZero: true,
-         ticks: {
-           precision: 0
-         }
-       }
-     }
-   }
- });
-
-
+  // Range slider -> query
   let timeout;
   const slider = document.getElementById('logRange');
+  const rangeOutput = document.getElementById('rangeOutput');
+  const rangeBubble = document.getElementById('rangeBubble');
 
   slider.addEventListener('change', function () {
     const days = this.value;
     clearTimeout(timeout);
-    timeout = setTimeout(() => {
-      window.location.href = `/logging_analytics?days=${days}`;
-    }, 300);  // wait 300ms to avoid spamming
+    timeout = setTimeout(() => { window.location.href = `/logging_analytics?days=${days}`; }, 300);
   });
-
-  //bubble on slider
-  const rangeOutput = document.getElementById('rangeOutput');
-  const rangeBubble = document.getElementById('rangeBubble');
 
   function updateBubble() {
     const val = slider.value;
     const min = slider.min;
     const max = slider.max;
     const percent = (val - min) / (max - min);
-
-    // Position bubble
     const sliderWidth = slider.offsetWidth;
     const bubbleOffset = slider.offsetLeft + percent * sliderWidth;
 
@@ -590,33 +500,22 @@ document.getElementById("showBarChart").addEventListener("click", () => {
     rangeBubble.style.left = `${bubbleOffset}px`;
     rangeOutput.textContent = val;
   }
-
   slider.addEventListener("input", updateBubble);
   window.addEventListener("load", updateBubble);
 
   document.getElementById("dateSearchBtn").addEventListener("click", function () {
-  const startDate = document.getElementById("X-DATE").value;
-  const endDate = document.getElementById("Y-DATE").value;
+    const startDate = document.getElementById("X-DATE").value;
+    const endDate = document.getElementById("Y-DATE").value;
 
-  if (!startDate || !endDate) {
-    alert("Please select both start and end dates.");
-    return;
-  }
+    if (!startDate || !endDate) { alert("Please select both start and end dates."); return; }
 
-  // Check range does not exceed 20 days
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const diffTime = Math.abs(end - start);
-  const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffDays = Math.abs(end - start) / (1000 * 60 * 60 * 24);
+    if (diffDays > 20) { alert("The date range cannot exceed 20 days."); return; }
 
-  if (diffDays > 20) {
-    alert("The date range cannot exceed 20 days.");
-    return;
-  }
-
-  window.location.href = `/logging_analytics?start_date=${startDate}&end_date=${endDate}`;
-});
-
+    window.location.href = `/logging_analytics?start_date=${startDate}&end_date=${endDate}`;
+  });
 </script>
 
 {% endblock %}
