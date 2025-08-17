@@ -3764,6 +3764,16 @@ def flag_session(session_id):
         'flagged_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
     }
 
+    try:
+        notify_user_action(
+            to_email=g.user.get('email'),
+            action_type="Flagged Session",
+            item_name=f"You flagged a session. The admin team will review this and get back to you soon."
+        )
+    except Exception:
+        # notification failure shouldn't block flow
+        pass
+
     findings = detect_sensitive_changes(actions)
     if findings:
         session['review_changes'] = findings
