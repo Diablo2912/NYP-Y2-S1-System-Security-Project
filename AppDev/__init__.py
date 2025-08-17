@@ -2668,7 +2668,7 @@ def is_ip_blocked(mysql, client_ip: str) -> bool:
         return False
 
 @app.route('/login', methods=['GET', 'POST'])
-@limiter.limit("500 per 1 minutes")
+@limiter.limit("5 per 1 minutes")
 def login():
     def _is_safe_next(target: str) -> bool:
         if not target:
