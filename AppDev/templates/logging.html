@@ -14,7 +14,32 @@
   {% endif %}
 {% endwith %}
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-ywzG+YB8q1YQk... (shortened)" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+<style>
+  /* Teal info pill (replaces black icons) */
+  :root{
+    --tip-color: #0aa2c0;          /* teal */
+    --tip-bg: rgba(10,162,192,.10);
+    --tip-border: rgba(10,162,192,.28);
+  }
+  .cz-help{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:20px; height:20px; margin-left:.35rem;
+    color:var(--tip-color); background:var(--tip-bg);
+    border:1px solid var(--tip-border); border-radius:50%;
+    cursor:help; vertical-align:middle;
+    transition: background .2s ease, color .2s ease, transform .2s ease, box-shadow .2s ease;
+  }
+  .cz-help:hover{ background:rgba(10,162,192,.16); color:#088aa3; transform:translateY(-1px); }
+  .cz-help:focus{ outline:none; box-shadow:0 0 0 .2rem rgba(10,162,192,.25); }
+
+  /* Make sure portaled tooltips float above everything */
+  .tooltip{ z-index: 2000; }
+
+  /* (Existing) minor table cosmetics kept intact */
+  .table-responsive { overflow: auto; }
+</style>
 
 <div class="container-fluid pt-4">
   <div class="row">
@@ -134,7 +159,17 @@
             </div>
           </div>
 
-          <h5>Total Logs <i class="fa-solid fa-circle-info" title="The total number of events or activities recorded in the system."></i> :  <u>{{ logs_count }}</u> </h5>
+          <h5>
+            Total Logs
+            <span class="cz-help"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-container="body"
+                  data-bs-title="The total number of events or activities recorded in the system.">
+              <i class="fa-solid fa-circle-info"></i>
+            </span>
+            : <u>{{ logs_count }}</u>
+          </h5>
 
           <div class="table-responsive">
             <table class="table table-bordered table-hover text-center align-middle">
@@ -147,39 +182,61 @@
                       <i class="fa-solid {% if sort_by == 'date' %}{% if sort_order == 'asc' %}fa-angle-down{% else %}fa-angle-up{% endif %}{% else %}fa-angle-up text-muted{% endif %} ms-1"></i>
                     </a>
                   </th>
-                  <th>Time <i class="fa-solid fa-circle-info" title="Time is in Singapore Standard Time (SGT),UTC +8"></i></th>
+                  <th>
+                    Time
+                    <span class="cz-help"
+                          data-bs-toggle="tooltip"
+                          data-bs-placement="top"
+                          data-bs-container="body"
+                          data-bs-title="Time is in Singapore Standard Time (SGT), UTC +8">
+                      <i class="fa-solid fa-circle-info"></i>
+                    </span>
+                  </th>
                   <th style="width: 15%;">
                     <a href="{{ url_for(
-                    'logging',
-                    sort_by='category',
-                    sort_order='asc' if sort_order == 'desc' and sort_by == 'category' else 'desc',
-                    search=search_query,
-                    roles=selected_roles,
-                    statuses=selected_statuses) }}"
-                    class="text-decoration-none text-dark">
-                    Severity
-                    <i class="fa-solid fa-circle-info" title="
-Info: Indicates routine operations or successful actions that require no intervention.
-
-Warning: Flags unusual or unexpected behavior that may need monitoring.
-
-Error: Represents failures that prevent a specific task from completing.
-
-Critical: Denotes severe issues that threaten system stability or security and need immediate action."></i>
-                    <i class="fa-solid {% if sort_by == 'category' %}{% if sort_order == 'asc' %}fa-angle-up{% else %}fa-angle-down{% endif %}{% else %}fa-angle-up text-muted{% endif %} ms-1"></i>
-                  </a>
+                      'logging',
+                      sort_by='category',
+                      sort_order='asc' if sort_order == 'desc' and sort_by == 'category' else 'desc',
+                      search=search_query,
+                      roles=selected_roles,
+                      statuses=selected_statuses) }}"
+                      class="text-decoration-none text-dark">
+                      Severity
+                      <span class="cz-help"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="top"
+                            data-bs-container="body"
+                            data-bs-title="Info: Routine operations that need no action.
+Warning: Unusual behavior worth monitoring.
+Error: A task failed to complete.
+Critical: Severe issue requiring immediate action.">
+                        <i class="fa-solid fa-circle-info"></i>
+                      </span>
+                      <i class="fa-solid {% if sort_by == 'category' %}{% if sort_order == 'asc' %}fa-angle-up{% else %}fa-angle-down{% endif %}{% else %}fa-angle-up text-muted{% endif %} ms-1"></i>
+                    </a>
                   </th>
-                  <th style="width: 25%;">Activity <i class="fa-solid fa-circle-info" title="Describes the event or action recorded by the system"></i>
+                  <th style="width: 25%;">
+                    Activity
+                    <span class="cz-help"
+                          data-bs-toggle="tooltip"
+                          data-bs-placement="top"
+                          data-bs-container="body"
+                          data-bs-title="Describes the event or action recorded by the system">
+                      <i class="fa-solid fa-circle-info"></i>
+                    </span>
+                  </th>
                   <th>
-                    Status <i class="fa-solid fa-circle-info" title="
-                    Open: The issue or log entry has been created but not yet addressed.
-
-Closed: Also Known As Resolved. The issue has been resolved or no further action is required.
-
-Accepted: The issue has been acknowledged and will be worked on.
-
-Triage: The issue is being reviewed and prioritized based on severity and impact."></i>
-
+                    Status
+                    <span class="cz-help"
+                          data-bs-toggle="tooltip"
+                          data-bs-placement="top"
+                          data-bs-container="body"
+                          data-bs-title="Open: Created, not yet addressed.
+Closed: Resolved or no further action needed.
+Accepted: Acknowledged and will be worked on.
+Triage: Under review and prioritization.">
+                      <i class="fa-solid fa-circle-info"></i>
+                    </span>
                   </th>
                   <th>IP Address</th>
                   <th>Actions</th>
@@ -197,7 +254,7 @@ Triage: The issue is being reviewed and prioritized based on severity and impact
                     {% elif log.category == 'Warning' %}
                       <span class="badge rounded-pill bg-warning text-dark">Warning</span>
                     {% elif log.category == 'Error' %}
-                      <span class="badge rounded-pill bg-orange text-white" style="background-color: #fd7e14;">Error</span>
+                      <span class="badge rounded-pill text-white" style="background-color: #fd7e14;">Error</span>
                     {% elif log.category == 'Critical' %}
                       <span class="badge rounded-pill bg-danger">Critical</span>
                     {% else %}
@@ -208,40 +265,40 @@ Triage: The issue is being reviewed and prioritized based on severity and impact
                   <td>{{ log.status }}</td>
                   <td>{{ log.ip_address }}</td>
                   <td>
-                     <!-- Edit Button -->
-                      <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editStatusModal_{{ log.id }}">
-                        Edit
-                      </button>
+                    <!-- Edit Button -->
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editStatusModal_{{ log.id }}">
+                      Edit
+                    </button>
 
-                      <!-- Edit Log Status Modal -->
-                      <div class="modal fade" id="editStatusModal_{{ log.id }}" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog">
-                          <div class="modal-content">
-                            <form action="{{ url_for('update_log_status', id=log.id) }}" method="POST">
-                              <div class="modal-header">
-                                <h5 class="modal-title">Edit Log Status</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <!-- Edit Log Status Modal -->
+                    <div class="modal fade" id="editStatusModal_{{ log.id }}" tabindex="-1" aria-hidden="true">
+                      <div class="modal-dialog">
+                        <div class="modal-content">
+                          <form action="{{ url_for('update_log_status', id=log.id) }}" method="POST">
+                            <div class="modal-header">
+                              <h5 class="modal-title">Edit Log Status</h5>
+                              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body text-start">
+                              <div class="container mb-5 pb-5">
+                                <label for="statusSelect_{{ log.id }}" class="form-label">Select New Status</label>
+                                <select class="form-select" id="statusSelect_{{ log.id }}" name="status" required>
+                                  {% for s in ['Open', 'Accepted', 'Triage', 'Closed'] %}
+                                    <option value="{{ s }}" {% if log.status == s %}selected{% endif %}>{{ s }}</option>
+                                  {% endfor %}
+                                </select>
                               </div>
-                              <div class="modal-body text-start">
-                                <div class="container mb-5 pb-5">
-                                  <label for="statusSelect_{{ log.id }}" class="form-label">Select New Status</label>
-                                  <select class="form-select" id="statusSelect_{{ log.id }}" name="status" required>
-                                    {% for s in ['Open', 'Accepted', 'Triage', 'Closed'] %}
-                                      <option value="{{ s }}" {% if log.status == s %}selected{% endif %}>{{ s }}</option>
-                                    {% endfor %}
-                                  </select>
-                                </div>
-                              </div>
-                              <div class="modal-footer">
-                                <button type="submit" class="btn btn-primary">Update</button>
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                              </div>
-                            </form>
-                          </div>
+                            </div>
+                            <div class="modal-footer">
+                              <button type="submit" class="btn btn-primary">Update</button>
+                              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            </div>
+                          </form>
                         </div>
                       </div>
+                    </div>
 
-                    <!-- Delete Button (Triggers Modal) -->
+                    <!-- Delete Button -->
                     <form action="{{ url_for('delete_log', id=log.id) }}" method="POST" style="display: inline-block;">
                       <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                     </form>
@@ -260,6 +317,13 @@ Triage: The issue is being reviewed and prioritized based on severity and impact
   </div>
 </div>
 
+<!-- Initialize Bootstrap tooltips (portaled to body to avoid clipping) -->
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+      new bootstrap.Tooltip(el, { container: 'body' });
+    });
+  });
+</script>
 
 {% endblock %}
-
