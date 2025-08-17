@@ -145,12 +145,12 @@ mail = Mail(app)
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'glen'
-app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'glen'
+# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 
 # BRANDON SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -169,10 +169,10 @@ app.config['MYSQL_PORT'] = 3306
 # app.config['MYSQL_PORT'] = 3306
 #
 # # #SACHIN SQL DB CONFIG
-# app.config['MYSQL_HOST'] = 'localhost'
-# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-# app.config['MYSQL_DB'] = 'sspCropzy'
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+app.config['MYSQL_DB'] = 'sspCropzy'
 # #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -3571,7 +3571,7 @@ def activity_history():
         return redirect(url_for('verify_before_activity'))
 
     last_verified = result['activity_verified_at']
-    if (datetime.utcnow() - last_verified).total_seconds() > 300:
+    if (datetime.utcnow() - last_verified).total_seconds() > 180:
         # Clear it from DB
         cursor = mysql.connection.cursor()
         cursor.execute("UPDATE accounts SET activity_verified_at = NULL WHERE id = %s", (user_id,))
@@ -3580,7 +3580,7 @@ def activity_history():
         flash("Access expired. Please re-verify to view session activity.", "warning")
         return redirect(url_for('verify_before_activity'))
 
-    time_left = 300 - int((datetime.utcnow() - last_verified).total_seconds())
+    time_left = 180 - int((datetime.utcnow() - last_verified).total_seconds())
 
     # --- Fetch session activity ---
     filter_type = request.args.get("filter", "all")

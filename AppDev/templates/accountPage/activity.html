@@ -123,7 +123,7 @@
       {% if time_left %}
       <div class="cz-banner d-flex justify-content-center mb-3">
         <strong class="me-1">Time remaining to view session history:</strong>
-        <span id="countdown">{{ time_left }}</span> seconds
+        <span id="countdown">{{ time_left }} </span> seconds
       </div>
       {% endif %}
 
@@ -359,6 +359,37 @@
   </div>
 </div>
 
+<!-- REVIEW CHANGES MODAL (auto-opens if `review_changes` exists) -->
+{% if review_changes %}
+<div class="modal fade" id="reviewChangesModal" tabindex="-1" aria-labelledby="reviewChangesLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-warning-subtle">
+        <h5 class="modal-title" id="reviewChangesLabel">We noticed important account changes</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">These actions were recorded in the flagged session:</p>
+        <ul class="mb-3">
+          {% for c in review_changes %}
+            <li>
+              <strong>{{ c.label }}</strong>
+              {% if c.category %}<span class="text-muted"> — {{ c.category }}</span>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+        <a class="btn btn-outline-primary" href="{{ url_for('account_security_review') }}">
+          Review changes
+        </a>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% if time_left %}
 <script>
   let countdown = {{ time_left }};
@@ -432,6 +463,20 @@
     const form=document.getElementById(targetFormId);
     if(form) form.submit();
   });
+})();
+</script>
+
+<!-- Auto-open the Review Changes modal if present -->
+<script>
+(function () {
+  const modalEl = document.getElementById('reviewChangesModal');
+  if (!modalEl) return;
+  try {
+    new bootstrap.Modal(modalEl, { backdrop: 'static' }).show();
+  } catch (_) {
+    modalEl.classList.add('show');
+    modalEl.style.display = 'block';
+  }
 })();
 </script>
 
