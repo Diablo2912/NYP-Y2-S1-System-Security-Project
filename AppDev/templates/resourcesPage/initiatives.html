@@ -1,16 +1,81 @@
 {% extends "base.html" %}
-
 {% block content %}
 
-<!-- Edit here -->
-<h1>Crop Calendar</h1>
-<p>This is a calendar to show different optimal growth periods for crops. <br>
-Customers can feel free to input any date.</p>
+<!-- Crop Calendar (UI clean-up only; logic unchanged) -->
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
 
-<!-- FullCalendar integration -->
-<div id='calendar'></div>
+<style>
+  :root{
+    --cal-accent:#198754;                 /* Cropzy green */
+    --cal-border:rgba(25,135,84,.18);
+    --cal-wash:#f4faf6;
+  }
 
-<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js'></script>
+  .cal-wrap{
+    max-width: 1400px;       /* wider than default container so it doesn't feel cramped */
+    margin: 1rem auto 2rem;
+    padding: 0 16px;
+  }
+
+  .cal-card{
+    background:#fff;
+    border:1px solid var(--cal-border);
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.06);
+    padding: 1.25rem;
+  }
+
+  .cal-title{
+    display:flex; align-items:center; gap:.6rem;
+    margin: .25rem 0 .5rem;
+    font-weight: 800;
+    font-size: clamp(1.75rem, 1.2rem + 1.5vw, 2.25rem);
+  }
+  .cal-title::before{
+    content:"";
+    width:12px; height:12px; border-radius:50%;
+    background:var(--cal-accent);
+    box-shadow:0 0 0 6px var(--cal-wash);
+  }
+  .cal-note{
+    color:#6c757d;
+    margin-bottom: 1rem;
+  }
+
+  /* Calendar container styling */
+  #calendar{
+    background:#fff;
+    border:1px solid var(--cal-border);
+    border-radius:14px;
+    padding:10px;
+  }
+
+  /* Make FullCalendar buttons feel like the site */
+  .fc .fc-button{
+    background: var(--cal-accent);
+    border: 0;
+  }
+  .fc .fc-button:disabled{
+    background: #86d0b0;
+    opacity: .9;
+  }
+  .fc .fc-toolbar-title{
+    font-weight: 700;
+  }
+</style>
+
+<div class="cal-wrap">
+  <div class="cal-card">
+    <h1 class="cal-title">Crop Calendar</h1>
+    <p class="cal-note">
+      This calendar helps you mark optimal growth periods for crops. Click a date to add an event, or click an existing event to edit it.
+    </p>
+
+    <div id="calendar"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
     var calendarEl = document.getElementById('calendar');
@@ -18,50 +83,40 @@ Customers can feel free to input any date.</p>
     var calendar = new FullCalendar.Calendar(calendarEl, {
       initialView: 'dayGridMonth',
 
-      // Event click handler for modifying existing events
+      // Event click handler for modifying existing events (logic unchanged)
       eventClick: function(info) {
-        // Prompt the user to edit the event title
         var newTitle = prompt("Edit event title:", info.event.title);
-
-        // If the user changes the title, update it
         if (newTitle !== null) {
           info.event.setProp('title', newTitle);
         }
 
-        // Prompt for a new end date
-        var newEndDate = prompt("Enter the event's new end date (YYYY-MM-DD):", info.event.end ? info.event.end.toISOString().split('T')[0] : info.event.start.toISOString().split('T')[0]);
+        var newEndDate = prompt(
+          "Enter the event's new end date (YYYY-MM-DD):",
+          info.event.end ? info.event.end.toISOString().split('T')[0] : info.event.start.toISOString().split('T')[0]
+        );
 
-        // If a new end date is provided, update it
         if (newEndDate) {
           let newEnd = new Date(newEndDate);
-          newEnd.setDate(newEnd.getDate() + 1);  // Add one day to fix exclusive end date issue
+          newEnd.setDate(newEnd.getDate() + 1);   // keep exclusive end behavior
           info.event.setEnd(newEnd.toISOString().split('T')[0]);
         } else {
           alert("End date is required.");
         }
       },
 
-      // Event click handler for creating new events
+      // Date click handler for creating new events (logic unchanged)
       dateClick: function(info) {
-        // Prompt the user to enter event title
         var eventTitle = prompt("Enter event title:");
-
-        // If a title is entered, proceed to ask for start and end dates
         if (eventTitle) {
-          // Prompt the user for the event's end date
-          var startDate = info.dateStr; // The date user clicked on
+          var startDate = info.dateStr;
           var endDate = prompt("Enter the event's end date (YYYY-MM-DD):");
-
-          // Validate that the end date is entered correctly
           if (endDate) {
             let newEnd = new Date(endDate);
-            newEnd.setDate(newEnd.getDate() + 1); // Add one day to fix the issue
-
-            // Add the event with adjusted end date
+            newEnd.setDate(newEnd.getDate() + 1); // keep exclusive end behavior
             calendar.addEvent({
               title: eventTitle,
               start: startDate,
-              end: newEnd.toISOString().split('T')[0], // Adjusted end date
+              end: newEnd.toISOString().split('T')[0],
               allDay: true
             });
           } else {
@@ -74,8 +129,5 @@ Customers can feel free to input any date.</p>
     calendar.render();
   });
 </script>
-<!-- FullCalendar integration ends -->
 
-<!-- To here -->
-
-{% endblock %}
+{% endblock %}
