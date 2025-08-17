@@ -702,25 +702,57 @@ def generate_log_report_pdf(filename, login_activity, category_summary, trend_da
         except Exception:
             latest_logs = []
 
+    # Build a small style for wrapped activity text
+    styles = getSampleStyleSheet()
+    activity_style = ParagraphStyle(
+        name="ActivityCell",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=8.5,
+        leading=10,
+        wordWrap="CJK",  # more aggressive wrapping (handles long tokens)
+    )
+
     if latest_logs:
         headers = ["Date", "Time", "Category", "Status", "IP", "Activity"]
         rows = [headers]
         sample = latest_logs[0]
         is_tuple = not isinstance(sample, dict)
+
+        def _activity_paragraph(txt: str) -> Paragraph:
+            # Escape to avoid accidental HTML interpretation
+            return Paragraph(escape(txt or ""), activity_style)
+
         for r in latest_logs:
             if is_tuple:
                 rows.append([
-                    str(r[2] or ""), str(r[3] or ""), str(r[4] or ""),
-                    str(r[6] or ""), str(r[7] or ""),
-                    (str(r[5] or "")[:80] + ("…" if len(str(r[5] or "")) > 80 else ""))
+                    str(r[2] or ""),  # date
+                    str(r[3] or ""),  # time
+                    str(r[4] or ""),  # category
+                    str(r[6] or ""),  # status
+                    str(r[7] or ""),  # ip
+                    _activity_paragraph(str(r[5] or "")),  # Activity (wrapped)
                 ])
             else:
                 rows.append([
-                    str(r.get("date","")), str(r.get("time","")), str(r.get("category","")),
-                    str(r.get("status","")), str(r.get("ip_address","")),
-                    (str(r.get("activity",""))[:80] + ("…" if len(str(r.get("activity",""))) > 80 else ""))
+                    str(r.get("date", "")),
+                    str(r.get("time", "")),
+                    str(r.get("category", "")),
+                    str(r.get("status", "")),
+                    str(r.get("ip_address", "")),
+                    _activity_paragraph(str(r.get("activity", ""))),  # Activity (wrapped)
                 ])
-        col_widths = [table_width*0.12, table_width*0.10, table_width*0.14, table_width*0.12, table_width*0.17, table_width*0.35]
+
+        # Keep your existing widths; wrapping will respect these
+        col_widths = [
+            table_width * 0.12,  # Date
+            table_width * 0.10,  # Time
+            table_width * 0.14,  # Category
+            table_width * 0.12,  # Status
+            table_width * 0.17,  # IP
+            table_width * 0.35,  # Activity (wrapped)
+        ]
+
         logs_tbl = Table(rows, colWidths=col_widths, repeatRows=1)
         logs_tbl.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f8f8f8")),
@@ -730,14 +762,21 @@ def generate_log_report_pdf(filename, login_activity, category_summary, trend_da
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#fcfcfc")]),
+            # Optional: tighten padding so wrapped text uses space efficiently
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
         ]))
+
         ltw, lth = logs_tbl.wrapOn(c, table_width, page_h)
 
-        # Ensure room for the trend chart beneath; trim if needed.
+        # Preserve your existing check to keep room for the trend chart
         min_space_for_trend = TREND_H + ROW_SPACING + 60
         available = y_cursor - (MARGIN_B + min_space_for_trend)
         if lth > max(40, available):
-            approx_row_h = 14
+            # Recompute a conservative row estimate; wrapped paragraphs are taller
+            approx_row_h = 16  # slightly larger to account for wrapped lines
             max_rows = max(2, int(available // approx_row_h))
             if max_rows < len(rows):
                 rows = rows[:max_rows]
@@ -750,6 +789,10 @@ def generate_log_report_pdf(filename, login_activity, category_summary, trend_da
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
                     ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
                     ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#fcfcfc")]),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                    ("TOPPADDING", (0, 0), (-1, -1), 2),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
                 ]))
                 ltw, lth = logs_tbl.wrapOn(c, table_width, page_h)
 
@@ -758,7 +801,6 @@ def generate_log_report_pdf(filename, login_activity, category_summary, trend_da
     else:
         c.setFont("Helvetica", 10)
         c.drawString(MARGIN_L, y_cursor - 12, "No logs available.")
-        y_cursor -= (ROW_SPACING + 8)
 
     # Trend (full width)
     c.setFont("Helvetica-Bold", 12)
