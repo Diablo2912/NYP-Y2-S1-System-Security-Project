@@ -3,8 +3,41 @@
 {% block content %}
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
-<div class="container d-flex justify-content-center align-items-center min-vh-100">
-  <div style="width: 100%; max-width: 400px;">
+<style>
+  /* Cropzy light theme for the 2FA/SMS pages */
+  .cz-2fa-card{
+    background:#eaf6ef; /* very light green */
+    border:0;
+    border-radius:1rem;
+  }
+  .cz-2fa-title{
+    font-weight:700;
+    letter-spacing:.3px;
+  }
+  .pincode-input{
+    width:54px;
+    height:56px;
+    font-size:1.35rem;
+    font-weight:600;
+    border:2px solid #cde7d8;
+    border-radius:.75rem;
+    outline:0;
+    transition:.15s ease;
+  }
+  .pincode-input:focus{
+    border-color:#198754;
+    box-shadow:0 0 0 .25rem rgba(25,135,84,.15);
+  }
+  .pincode-input::-webkit-outer-spin-button,
+  .pincode-input::-webkit-inner-spin-button{ -webkit-appearance: none; margin:0; }
+  .pincode-input[type=tel]{ -moz-appearance: textfield; }
+  .cz-links a{ color:#198754; }
+  .cz-links a:hover{ text-decoration:underline; }
+</style>
+
+<div class="container d-flex justify-content-center align-items-center min-vh-100 py-4">
+  <div style="width: 100%; max-width: 420px;">
+
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -19,15 +52,33 @@
       {% endif %}
     {% endwith %}
 
-    <!-- OTP Form -->
-    <form id="form" class="bg-white rounded shadow p-4" method="POST" action="{{ url_for('sms_verify_otp', id=id) }}">
-      <h1 class="text-center mb-4 fs-4 text-uppercase">SMS Authentication</h1>
+    <!-- SMS OTP Form -->
+    <form id="form" class="cz-2fa-card shadow p-4" method="POST" action="{{ url_for('sms_verify_otp', id=id) }}">
+      <h1 class="text-center mb-3 fs-4 cz-2fa-title">SMS Authentication</h1>
+
+      <!-- Session Timer (same behavior as 2FA) -->
+      <div class="alert alert-warning mb-3" role="alert">
+        <div class="d-flex justify-content-between align-items-center">
+          <span>
+            <strong>SMS verification in progress.</strong>
+            This page expires in <span id="countdown">--:--</span>.
+          </span>
+        </div>
+        <div class="progress mt-2" style="height:6px;">
+          <div class="progress-bar bg-success" id="countdown-bar" style="width:100%"></div>
+        </div>
+      </div>
 
       <div class="mb-3 text-center">
         <label class="form-label mb-2">Enter the 6-digit code sent to your phone number</label>
         <div class="d-flex justify-content-between">
           {% for i in range(6) %}
-            <input type="tel" class="form-control text-center mx-1 pincode-input" maxlength="1" pattern="\d*" autocomplete="off">
+            <input type="tel"
+                   class="form-control text-center mx-1 pincode-input"
+                   maxlength="1"
+                   pattern="\d*"
+                   inputmode="numeric"
+                   autocomplete="one-time-code">
           {% endfor %}
         </div>
       </div>
@@ -35,18 +86,49 @@
       <!-- Hidden input to hold the combined OTP -->
       <input type="hidden" name="otp" id="otpHidden">
 
-      <div class="text-center">
-        <button type="submit" class="btn btn-primary w-100 rounded-pill" disabled id="continueBtn">Continue</button>
-      </div>
+      <button type="submit" class="btn btn-success w-100 rounded-pill" disabled id="continueBtn">Continue</button>
 
-      <div class="text-center mt-2">
-        <a href="{{ url_for('more_auth', id=id) }}" id="moreBtn" class="text-primary text-decoration-none">Sign in another way</a>
+      <div class="text-center mt-3 cz-links">
+        {# Optional: add a resend route if you have one for SMS, e.g., 'sms_resend_otp' #}
+        {# <a href="{{ url_for('sms_resend_otp', id=id) }}" id="resendBtn" class="text-decoration-none">Resend verification code</a><br> #}
+        <a href="{{ url_for('more_auth', id=id) }}" id="moreBtn" class="text-decoration-none">Sign in another way</a>
       </div>
     </form>
   </div>
 </div>
 
 <script>
+  (function () {
+    // Server-synced remaining seconds (falls back to 120 if not provided)
+    var remaining = {{ remaining_seconds|default(120) }};
+    var total = Math.max(remaining, 0);
+
+    var cd = document.getElementById('countdown');
+    var bar = document.getElementById('countdown-bar');
+
+    function fmt(sec) {
+      var m = Math.floor(sec / 60);
+      var s = sec % 60;
+      return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+
+    function tick() {
+      cd.textContent = fmt(remaining);
+      if (bar) {
+        var pct = total > 0 ? (remaining / total) * 100 : 0;
+        bar.style.width = pct + '%';
+      }
+      if (remaining <= 0) {
+        // Hard redirect to login (same as 2FA)
+        window.location.replace("{{ url_for('login') }}");
+        return;
+      }
+      remaining -= 1;
+      setTimeout(tick, 1000);
+    }
+    tick();
+  })();
+
   const inputs = document.querySelectorAll('.pincode-input');
   const hiddenOtpInput = document.getElementById('otpHidden');
   const continueBtn = document.getElementById('continueBtn');
@@ -54,6 +136,8 @@
 
   inputs.forEach((input, index) => {
     input.addEventListener('input', () => {
+      // numeric-only; keep one digit
+      input.value = input.value.replace(/\D/g,'').slice(0,1);
       if (input.value && index < inputs.length - 1) {
         inputs[index + 1].focus();
       }
@@ -72,7 +156,7 @@
     continueBtn.disabled = !allFilled;
   }
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', () => {
     const otp = [...inputs].map(i => i.value).join('');
     hiddenOtpInput.value = otp;
   });

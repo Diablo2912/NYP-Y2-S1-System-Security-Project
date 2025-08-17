@@ -145,20 +145,20 @@ mail = Mail(app)
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'glen'
-# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-# app.config['MYSQL_DB'] = 'ssp_db'
-# app.config['MYSQL_PORT'] = 3306
-
-# BRANDON SQL DB CONFIG
 app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
 app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'brandon'
-app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+app.config['MYSQL_USER'] = 'glen'
+app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
 app.config['MYSQL_DB'] = 'ssp_db'
 app.config['MYSQL_PORT'] = 3306
+
+# BRANDON SQL DB CONFIG
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'brandon'
+# app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -2896,24 +2896,45 @@ def sms_verify_otp(id):
     hostname = socket.gethostname()
     ip_addr = socket.gethostbyname(hostname)
     user_agent = request.headers.get('User-Agent')
+
+    # Must have a pending 2FA session for this user
     if 'pending_2fa_user_id' not in session or session['pending_2fa_user_id'] != id:
         flash("Unauthorized access.", "error")
         return redirect(url_for('login'))
 
-    # Send OTP on GET request
+    # Ensure/validate 2FA page lifetime (max 2 minutes)
+    started_at = session.get('pending_2fa_started_at')
+    if not started_at:
+        # If the starter timestamp wasn't set earlier in the flow, set it now.
+        started_at = time.time()
+        session['pending_2fa_started_at'] = started_at
+
+    # Expire session if over 120s
+    if (time.time() - started_at) > 120:
+        otp_store.pop(id, None)
+        session.pop('pending_2fa_user_id', None)
+        session.pop('pending_2fa_started_at', None)
+        session.pop('pending_2fa_attempts', None)
+        flash("Your verification session expired. Please login again.", "error")
+        return redirect(url_for('login'))
+
+    # For UI countdown
+    remaining_seconds = max(0, 120 - int(time.time() - started_at))
+
     if request.method == 'GET':
-        # Generate and send OTP
+        # Generate and send OTP (60s validity) — same as your original behavior
         otp = f"{random.randint(0, 999999):06d}"
-        expires = time.time() + 60  # 60 seconds expiry
+        expires = time.time() + 60  # OTP itself expires after 60s
         otp_store[id] = {"otp": otp, "expires": expires}
 
-        # Fetch user phone
+        # Fetch user phone and send SMS
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cursor.execute("SELECT * FROM accounts WHERE id = %s", (id,))
         user = cursor.fetchone()
         cursor.close()
 
         if user:
+            # Assuming your sender reads otp from otp_store; if not, add `otp` as an argument.
             send_otp_sms(user['phone_number'], id, user['first_name'], user['last_name'])
 
     if request.method == 'POST':
@@ -2924,13 +2945,26 @@ def sms_verify_otp(id):
             flash("No OTP found. Please login again.", "error")
             return redirect(url_for('login'))
 
+        # OTP token expiry (separate from page/session lifetime)
         if time.time() > record['expires']:
             flash("OTP expired. Please login again.", "error")
             otp_store.pop(id, None)
             session.pop('pending_2fa_user_id', None)
+            session.pop('pending_2fa_started_at', None)
+            session.pop('pending_2fa_attempts', None)
             return redirect(url_for('login'))
 
+        # Track attempts (max 3)
+        attempts = session.get('pending_2fa_attempts', 0)
+
         if entered_otp == record['otp']:
+            # Success: clear OTP/session markers
+            otp_store.pop(id, None)
+            session.pop('pending_2fa_user_id', None)
+            session.pop('pending_2fa_started_at', None)
+            session.pop('pending_2fa_attempts', None)
+
+            # Fetch user details
             cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
             cursor.execute('SELECT * FROM accounts WHERE id = %s', (id,))
             user = cursor.fetchone()
@@ -2939,9 +2973,6 @@ def sms_verify_otp(id):
             if not user:
                 flash("User not found. Please login again.", "error")
                 return redirect(url_for('login'))
-
-            otp_store.pop(id, None)
-            session.pop('pending_2fa_user_id', None)
 
             session_id = log_session_activity(user['id'], user['status'], 'login')
 
@@ -2963,22 +2994,31 @@ def sms_verify_otp(id):
             log_user_action(
                 user_id=user['id'],
                 session_id=session_id,
-                action=f"Login successful (via 2FA) | IP: {ip_addr} | Agent: {user_agent}"
+                action=f"Login successful (via SMS 2FA) | IP: {ip_addr} | Agent: {user_agent}"
             )
 
             notify_user_action(
                 to_email=user['email'],
-                action_type="Login Notification (2FA)",
-                item_name=f"Your Cropzy account was just logged in via 2FA from IP: {ip_addr}\n\nDevice: {user_agent}"
+                action_type="Login Notification (SMS 2FA)",
+                item_name=f"Your Cropzy account was just logged in via SMS 2FA from IP: {ip_addr}\n\nDevice: {user_agent}"
             )
 
             flash("Login successful!", "success")
             return response
         else:
-            flash("Invalid OTP. Please try again.", "error")
+            attempts += 1
+            session['pending_2fa_attempts'] = attempts
+            if attempts >= 3:
+                flash("Too many incorrect OTP attempts. Please login again.", "error")
+                otp_store.pop(id, None)
+                session.pop('pending_2fa_user_id', None)
+                session.pop('pending_2fa_started_at', None)
+                session.pop('pending_2fa_attempts', None)
+                return redirect(url_for('login'))
+            flash(f"Invalid OTP. Attempt {attempts}/3.", "error")
 
-    return render_template('/accountPage/sms_auth.html', id=id)
-
+    # Render SMS page with timer/attempt context
+    return render_template('/accountPage/sms_auth.html', id=id, remaining_seconds=remaining_seconds)
 
 def generate_recovery_code(id):
     code = f"{random.randint(0, 999999):06d}"  # Generate 12-digit code
