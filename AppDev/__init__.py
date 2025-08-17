@@ -153,12 +153,12 @@ mail = Mail(app)
 # app.config['MYSQL_PORT'] = 3306
 
 # BRANDON SQL DB CONFIG
-# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-# app.config['MYSQL_HOST'] = '127.0.0.1'
-# app.config['MYSQL_USER'] = 'brandon'
-# app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
-# app.config['MYSQL_DB'] = 'ssp_db'
-# app.config['MYSQL_PORT'] = 3306
+app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'brandon'
+app.config['MYSQL_PASSWORD'] = 'Pa$$w0rd'
+app.config['MYSQL_DB'] = 'ssp_db'
+app.config['MYSQL_PORT'] = 3306
 #
 # #SACHIN SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -169,10 +169,10 @@ mail = Mail(app)
 # app.config['MYSQL_PORT'] = 3306
 #
 # # #SACHIN SQL DB CONFIG
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-app.config['MYSQL_DB'] = 'sspCropzy'
+# app.config['MYSQL_HOST'] = 'localhost'
+# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+# app.config['MYSQL_DB'] = 'sspCropzy'
 # #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -5983,6 +5983,22 @@ def handle_all(e):
     admin_log_activity(mysql, msg, "Critical", user_id)
     return _render_error(500, e)
 
+
+RATELIMIT_ERROR_MSG = "Too Many Request Made. Try Again Later"
+
+def _render_rate_limit(status_code, e):
+    _log_ref(e, status_code)  # keep for diagnostics, not shown to user
+    if _wants_json():
+        return jsonify({"error": {"message": RATELIMIT_ERROR_MSG}}), status_code
+    return render_template("errors/error.html",
+                           message=RATELIMIT_ERROR_MSG,
+                           home_url=_home_url()), status_code
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    user_id = getattr(g, "user", {}).get("id", None)
+    msg = f"CSRF error at {request.path} (method={request.method}), ip={request.remote_addr}"
+    admin_log_activity(mysql, msg, "Error", user_id)
+    return _render_rate_limit(429, e)
 
 # Simulate CSRF failure (if Flask-WTF is installed)
 from flask_wtf.csrf import CSRFError
