@@ -30,7 +30,7 @@ from cryptography.x509.oid import NameOID
 from deepface import DeepFace
 from dotenv import load_dotenv
 from flask import Flask, Response, flash, g, jsonify, make_response, redirect, render_template, request, send_file, \
-    session, url_for
+    session, url_for, abort
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_mail import Mail, Message
@@ -71,7 +71,7 @@ import unicodedata
 from urllib.parse import urljoin, urlparse
 
 from authlib.integrations.flask_client import OAuth
-from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
+from werkzeug.exceptions import HTTPException, RequestEntityTooLarge, TooManyRequests
 from flask_wtf.csrf import CSRFError
 try:
     from flask_limiter.errors import RateLimitExceeded
@@ -145,12 +145,12 @@ mail = Mail(app)
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'glen'
-app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'glen'
+# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 
 # BRANDON SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -169,10 +169,10 @@ app.config['MYSQL_PORT'] = 3306
 # app.config['MYSQL_PORT'] = 3306
 #
 # # #SACHIN SQL DB CONFIG
-# app.config['MYSQL_HOST'] = 'localhost'
-# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-# app.config['MYSQL_DB'] = 'sspCropzy'
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+app.config['MYSQL_DB'] = 'sspCropzy'
 # #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -5972,12 +5972,50 @@ def handle_csrf(e):
 def handle_413(e):
     return _render_error(413, e)
 
+@app.errorhandler(405)
+def handle_405(e):
+    return _render_error(405, e)
+
 @app.errorhandler(Exception)
 def handle_all(e):
     user_id = getattr(g, "user", {}).get("id", None)
     msg = f"Unhandled exception at {request.path} (method={request.method}): {type(e).__name__}: {e}"
     admin_log_activity(mysql, msg, "Critical", user_id)
     return _render_error(500, e)
+
+
+# Simulate CSRF failure (if Flask-WTF is installed)
+from flask_wtf.csrf import CSRFError
+@app.route("/test/csrf", methods=["POST"])
+def test_csrf():
+    raise CSRFError("bad token")
+
+@app.route("/test/500")
+def test_500():
+    raise RuntimeError("boom")
+
+@app.route("/test/404")
+def test_404():
+    abort(404)
+
+@app.route("/test/403")
+def test_403():
+    abort(403)
+
+# GET-only to trigger 405 when POSTed
+@app.route("/test/405", methods=["GET"])
+def test_405():
+    abort(405)
+
+# Simulate 413 without large uploads
+@app.route("/test/413")
+def test_413():
+    raise RequestEntityTooLarge()
+
+# If you don't have flask-limiter, simulate 429 directly
+@app.route("/test/429")
+def test_429():
+    raise TooManyRequests()
 
 
 if __name__ == "__main__":
