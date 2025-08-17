@@ -203,15 +203,17 @@
                       class="text-decoration-none text-dark">
                       Severity
                       <span class="cz-help"
-                            data-bs-toggle="tooltip"
-                            data-bs-placement="top"
-                            data-bs-container="body"
-                            data-bs-title="Info: Routine operations that need no action.
-Warning: Unusual behavior worth monitoring.
-Error: A task failed to complete.
-Critical: Severe issue requiring immediate action.">
-                        <i class="fa-solid fa-circle-info"></i>
-                      </span>
+      data-bs-toggle="tooltip"
+      data-bs-placement="top"
+      data-bs-container="body"
+      data-bs-html="true"
+      data-bs-title="Info: Routine operations that need no action.<br>
+                     Warning: Unusual behavior worth monitoring.<br>
+                     Error: A task failed to complete.<br>
+                     Critical: Severe issue requiring immediate action.">
+  <i class="fa-solid fa-circle-info"></i>
+</span>
+
                       <i class="fa-solid {% if sort_by == 'category' %}{% if sort_order == 'asc' %}fa-angle-up{% else %}fa-angle-down{% endif %}{% else %}fa-angle-up text-muted{% endif %} ms-1"></i>
                     </a>
                   </th>
@@ -230,10 +232,11 @@ Critical: Severe issue requiring immediate action.">
                     <span class="cz-help"
                           data-bs-toggle="tooltip"
                           data-bs-placement="top"
+                           data-bs-html="true"
                           data-bs-container="body"
-                          data-bs-title="Open: Created, not yet addressed.
-Closed: Resolved or no further action needed.
-Accepted: Acknowledged and will be worked on.
+                          data-bs-title="Open: Created, not yet addressed.<br>
+Closed: Resolved or no further action needed.<br>
+Accepted: Acknowledged and will be worked on.<br>
 Triage: Under review and prioritization.">
                       <i class="fa-solid fa-circle-info"></i>
                     </span>
