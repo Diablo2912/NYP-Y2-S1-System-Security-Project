@@ -22,6 +22,7 @@ import re
 
 import MySQLdb.cursors
 import bleach
+from urllib.parse import quote
 from cryptography import x509
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes, serialization
@@ -282,10 +283,38 @@ def generate_self_signed_cert(cert_file='certs/cert.pem', key_file='certs/key.pe
 
 
 def sanitize_input(user_input):
+    # Define safe tags and attributes
     allowed_tags = ['a', 'b', 'i', 'em', 'strong']
     allowed_attributes = {'a': ['href']}
 
-    return bleach.clean(user_input, tags=allowed_tags, attributes=allowed_attributes)
+    # Step 1: Clean HTML tags
+    cleaned = bleach.clean(user_input, tags=allowed_tags, attributes=allowed_attributes)
+
+    # Step 2: Re-encode <a href> URLs safely
+    def filter_href(attrs, new=False):
+        href = attrs.get("href", "")
+        if href:
+            # Only allow http and https
+            if href.startswith(("http://", "https://")):
+                # Encode the URL so no JavaScript injection works
+                attrs["href"] = quote(href, safe=":/#?&=")
+            else:
+                # Drop dangerous protocols (like javascript:)
+                attrs.pop("href", None)
+        return attrs
+
+    # Apply filtering to links
+    return bleach.clean(
+        cleaned,
+        tags=allowed_tags,
+        attributes={'a': filter_href}
+    )
+
+# print(sanitize_input('<a href="javascript:alert(1)">Click me</a>'))
+# # Output: <a>Click me</a>
+#
+# print(sanitize_input('<a href="http://example.com/?q=<script>">Example</a>'))
+# # Output: <a href="http://example.com/?q=%3Cscript%3E">Example</a>
 
 
 def login_required(f):
