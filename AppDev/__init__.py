@@ -146,12 +146,12 @@ mail = Mail(app)
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
 # GLEN SQL DB CONFIG
-app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'glen'
-app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
-app.config['MYSQL_DB'] = 'ssp_db'
-app.config['MYSQL_PORT'] = 3306
+# app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
+# app.config['MYSQL_HOST'] = '127.0.0.1'
+# app.config['MYSQL_USER'] = 'glen'
+# app.config['MYSQL_PASSWORD'] = 'dbmsPa55'
+# app.config['MYSQL_DB'] = 'ssp_db'
+# app.config['MYSQL_PORT'] = 3306
 
 # BRANDON SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -170,10 +170,10 @@ app.config['MYSQL_PORT'] = 3306
 # app.config['MYSQL_PORT'] = 3306
 #
 # # #SACHIN SQL DB CONFIG
-# app.config['MYSQL_HOST'] = 'localhost'
-# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-# app.config['MYSQL_DB'] = 'sspCropzy'
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+app.config['MYSQL_DB'] = 'sspCropzy'
 # #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
@@ -3485,7 +3485,7 @@ def send_activity_email_token(id):
         sender=EMAIL_SENDER,
         recipients=[user['email']]
     )
-    msg.body = f"Click to confirm access to session activity (valid for 5 minutes):\n\n{link}"
+    msg.body = f"Click to confirm access to session activity (valid for 1 minute):\n\n{link}"
     mail.send(msg)
 
     flash("Verification email sent. Please check your inbox.", "info")
@@ -3495,7 +3495,7 @@ def send_activity_email_token(id):
 @app.route('/confirm_activity_access/<token>')
 def confirm_activity_access(token):
     try:
-        data = serializer.loads(token, salt='activity-verification', max_age=300)
+        data = serializer.loads(token, salt='activity-verification', max_age=60)
         user_id = data['id']
 
         # Update user's verification timestamp in DB
@@ -6059,7 +6059,6 @@ def handle_405(e):
 def handle_all(e):
     user_id = getattr(g, "user", {}).get("id", None)
     msg = f"Unhandled exception at {request.path} (method={request.method}): {type(e).__name__}: {e}"
-    admin_log_activity(mysql, msg, "Critical", user_id)
     return _render_error(500, e)
 
 
