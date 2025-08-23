@@ -1,0 +1,133 @@
+-- Table: accounts
+CREATE TABLE accounts (
+    id INT AUTO_INCREMENT,
+    first_name VARCHAR(50),
+    last_name VARCHAR(45),
+    gender VARCHAR(1),
+    phone_number VARCHAR(15),
+    email VARCHAR(100) UNIQUE,
+    password VARCHAR(255),
+    status VARCHAR(45),
+    two_factor_status VARCHAR(45),
+    recovery_code VARCHAR(255),
+    countries VARCHAR(200),
+    face LONGBLOB,
+    activity_verified_at DATETIME,
+    frozen TINYINT(1) DEFAULT 0,
+    google_sub VARCHAR(64),
+    oauth_provider VARCHAR(32),
+    oauth_picture TEXT,
+    oauth_email_verified TINYINT(1) DEFAULT 0,
+    last_login_provider VARCHAR(32),
+    is_password_set TINYINT(1) DEFAULT 0,
+    password_strength ENUM('weak','medium','strong','unknown') DEFAULT 'unknown',
+    password_last_changed DATETIME,
+    email_verified TINYINT(1) DEFAULT 0
+);
+
+-- Table: frozen_account
+CREATE TABLE frozen_account (
+    id INT AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    reason VARCHAR(255),
+    frozen_at DATETIME,
+    is_frozen TINYINT(1) DEFAULT 1,
+    CONSTRAINT fk_frozen_user FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE CASCADE
+);
+
+-- Table: ip_blocklist
+CREATE TABLE ip_blocklist (
+    ip VARCHAR(45),
+    reason VARCHAR(255),
+    created_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATE,
+    CONSTRAINT fk_ipblock_user FOREIGN KEY (created_by) REFERENCES accounts(id) ON DELETE SET NULL
+);
+
+-- Table: ip_geo_cache
+CREATE TABLE ip_geo_cache (
+    ip VARCHAR(45),
+    country_code VARCHAR(8),
+    city VARCHAR(128),
+    lat DOUBLE,
+    lon DOUBLE,
+    last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Table: logs
+CREATE TABLE logs (
+    id INT AUTO_INCREMENT,
+    user_id INT,
+    date DATE,
+    time VARCHAR(45),
+    category VARCHAR(45),
+    activity VARCHAR(255),
+    status VARCHAR(45),
+    ip_address VARCHAR(100),
+    CONSTRAINT fk_logs_user FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE SET NULL
+);
+
+-- Table: password_resets
+CREATE TABLE password_resets (
+    id INT AUTO_INCREMENT,
+    email VARCHAR(255) NOT NULL,
+    token VARCHAR(255) NOT NULL,
+    expires_at DATETIME,
+    created_at DATETIME
+);
+
+-- Table: session_flags
+CREATE TABLE session_flags (
+    id INT AUTO_INCREMENT,
+    session_id INT NOT NULL,
+    user_id INT NOT NULL,
+    reason VARCHAR(255),
+    details TEXT,
+    status ENUM('OPEN','RESOLVED','DISMISSED') DEFAULT 'OPEN',
+    resolved_by INT,
+    resolved_at DATETIME,
+    resolution_note VARCHAR(255),
+    created_at DATETIME,
+    CONSTRAINT fk_flags_user FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE CASCADE,
+    CONSTRAINT fk_flags_resolver FOREIGN KEY (resolved_by) REFERENCES accounts(id) ON DELETE SET NULL
+);
+
+-- Table: unfreeze_requests
+CREATE TABLE unfreeze_requests (
+    id INT AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    token VARCHAR(64) NOT NULL,
+    expires_at DATETIME,
+    full_name VARCHAR(100),
+    email VARCHAR(100),
+    phone_number VARCHAR(20),
+    details TEXT,
+    CONSTRAINT fk_unfreeze_user FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE CASCADE
+);
+
+-- Table: user_actions_log
+CREATE TABLE user_actions_log (
+    id INT AUTO_INCREMENT,
+    user_id INT,
+    session_id INT,
+    action VARCHAR(255),
+    timestamp DATETIME,
+    CONSTRAINT fk_actions_user FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE SET NULL
+);
+
+-- Table: user_session_activity
+CREATE TABLE user_session_activity (
+    id INT AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    status VARCHAR(45),
+    login_time DATETIME,
+    logout_time DATETIME,
+    ip_address VARCHAR(100),
+    user_agent TEXT,
+    revoked_by VARCHAR(50),
+    revoked_by_id INT,
+    revoked_at DATETIME,
+    CONSTRAINT fk_session_user FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE CASCADE,
+    CONSTRAINT fk_revoked_by FOREIGN KEY (revoked_by_id) REFERENCES accounts(id) ON DELETE SET NULL
+);
