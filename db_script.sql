@@ -112,4 +112,15 @@ CREATE TABLE user_actions_log (
 -- Table: user_session_activity
 CREATE TABLE user_session_activity (
     id INT AUTO_INCREMENT,
-    user_id INT_
+    user_id INT NOT NULL,
+    status VARCHAR(45),
+    login_time DATETIME,
+    logout_time DATETIME,
+    ip_address VARCHAR(100),
+    user_agent TEXT,
+    revoked_by VARCHAR(50),
+    revoked_by_id INT,
+    revoked_at DATETIME,
+    CONSTRAINT fk_session_user FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE CASCADE,
+    CONSTRAINT fk_revoked_by FOREIGN KEY (revoked_by_id) REFERENCES accounts(id) ON DELETE SET NULL
+);
