@@ -100,7 +100,7 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 ALGORITHM = 'pbkdf2_sha256'
-SECRET_KEY = 'asdsa8f7as8d67a8du289p1eu89hsad7y2189eha8'
+SECRET_KEY = os.getenv("SECRET_KEY")
 stripe.api_key = "sk_test_51Qrle9CddzoT6fzjpqNPd1g3UV8ScbnxiiPK5uYT0clGPV82Gn7QPwcakuijNv4diGpcbDadJjzunwRcWo0eOXvb00uDZ2Gnw6"
 fernet_key = os.getenv("RECOVERY_ENC_KEY")
 if isinstance(fernet_key, str):
