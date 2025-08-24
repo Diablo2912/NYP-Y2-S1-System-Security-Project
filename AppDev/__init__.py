@@ -145,6 +145,12 @@ mail = Mail(app)
 # SETUP UR DB CONFIG ACCORDINGLY
 # DON'T DELETE OTHER CONFIGS JUST COMMENT AWAY IF NOT USING
 
+app.config['MYSQL_HOST'] = '127.0.0.1'
+app.config['MYSQL_USER'] = 'root'
+app.config['MYSQL_PASSWORD'] = 'your password here'
+app.config['MYSQL_DB'] = 'SSP Cropzy'
+app.config['MYSQL_PORT'] = 3306
+
 # GLEN SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'
 # app.config['MYSQL_HOST'] = '127.0.0.1'
@@ -170,10 +176,10 @@ mail = Mail(app)
 # app.config['MYSQL_PORT'] = 3306
 #
 # # #SACHIN SQL DB CONFIG
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'              # or your MySQL username
-app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
-app.config['MYSQL_DB'] = 'sspCropzy'
+# app.config['MYSQL_HOST'] = 'localhost'
+# app.config['MYSQL_USER'] = 'root'              # or your MySQL username
+# app.config['MYSQL_PASSWORD'] = 'mysql'       # match what you set in Workbench
+# app.config['MYSQL_DB'] = 'sspCropzy'
 # #
 # #SADEV SQL DB CONFIG
 # app.secret_key = 'asd9as87d6s7d6awhd87ay7ss8dyvd8bs'

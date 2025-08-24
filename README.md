@@ -5,12 +5,15 @@ The objective of this project is for students to apply the knowledge and skills 
 #### Project Description
 Cropzy is an all in one platform which aims to equip farmers with the resources and tools to optimize productivity/crop yield while prioritizing sustainability.
 
-Features: 
+## Python Version
+Python 3.11.0
+
+## Features: 
 - Sustainable Eco-Friendly Agricultural Products on sale
 - Tools such as Carbon Footprint Tracker, Crop Calendar, Seasonal Updates
 - Resources such as news articles, educational videos, related information like soil information, Chatbot
 
-#### Note
+## !! Important !!
 
 Some features may not work as intended as sensitive values (API keys, secret keys, database credentials) have been removed for security reasons.
 
@@ -18,58 +21,29 @@ To run the project locally, you will need to:
 
 - Set up your own `.env` file with the required environment variables (see `.env` for reference).
 - Provide your own API keys/secrets (e.g., Google, Twilio, Stripe, reCAPTCHA).
+- Ensure all dependencies are installed.
+- Ensure a MySQL database connection has been set up 
 
-## Python Version
-Python 3.11.0
+## Instructions:
 
-## Install Required Dependencies
+### Install MySQL, Set Up Database Connection and Run given script
+- Install MySQL Workbench here: https://dev.mysql.com/downloads/installer/
+- Create a new connection: 
+  - Example: ![img.png](InstructionsImage/img.png)
+- Log in to root and run the sql script: [DB Scripts](https://github.com/Diablo2912/NYP-Y2-S1-System-Security-Project/blob/master/db_script.sql)
+- Change details on line 148-152 in __init__.py:
+  - Example: ![img_1.png](InstructionsImage/img_1.png)
+  
+
+### Install Required Dependencies
 
 ```bash
   pip install -r requirements.txt
 ```
 
-## MySQL Database Scripts
-Configure your own MySQL Database connection
+### Run application
+Once everything has been set up, run the __init__.py file. Wait for the application to load and click the link in your __Run__ terminal.
 
-[DB Scripts](https://github.com/Diablo2912/NYP-Y2-S1-System-Security-Project/blob/master/db_script.sql)
-
-## Group Members
-
-- Brandon Ngiam Wen Kai (Team Lead)
-- Loo Yong Hong Glen (DB Admin)
-- Dhanasekaran Sachin (UI Admin)
-- Sadev Dulneth
-
-## Features Done by Each Member
-
-### Brandon Ngiam Wen Kai
-- Rate Limiting
-- Password Reset
-- Account Freeze
-- Secure Chatbot Input
-- Account Creation Check
-
-### Dhanasekaran Sachin
-- Session Management
-- Email Notifications (under Session Management)
-- Security Challenges & Re-authentication
-- Error Handling
-- Input Validation
-
-### Loo Yong Hong Glen
-- Authentication Token
-- Multi-Factor Authentication
-- Logs
-- IP Management
-- Geofencing
-- Role-Based Access Control
-- Input Sanitisation
-
-### Sadev Dulneth
-- CSRF Protection
-- Auto Form Destruct Timer
-- Encrypted Recovery Code
-- Secure Header and HTTPS
-- Security Checkup Page
-- Clickjacking Prevention
-- Google OAuth
+### Additional Info 
+Once in the application, create an account and login to explore the website's features
+![main_page](InstructionsImage/img_2.png)
