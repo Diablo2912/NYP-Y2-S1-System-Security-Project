@@ -10,7 +10,7 @@ The objective of this project is for students to apply the knowledge and skills 
 
 ## MySQL Database Scripts
 
-[DB Scripts]([https://linktodocumentation](https://github.com/Diablo2912/NYP-Y2-S1-System-Security-Project/blob/master/db_script.txt))
+[DB Scripts](https://github.com/Diablo2912/NYP-Y2-S1-System-Security-Project/blob/master/db_script.txt)
 
 ## Group Members
 
