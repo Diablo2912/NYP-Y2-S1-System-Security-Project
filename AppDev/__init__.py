@@ -101,7 +101,7 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 ALGORITHM = 'pbkdf2_sha256'
 SECRET_KEY = os.getenv("SECRET_KEY")
-stripe.api_key = "sk_test_51Qrle9CddzoT6fzjpqNPd1g3UV8ScbnxiiPK5uYT0clGPV82Gn7QPwcakuijNv4diGpcbDadJjzunwRcWo0eOXvb00uDZ2Gnw6"
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 fernet_key = os.getenv("RECOVERY_ENC_KEY")
 if isinstance(fernet_key, str):
     fernet_key = fernet_key.encode()
@@ -119,7 +119,7 @@ oauth.register(
 )
 
 app.register_blueprint(main_blueprint)
-app.config['SECRET_KEY'] = '5791262abcdefg'
+app.config['SECRET_KEY'] = os.getenv("FLASK_SECRET_KEY")
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=90)
 
