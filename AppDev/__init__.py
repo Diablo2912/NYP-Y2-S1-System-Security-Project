@@ -1044,7 +1044,7 @@ def home():
         return render_template('/home/homePage.html', articles=articles, updates=updates, chart1_data=None,
                                chart2_data=None, chart3_data=None, user_info=user_info)
 
-    # Chart 1 - CO₂ Emissions by Product
+    # Chart 1 - CO2 Emissions by Product
     plt.figure(figsize=(10, 5))
     plt.bar(df['name'], df['co2'], color='skyblue')
     plt.xlabel('Product Name')
@@ -1059,7 +1059,7 @@ def home():
     chart1_data = base64.b64encode(buffer1.getvalue()).decode('utf-8')
     buffer1.close()
 
-    # Chart 2 - CO₂ Emissions by Product Category
+    # Chart 2 - CO2 Emissions by Product Category
     category_totals = df.groupby('category')['co2'].sum()
     plt.figure(figsize=(8, 5))
     plt.pie(category_totals, labels=category_totals.index, autopct='%1.1f%%', startangle=140)
@@ -1071,7 +1071,7 @@ def home():
     chart2_data = base64.b64encode(buffer2.getvalue()).decode('utf-8')
     buffer2.close()
 
-    # Chart 3 - Highest vs. Lowest CO₂ Emission Products
+    # Chart 3 - Highest vs. Lowest CO2 Emission Products
     highest = df.nlargest(3, 'co2')
     lowest = df.nsmallest(3, 'co2')
 
@@ -1511,7 +1511,7 @@ def accountInfo():
     user = cursor.fetchone()
     cursor.close()
 
-    # 🛠 Fix: MySQL stores BLOBs or bytes — decode to string first
+    #  Fix: MySQL stores BLOBs or bytes — decode to string first
     if user and user.get('recovery_code'):
         try:
             encrypted = user['recovery_code']
@@ -1945,7 +1945,7 @@ def createAdmin():
     create_admin_form = CreateAdminForm(request.form)
 
     if request.method == 'POST':
-        # ✅ reCAPTCHA validation
+        #  reCAPTCHA validation
         recaptcha_response = request.form.get('g-recaptcha-response')
         r = requests.post("https://www.google.com/recaptcha/api/siteverify", data={
             'secret': os.getenv("RECAPTCHA_SECRET_KEY"),
@@ -2758,7 +2758,7 @@ def login():
             # Hardcoded IP for testing (uncomment to force a fixed IP every login)
             # ip_address = "172.21.0.1"
 
-            # ⬇⬇⬇ NEW: Block if IP is in ip_blocklist
+            #  NEW: Block if IP is in ip_blocklist
             if is_ip_blocked(mysql, ip_address):
                 flash("Login from your region is not allowed.", "danger")
                 try:
@@ -2779,7 +2779,7 @@ def login():
                 except Exception:
                     pass
                 return redirect(url_for('login'))
-            # ⬆⬆⬆ END NEW
+            #  END NEW
 
             # Country restrictions
             current_country = get_user_country(ip_address)
@@ -3495,7 +3495,7 @@ def send_activity_email_token(id):
 @app.route('/confirm_activity_access/<token>')
 def confirm_activity_access(token):
     try:
-        data = serializer.loads(token, salt='activity-verification', max_age=60)
+        data = serializer.loads(token, salt='activity-verification', max_age=40)
         user_id = data['id']
 
         # Update user's verification timestamp in DB
@@ -4115,7 +4115,7 @@ def admin_notify_flagger(flag_id):
         flash("Could not determine the recipient for this flag.", "danger")
         return redirect(url_for('view_session_flags'))
 
-    # Send email using your existing helper (unchanged)
+    # Send email using the existing helper (unchanged)
     try:
         send_email(rec['email'], subject, message)
         flash(f"Email sent to {rec['first_name']} {rec['last_name']} ({rec['email']}).", "success")
@@ -4350,7 +4350,7 @@ def recovery_auth(id):
             if input_code == stored_code:
                 generate_recovery_code(id)
 
-                # ✅ Only one log here
+                #  Only one log here
                 session_id = log_session_activity(result['id'], result['status'], 'login')
 
                 payload = {
@@ -4372,7 +4372,7 @@ def recovery_auth(id):
                 hostname = socket.gethostname()
                 ip_addr = socket.gethostbyname(hostname)
                 user_agent = request.headers.get('User-Agent')
-                # ✅ Use user action log instead of logging a new session
+                #  Use user action log instead of logging a new session
                 log_user_action(
                     user_id=result['id'],
                     session_id=session_id,
@@ -4529,7 +4529,7 @@ def change_pswd(id):
             new_pswd     = form.new_pswd.data
             confirm_pswd = form.confirm_pswd.data
 
-            # ✅ Verify current password against PBKDF2 hash
+            #  Verify current password against PBKDF2 hash
             if not verify_password(current_pswd, user['password']):
                 flash("Incorrect current password.", "danger")
                 return redirect(url_for('change_pswd', id=id))
@@ -4538,11 +4538,11 @@ def change_pswd(id):
                 flash("New passwords do not match.", "danger")
                 return redirect(url_for('change_pswd', id=id))
 
-            # ✅ Hash and score the new password
+            #  Hash and score the new password
             new_hash = hash_password(new_pswd)
             new_level, _ = _score_password_strength(new_pswd)  # 'weak'|'medium'|'strong'
 
-            # ✅ Update DB: password + strength + last_changed; ensure local password is marked as set
+            #  Update DB: password + strength + last_changed; ensure local password is marked as set
             cursor.execute("""
                 UPDATE accounts
                    SET password = %s,
@@ -4948,7 +4948,7 @@ def finalize_edit(token):
                     f"Edited seasonal update: {edit_entry['data']['title']}"
                 )
 
-                # ✅ Send confirmation notification
+                #  Send confirmation notification
                 notify_user_action(
                     to_email=user_email,
                     action_type="Edited Seasonal Update",
@@ -5029,7 +5029,7 @@ def add_to_cart(product_id):
             "name": product.name,
             "price": float(product.price),
             "image": url_for('static', filename='uploads/' + (product.image_filename or 'default.jpg')),
-            # ✅ Include Image
+            #  Include Image
             "quantity": 1
         }
 
@@ -5507,7 +5507,7 @@ def google_callback():
         first = name.split(" ", 1)[0] if name else ""
         last  = name.split(" ", 1)[1] if (" " in name) else ""
 
-        # Store a random hash (never revealed). Use your app's hash_password helper (PBKDF2/etc.)
+        # Store a random hash (never revealed). Use app's hash_password helper (PBKDF2/etc.)
         random_local_pw = secrets.token_urlsafe(24)
         random_hash = hash_password(random_local_pw)
 
@@ -5619,7 +5619,7 @@ def build_security_checkup(user_row):
     twofa_ok = str((user_row or {}).get('two_factor_status', '')).lower() == 'enabled'
     email_verified = bool((user_row or {}).get('oauth_email_verified') or (user_row or {}).get('email_verified'))
 
-    # ----- Face ID detection (robust) -----
+    # ----- Face ID detection  -----
     # 1) If there's a boolean column on accounts (e.g., face_id_enrolled or face),
     #    use it. Otherwise 2) look for a template row in a separate table.
     face_enabled = False
@@ -5713,7 +5713,7 @@ def account_security_review():
         flash("User not found.", "danger")
         return redirect(url_for('accountInfo'))
 
-    # Build the checkup payload (uses your helper)
+    # Build the checkup payload (uses the helper)
     checkup = build_security_checkup(user_row)
 
     # Render the Security Review pane
@@ -6118,4 +6118,4 @@ if __name__ == "__main__":
         check_db_connection(mysql)
         cleanup_expired_blocks(mysql)
 
-    app.run(ssl_context=("certs/cert.pem", "certs/key.pem"), host="127.0.0.1", port=443, debug=True)
+    app.run(ssl_context=("certs/cert.pem", "certs/key.pem"), host="127.0.0.1", port=443, debug=False)

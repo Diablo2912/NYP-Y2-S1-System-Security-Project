@@ -119,6 +119,10 @@ class SeasonalUpdateForm(FlaskForm):
         ],
         render_kw={"placeholder": "Enter update title..."}
     )
+
+
+    
+
     content = StringField(
         'Update Content',
         validators=[
