@@ -5793,7 +5793,6 @@ def freeze_account(user_id):
         except Exception as e:
             print(f"[DEBUG] Failed to log critical admin freeze: {e}")
 
-    # Proceed with freezing (works for all accounts)
     cursor.execute(
         "INSERT INTO frozen_account (user_id, reason, frozen_at, is_frozen) VALUES (%s, %s, NOW(), TRUE)",
         (user_id, 'Manual freeze by user'))
@@ -5817,54 +5816,7 @@ def is_account_frozen(user_id):
     freeze_entry = cursor.fetchone()
     cursor.close()
 
-    # Return True if most recent freeze entry exists and is active
     return freeze_entry and freeze_entry['is_frozen'] == True
-
-
-# def send_unfreeze_email(user_id, email):
-#     try:
-#         token = secrets.token_urlsafe(32)
-#         expires_at = datetime.utcnow() + timedelta(minutes=1)
-#
-#         cursor = mysql.connection.cursor()
-#         cursor.execute("""
-#             INSERT INTO unfreeze_requests (user_id, token, expires_at)
-#             VALUES (%s, %s, %s)
-#         """, (user_id, token, expires_at))
-#         mysql.connection.commit()
-#
-#         unfreeze_url = url_for('unfreeze_account', token=token, _external=True)
-#         subject = "[Cropzy] Unfreeze Your Account"
-#         message = (
-#             f"Hi,\n\n"
-#             f"Your account was frozen. To unfreeze it, please click the link below:\n\n"
-#             f"{unfreeze_url}\n\n"
-#             f"This link will expire in 10 minutes.\n\n"
-#             f"Best,\nCropzy Support"
-#         )
-#         send_email(email, subject, message)
-#
-#     except Exception as e:
-#         print(f"[ERROR] Failed to send unfreeze email: {e}")
-#
-#
-# @app.route('/send_unfreeze_email', methods=['POST'])
-# def ajax_send_unfreeze_email():
-#     user_id = request.args.get('user_id')  # or from request.json
-#
-#     if not user_id:
-#         return jsonify({'status': 'error', 'message': 'User not logged in.'}), 403
-#
-#     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-#     cursor.execute("SELECT email FROM accounts WHERE id = %s", (user_id,))
-#     user = cursor.fetchone()
-#     cursor.close()
-#
-#     if not user:
-#         return jsonify({'status': 'error', 'message': 'User not found.'}), 404
-#
-#     send_unfreeze_email(user_id, user['email'])
-#     return jsonify({'status': 'success', 'message': 'Unfreeze email sent.'})
 
 @app.route('/freezeAccountDetails', methods=['GET', 'POST'])
 @jwt_required
