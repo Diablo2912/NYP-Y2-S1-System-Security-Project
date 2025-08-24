@@ -31,7 +31,7 @@ Python 3.11.0
 ## MySQL Database Scripts
 Configure your own MySQL Database connection
 
-[DB Scripts]([https://linktodocumentation](https://github.com/Diablo2912/NYP-Y2-S1-System-Security-Project/blob/master/db_script.sql))
+[DB Scripts]([https://linktodocumentation](https://github.com/Diablo2912/NYP-Y2-S1-System-Security-Project/blob/master/db_script.sql)
 
 ## Group Members
 
