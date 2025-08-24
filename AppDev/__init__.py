@@ -554,7 +554,7 @@ def block_ip():
 
 # SUMMARIZER
 # Configure Gemini API
-genai.configure(api_key="AIzaSyD2fWMVBdWusPXpUhRlOfwOb5SwiZVMmyA")
+genai.configure(api_key = os.getenv("GEMINI_KEY"))
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 def generate_logs_summary(mysql):
@@ -2867,9 +2867,9 @@ def login():
     return response
 
 
-account_sid = 'AC69fe3693aeb2b86b276600293ab078d5'
-auth_token = 'e475d20188609c83fc90575507d297b1'
-twilio_phone = '+13072882468'
+account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+twilio_phone = os.getenv("TWILIO_PHONE")
 client = Client(account_sid, auth_token)
 
 
