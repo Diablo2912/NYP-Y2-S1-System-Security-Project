@@ -2,6 +2,26 @@
 
 The objective of this project is for students to apply the knowledge and skills acquired to demonstrate insecure and secure web applications/APIs/Systems and develop secure web applications, including systems.
 
+#### Project Description
+Cropzy is an all in one platform which aims to equip farmers with the resources and tools to optimize productivity/crop yield while prioritizing sustainability.
+
+Features: 
+- Sustainable Eco-Friendly Agricultural Products on sale
+- Tools such as Carbon Footprint Tracker, Crop Calendar, Seasonal Updates
+- Resources such as news articles, educational videos, related information like soil information, Chatbot
+
+#### Note
+
+Some features may not work as intended as sensitive values (API keys, secret keys, database credentials) have been removed for security reasons.
+
+To run the project locally, you will need to:
+
+- Set up your own `.env` file with the required environment variables (see `.env` for reference).
+- Provide your own API keys/secrets (e.g., Google, Twilio, Stripe, reCAPTCHA).
+
+## Python Version
+Python 3.11.0
+
 ## Install Required Dependencies
 
 ```bash
@@ -9,8 +29,9 @@ The objective of this project is for students to apply the knowledge and skills 
 ```
 
 ## MySQL Database Scripts
+Configure your own MySQL Database connection
 
-[DB Scripts](https://github.com/Diablo2912/NYP-Y2-S1-System-Security-Project/blob/master/db_script.txt)
+[DB Scripts]([https://linktodocumentation](https://github.com/Diablo2912/NYP-Y2-S1-System-Security-Project/blob/master/db_script.sql))
 
 ## Group Members
 
