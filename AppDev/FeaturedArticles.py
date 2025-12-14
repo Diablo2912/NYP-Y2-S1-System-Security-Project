@@ -1,8 +1,12 @@
-from newsapi import NewsApiClient
+import os
 
+from newsapi import NewsApiClient
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def get_featured_articles():
-    api_key = '4e7c5fd299724d639e7d9e42ad933770'
+    api_key = os.getenv("NEWS_API_KEY")
     newsapi = NewsApiClient(api_key=api_key)
 
     try:
