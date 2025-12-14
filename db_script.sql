@@ -31,8 +31,7 @@ CREATE TABLE frozen_account (
     user_id INT NOT NULL,
     reason VARCHAR(255),
     frozen_at DATETIME,
-    is_frozen TINYINT(1) DEFAULT 1,
-    CONSTRAINT fk_frozen_user FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE CASCADE
+    is_frozen TINYINT(1) DEFAULT 1
 );
 
 -- Table: ip_blocklist
@@ -41,8 +40,7 @@ CREATE TABLE ip_blocklist (
     reason VARCHAR(255),
     created_by INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at DATE,
-    CONSTRAINT fk_ipblock_user FOREIGN KEY (created_by) REFERENCES accounts(id) ON DELETE SET NULL
+    expires_at DATE
 );
 
 -- Table: ip_geo_cache
@@ -64,8 +62,7 @@ CREATE TABLE logs (
     category VARCHAR(45),
     activity VARCHAR(255),
     status VARCHAR(45),
-    ip_address VARCHAR(100),
-    CONSTRAINT fk_logs_user FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE SET NULL
+    ip_address VARCHAR(100)
 );
 
 -- Table: password_resets
@@ -88,9 +85,7 @@ CREATE TABLE session_flags (
     resolved_by INT,
     resolved_at DATETIME,
     resolution_note VARCHAR(255),
-    created_at DATETIME,
-    CONSTRAINT fk_flags_user FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE CASCADE,
-    CONSTRAINT fk_flags_resolver FOREIGN KEY (resolved_by) REFERENCES accounts(id) ON DELETE SET NULL
+    created_at DATETIME
 );
 
 -- Table: unfreeze_requests
@@ -102,8 +97,7 @@ CREATE TABLE unfreeze_requests (
     full_name VARCHAR(100),
     email VARCHAR(100),
     phone_number VARCHAR(20),
-    details TEXT,
-    CONSTRAINT fk_unfreeze_user FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE CASCADE
+    details TEXT
 );
 
 -- Table: user_actions_log
@@ -112,8 +106,7 @@ CREATE TABLE user_actions_log (
     user_id INT,
     session_id INT,
     action VARCHAR(255),
-    timestamp DATETIME,
-    CONSTRAINT fk_actions_user FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE SET NULL
+    timestamp DATETIME
 );
 
 -- Table: user_session_activity
